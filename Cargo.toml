@@ -1,0 +1,11 @@
+[package]
+name = "sailor"
+version = "0.1.0"
+authors = ["Noah Hüsser <yatekii@yatekii.ch>"]
+edition = "2018"
+
+[dependencies]structopt = "*"
+quick-protobuf = "*"
+lyon = { features = ["extra"] }
+glium = "0.22.0"
+varint = "*"
