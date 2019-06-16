@@ -27,29 +27,26 @@ pub enum Command {
 
 pub struct Parameter(u32);
 
-fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, cursor: &mut usize) -> Path {
+fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, cursor: &mut usize, gcursor: &mut Point) -> Path {
     let mut builder = Path::builder();
 
     while *cursor < geometry.len() {
         let value = geometry[*cursor];
         *cursor += 1;
 
-        let mut c = point(0f32, 0f32);
-
-        println!("Extent: {}", extent);
+        println!("{:?}", gcursor);
 
         let count = value >> 3;
         match value & 0x07 {
             1 => {
                 for i in 0..count {
-                    println!("{:?}, {:?}", ZigZag::<i32>::zigzag(&geometry[*cursor]), *cursor);
                     let x = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
-                    println!("{:?}, {:?}", ZigZag::<i32>::zigzag(&geometry[*cursor]), *cursor);
                     let y = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
-                    c += vector(x, y);
-                    builder.move_to(c - vector(1.0, 1.0));
+                    *gcursor += vector(x, y);
+                    println!("{:?}", gcursor);
+                    builder.move_to(*gcursor - vector(1.0, 1.0));
                 }
                 match geometry_type {
                     GeomType::POINT => return builder.build(),
@@ -58,14 +55,13 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
             },
             2 => {
                 for i in 0..count {
-                    println!("{:?}, {:?}", ZigZag::<i32>::zigzag(&geometry[*cursor]), *cursor);
                     let x = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
-                    println!("{:?}, {:?}", ZigZag::<i32>::zigzag(&geometry[*cursor]), *cursor);
                     let y = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
-                    c += vector(x, y);
-                    builder.line_to(c - vector(1.0, 1.0));
+                    *gcursor += vector(x, y);
+                    println!("{:?}", gcursor);
+                    builder.line_to(*gcursor - vector(1.0, 1.0));
                 }
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),
@@ -96,10 +92,12 @@ pub fn geometry_commands_to_drawable(geometry_type: GeomType, geometry: &Vec<u32
 
     println!("parsing geometry");
 
+    let mut c = point(0f32, 0f32);
+
     if geometry_type == GeomType::POLYGON {
         while cursor < geometry.len() {
             println!("REAL {}", cursor);
-            let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor);
+            let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
             
             let mut tessellator = FillTessellator::new();
             let mut tmesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
