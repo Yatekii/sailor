@@ -35,7 +35,26 @@ fn main() {
     //     CLI::InspectTile { path } => tile::vector_tile_to_vbo(path),
     // }
 
-    let layers = crate::vector_tile::vector_tile_to_mesh("data/test.pbf");
+    let z = 8;
+    let (x, y) = crate::vector_tile::math::deg2num(47.3769, 8.5417, z);
+    let zxy: String = format!("/{}/{}/{}", z, x, y);
+    std::fs::create_dir_all(format!("cache{}", zxy)).expect("Could not create cache directories.");
+
+    let request_url = format!("https://api.maptiler.com/tiles/v3{}.pbf?key=t2mP0OQnprAXkW20R6Wd", zxy);
+    println!("{}", request_url);
+    let mut resp = reqwest::get(&request_url).expect("Could not load tile.");
+    if resp.status() != reqwest::StatusCode::OK {
+        panic!("Tile request failed.");
+    }
+    let mut data: Vec<u8> = vec![];
+    resp.copy_to(&mut data).expect("Could not read http response to buffer.");
+    let pbf = format!("cache{}.pbf", zxy);
+    let mut file = std::fs::File::create(&pbf).expect("Could not create pbf file.");
+
+    use std::io::Write;
+    file.write_all(&data[..]).expect("Could not write bytes.");
+
+    let layers = crate::vector_tile::vector_tile_to_mesh(pbf);
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let context = glium::glutin::ContextBuilder::new().with_vsync(true);
@@ -45,7 +64,12 @@ fn main() {
         .with_title("lyon + glium basic example");
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
+    const GREEN: [f32; 3] = [0.035, 0.678, 0.431f32];
+    const BLUE: [f32; 3] = [0.239, 0.824, 1.0f32];
+    const YELLOW: [f32; 3] = [1.0, 0.894, 0.408];
+
     let data = layers.iter().filter_map(|l| {
+        println!("{}", l.name);
         let vertex_buffer = glium::VertexBuffer::new(&display, &l.mesh.vertices).unwrap();
         let indices = glium::IndexBuffer::new(
             &display,
@@ -54,12 +78,12 @@ fn main() {
         ).unwrap();
         let uniforms = uniform! {
             layer_color: match &l.name[..] {
-                "water" => [0.0, 0.0, 1.0f32],
+                "water" => BLUE,
                 "waterway" => return None,
-                "landcover" => [1.0, 0.0, 0.0f32],
-                "landuse" => return None,
+                "landcover" => GREEN,
+                "landuse" => YELLOW,
                 "mountain_peak" => return None,
-                "park" => [0.0, 1.0, 0.0f32],
+                "park" => GREEN,
                 "boundary" => return None,
                 "transportation" => return None,
                 "transportation_name" => return None,
