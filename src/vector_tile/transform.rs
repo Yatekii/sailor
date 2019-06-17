@@ -2,11 +2,13 @@ use crate::vector_tile::*;
 use quick_protobuf::{MessageRead, BytesReader};
 use lyon::tessellation::geometry_builder::VertexBuffers;
 use crate::render::Vertex;
+use std::time;
 
 use std::fs::File;
 use std::io::Read;
 
 pub fn vector_tile_to_mesh(path: impl Into<String>) -> VertexBuffers<Vertex, u16> {
+    let t = time::Instant::now();
     let mut f = File::open(path.into()).expect("Unable to open file.");
     let mut buffer = Vec::new();
     // read the whole file
@@ -22,13 +24,15 @@ pub fn vector_tile_to_mesh(path: impl Into<String>) -> VertexBuffers<Vertex, u16
     let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
 
     for feature in &tile.layers[0].features {
-        let tmesh = crate::vector_tile::geometry_commands_to_drawable(feature.type_pb, &feature.geometry, tile.layers[0].extent);
+        let mut tmesh = crate::vector_tile::geometry_commands_to_drawable(feature.type_pb, &feature.geometry, tile.layers[0].extent);
+        for index in 0..tmesh.indices.len() {
+            tmesh.indices[index] += mesh.vertices.len() as u16;
+        }
         mesh.vertices.extend(tmesh.vertices);
         mesh.indices.extend(tmesh.indices);
     }
 
-    println!("File contains {} layers.", tile.layers.len());
-    // println!("Layer 1: {:#?}", tile.layers[0]);
+    println!("Took {} ms.", t.elapsed().as_millis());
 
     mesh
 }

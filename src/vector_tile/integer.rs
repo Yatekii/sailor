@@ -18,7 +18,8 @@ use crate::render::{
 use crate::vector_tile::mod_Tile::GeomType;
 
 fn area(path: &Path) -> f32 {
-    let points = path.points();
+    let mut points = path.points().to_vec();
+    points.push(points.first().expect("Path contains no points!").clone());
     let mut area = 0f32;
     for i in 0..points.len() - 1 {
         area += points[i].x * points[i + 1].y;
@@ -36,8 +37,6 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
         let value = geometry[*cursor];
         *cursor += 1;
 
-        println!("{:?}", gcursor);
-
         let count = value >> 3;
         match value & 0x07 {
             1 => {
@@ -47,7 +46,7 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
                     let y = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
                     *gcursor += vector(x, y);
-                    builder.move_to(*gcursor * 4.0 - vector(1.0, 1.0));
+                    builder.move_to((*gcursor - vector(0.5, 0.5)) * 2.0);
                 }
                 match geometry_type {
                     GeomType::POINT => return builder.build(),
@@ -61,7 +60,7 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
                     let y = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
                     *gcursor += vector(x, y);
-                    builder.line_to(*gcursor * 4.0 - vector(1.0, 1.0));
+                    builder.line_to((*gcursor - vector(0.5, 0.5)) * 2.0);
                 }
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),
@@ -77,7 +76,6 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
                     GeomType::POLYGON => {
                         let path = builder.build();
                         if area(&path) < 0f32 {
-                            println!("KEKKEKEKEKEKEK");
                             return path;
                         } else {
                             return path;
@@ -98,13 +96,10 @@ pub fn geometry_commands_to_drawable(geometry_type: GeomType, geometry: &Vec<u32
     let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
     let mut cursor = 0;
 
-    println!("parsing geometry");
-
     let mut c = point(0f32, 0f32);
 
     if geometry_type == GeomType::POLYGON {
         while cursor < geometry.len() {
-            println!("REAL {}", cursor);
             let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
             
             let mut tessellator = FillTessellator::new();
@@ -117,6 +112,9 @@ pub fn geometry_commands_to_drawable(geometry_type: GeomType, geometry: &Vec<u32
                 )
                 .expect("Failed to tesselate path.");
 
+            for index in 0..tmesh.indices.len() {
+                tmesh.indices[index] += mesh.vertices.len() as u16;
+            }
             mesh.vertices.extend(tmesh.vertices);
             mesh.indices.extend(tmesh.indices);
         }
@@ -130,4 +128,14 @@ pub fn geometry_commands_to_drawable(geometry_type: GeomType, geometry: &Vec<u32
     );
 
     mesh
+}
+
+#[cfg(test)]
+mod test {
+    use super::{ GeomType, point, parse_one_to_path };
+    #[test]
+    fn transform_geometry() {
+        let path = parse_one_to_path(GeomType::POLYGON, &vec![9, 1248, 2270, 250, 16, 36, 64, 15, 98, 264, 4, 74, 120, 162, 25, 48, 34, 25, 25, 32, 43, 11, 11, 28, 6, 88, 70, 90, 45, 76, 68, 108, 3, 266, 31, 50, 35, 11, 38, 28, 97, 15, 27, 45, 19, 7, 5, 22, 2, 19, 27, 1, 9, 131, 30, 187, 19, 173, 143, 375, 27, 177, 69, 147, 70, 49, 15], 4096, &mut 0, &mut point(0.0, 0.0));
+        dbg!(path);
+    }
 }
