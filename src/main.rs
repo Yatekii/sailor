@@ -39,7 +39,7 @@ fn main() {
     // let (x, y) = crate::vector_tile::math::deg2num(40.7128, 74.0060, z);
 
     let data = vector_tile::fetch_tile_data(z, x, y);
-    let layers = crate::vector_tile::vector_tile_to_mesh(&data);
+    let mut layers = crate::vector_tile::vector_tile_to_mesh(&data);
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let context = glium::glutin::ContextBuilder::new().with_vsync(true);
@@ -49,22 +49,11 @@ fn main() {
         .with_title("lyon + glium basic example");
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
-    let data = layers.iter().map(|l| {
-        println!("{}", l.name);
-        let vertex_buffer = glium::VertexBuffer::new(&display, &l.mesh.vertices).unwrap();
-        let indices = glium::IndexBuffer::new(
-            &display,
-            glium::index::PrimitiveType::TrianglesList,
-            &l.mesh.indices,
-        ).unwrap();
-        let uniforms = uniform! {
-            layer_color: l.color.clone()
-        };
-        (vertex_buffer, indices, uniforms)
-    }).collect::<Vec<_>>();
+    for layer in &mut layers {
+        layer.load(&display)
+    }
     
-    let program = glium::Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None)
-        .unwrap();
+    let program = glium::Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
 
     let mut status = true;
     loop {
@@ -74,14 +63,8 @@ fn main() {
 
         let mut target = display.draw();
         target.clear_color(0.8, 0.8, 0.8, 1.0);
-        for d in &data {
-            target.draw(
-                &d.0,
-                &d.1,
-                &program,
-                &d.2,
-                &Default::default(),
-            ).unwrap();
+        for layer in &layers {
+            layer.draw(&mut target, &program);
         }
 
         target.finish().unwrap();

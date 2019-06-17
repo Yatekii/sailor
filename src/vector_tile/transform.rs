@@ -49,18 +49,17 @@ pub fn vector_tile_to_mesh(data: &Vec<u8>) -> Vec<crate::render::Layer> {
 
         match &layer.name.to_string()[..] {
             "water" | "park" | "landcover" | "landuse" => {
-                layers.push(crate::render::Layer {
-                    name: layer.name.to_string(),
-                    id: 0,
-                    mesh: mesh,
-                    color: match &layer.name[..] {
+                layers.push(crate::render::Layer::new(
+                    layer.name.to_string(),
+                    mesh,
+                    match &layer.name[..] {
                         "water" => BLUE,
                         "landcover" => GREEN,
                         "landuse" => YELLOW,
                         "park" => GREEN,
                         _ => panic!("This is a bug. Please report it."),
                     }
-                })
+                ))
             },
             _ => {}
         }
