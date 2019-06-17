@@ -1,4 +1,3 @@
-mod postgis;
 mod vector_tile;
 mod render;
 
