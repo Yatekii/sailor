@@ -12,7 +12,7 @@ use varint::ZigZag;
 
 use crate::render::{
     Vertex,
-    VertexCtor,
+    LayerVertexCtor,
 };
 
 use crate::vector_tile::mod_Tile::GeomType;
@@ -108,7 +108,7 @@ pub fn geometry_commands_to_drawable(geometry_type: GeomType, geometry: &Vec<u32
                 .tessellate_path(
                     &path,
                     &FillOptions::tolerance(0.01),
-                    &mut BuffersBuilder::new(&mut tmesh, VertexCtor),
+                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor),
                 )
                 .expect("Failed to tesselate path.");
 
@@ -119,13 +119,6 @@ pub fn geometry_commands_to_drawable(geometry_type: GeomType, geometry: &Vec<u32
             mesh.indices.extend(tmesh.indices);
         }
     }
-    
-
-    println!(
-        " -- fill: {} vertices {} indices",
-        mesh.vertices.len(),
-        mesh.indices.len()
-    );
 
     mesh
 }

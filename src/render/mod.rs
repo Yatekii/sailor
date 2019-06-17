@@ -1,6 +1,11 @@
 mod vertex;
+mod layer;
 
 pub use vertex::{
     Vertex,
-    VertexCtor,
+    LayerVertexCtor,
+};
+
+pub use layer::{
+    Layer,
 };

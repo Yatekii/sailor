@@ -7,7 +7,7 @@ use std::time;
 use std::fs::File;
 use std::io::Read;
 
-pub fn vector_tile_to_mesh(path: impl Into<String>) -> VertexBuffers<Vertex, u16> {
+pub fn vector_tile_to_mesh(path: impl Into<String>) -> Vec<crate::render::Layer> {
     let t = time::Instant::now();
     let mut f = File::open(path.into()).expect("Unable to open file.");
     let mut buffer = Vec::new();
@@ -19,20 +19,27 @@ pub fn vector_tile_to_mesh(path: impl Into<String>) -> VertexBuffers<Vertex, u16
 
     let tile = Tile::from_reader(&mut reader, &buffer).expect("Cannot read Tile object.");
 
-    println!("Layer {:?}", tile.layers[0].name);
+    let mut layers = vec![];
 
-    let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
+    for layer in &tile.layers {
+        let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
 
-    for feature in &tile.layers[0].features {
-        let mut tmesh = crate::vector_tile::geometry_commands_to_drawable(feature.type_pb, &feature.geometry, tile.layers[0].extent);
-        for index in 0..tmesh.indices.len() {
-            tmesh.indices[index] += mesh.vertices.len() as u16;
+        for feature in &layer.features {
+            let mut tmesh = crate::vector_tile::geometry_commands_to_drawable(feature.type_pb, &feature.geometry, tile.layers[0].extent);
+            for index in 0..tmesh.indices.len() {
+                tmesh.indices[index] += mesh.vertices.len() as u16;
+            }
+            mesh.vertices.extend(tmesh.vertices);
+            mesh.indices.extend(tmesh.indices);
         }
-        mesh.vertices.extend(tmesh.vertices);
-        mesh.indices.extend(tmesh.indices);
+        layers.push(crate::render::Layer {
+            name: layer.name.to_string(),
+            id: 0,
+            mesh: mesh,
+        })
     }
 
     println!("Took {} ms.", t.elapsed().as_millis());
 
-    mesh
+    layers
 }

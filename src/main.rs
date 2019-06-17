@@ -35,7 +35,7 @@ fn main() {
     //     CLI::InspectTile { path } => tile::vector_tile_to_vbo(path),
     // }
 
-    let mesh = crate::vector_tile::vector_tile_to_mesh("data/test.pbf");
+    let layers = crate::vector_tile::vector_tile_to_mesh("data/test.pbf");
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let context = glium::glutin::ContextBuilder::new().with_vsync(true);
@@ -45,12 +45,31 @@ fn main() {
         .with_title("lyon + glium basic example");
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
-    let vertex_buffer = glium::VertexBuffer::new(&display, &mesh.vertices).unwrap();
-    let indices = glium::IndexBuffer::new(
-        &display,
-        glium::index::PrimitiveType::TrianglesList,
-        &mesh.indices,
-    ).unwrap();
+    let data = layers.iter().filter_map(|l| {
+        let vertex_buffer = glium::VertexBuffer::new(&display, &l.mesh.vertices).unwrap();
+        let indices = glium::IndexBuffer::new(
+            &display,
+            glium::index::PrimitiveType::TrianglesList,
+            &l.mesh.indices,
+        ).unwrap();
+        let uniforms = uniform! {
+            layer_color: match &l.name[..] {
+                "water" => [0.0, 0.0, 1.0f32],
+                "waterway" => return None,
+                "landcover" => [1.0, 0.0, 0.0f32],
+                "landuse" => return None,
+                "mountain_peak" => return None,
+                "park" => [0.0, 1.0, 0.0f32],
+                "boundary" => return None,
+                "transportation" => return None,
+                "transportation_name" => return None,
+                "place" => return None,
+                _ => return None,
+            }
+        };
+        Some((vertex_buffer, indices, uniforms))
+    }).collect::<Vec<_>>();
+    
     let program = glium::Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None)
         .unwrap();
 
@@ -62,13 +81,15 @@ fn main() {
 
         let mut target = display.draw();
         target.clear_color(0.8, 0.8, 0.8, 1.0);
-        target.draw(
-            &vertex_buffer,
-            &indices,
-            &program,
-            &glium::uniforms::EmptyUniforms,
-            &Default::default(),
-        ).unwrap();
+        for d in &data {
+            target.draw(
+                &d.0,
+                &d.1,
+                &program,
+                &d.2,
+                &Default::default(),
+            ).unwrap();
+        }
 
         target.finish().unwrap();
 

@@ -9,8 +9,9 @@ pub struct Vertex {
 implement_vertex!(Vertex, position);
 
 // A very simple vertex constructor that only outputs the vertex position
-pub struct VertexCtor;
-impl VertexConstructor<tessellation::FillVertex, Vertex> for VertexCtor {
+pub struct LayerVertexCtor;
+
+impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
     fn new_vertex(&mut self, vertex: tessellation::FillVertex) -> Vertex {
         assert!(!vertex.position.x.is_nan());
         assert!(!vertex.position.y.is_nan());
