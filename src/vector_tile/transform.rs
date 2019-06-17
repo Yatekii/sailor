@@ -42,11 +42,28 @@ pub fn vector_tile_to_mesh(data: &Vec<u8>) -> Vec<crate::render::Layer> {
             mesh.vertices.extend(tmesh.vertices);
             mesh.indices.extend(tmesh.indices);
         }
-        layers.push(crate::render::Layer {
-            name: layer.name.to_string(),
-            id: 0,
-            mesh: mesh,
-        })
+
+        const GREEN: [f32; 3] = [0.035, 0.678, 0.431f32];
+        const BLUE: [f32; 3] = [0.239, 0.824, 1.0f32];
+        const YELLOW: [f32; 3] = [1.0, 0.894, 0.408];
+
+        match &layer.name.to_string()[..] {
+            "water" | "park" | "landcover" | "landuse" => {
+                layers.push(crate::render::Layer {
+                    name: layer.name.to_string(),
+                    id: 0,
+                    mesh: mesh,
+                    color: match &layer.name[..] {
+                        "water" => BLUE,
+                        "landcover" => GREEN,
+                        "landuse" => YELLOW,
+                        "park" => GREEN,
+                        _ => panic!("This is a bug. Please report it."),
+                    }
+                })
+            },
+            _ => {}
+        }
     }
 
     println!("Took {} ms.", t.elapsed().as_millis());

@@ -49,11 +49,7 @@ fn main() {
         .with_title("lyon + glium basic example");
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
-    const GREEN: [f32; 3] = [0.035, 0.678, 0.431f32];
-    const BLUE: [f32; 3] = [0.239, 0.824, 1.0f32];
-    const YELLOW: [f32; 3] = [1.0, 0.894, 0.408];
-
-    let data = layers.iter().filter_map(|l| {
+    let data = layers.iter().map(|l| {
         println!("{}", l.name);
         let vertex_buffer = glium::VertexBuffer::new(&display, &l.mesh.vertices).unwrap();
         let indices = glium::IndexBuffer::new(
@@ -62,21 +58,9 @@ fn main() {
             &l.mesh.indices,
         ).unwrap();
         let uniforms = uniform! {
-            layer_color: match &l.name[..] {
-                "water" => BLUE,
-                "waterway" => return None,
-                "landcover" => GREEN,
-                "landuse" => YELLOW,
-                "mountain_peak" => return None,
-                "park" => GREEN,
-                "boundary" => return None,
-                "transportation" => return None,
-                "transportation_name" => return None,
-                "place" => return None,
-                _ => return None,
-            }
+            layer_color: l.color.clone()
         };
-        Some((vertex_buffer, indices, uniforms))
+        (vertex_buffer, indices, uniforms)
     }).collect::<Vec<_>>();
     
     let program = glium::Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None)
