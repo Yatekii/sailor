@@ -1,8 +1,6 @@
-use quick_protobuf::Reader;
-
 use crate::vector_tile::*;
 use quick_protobuf::{MessageRead, BytesReader};
-use lyon::tessellation::geometry_builder::{VertexConstructor, VertexBuffers, BuffersBuilder};
+use lyon::tessellation::geometry_builder::VertexBuffers;
 use crate::render::Vertex;
 
 use std::fs::File;

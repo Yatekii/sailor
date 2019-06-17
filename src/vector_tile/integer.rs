@@ -1,10 +1,13 @@
-use lyon::extra::rust_logo::build_logo_path;
-use lyon::path::builder::*;
 use lyon::path::Path;
 use lyon::math::*;
-use lyon::tessellation::geometry_builder::{VertexConstructor, VertexBuffers, BuffersBuilder};
-use lyon::tessellation::{FillTessellator, FillOptions};
-use lyon::tessellation;
+use lyon::tessellation::geometry_builder::{
+    VertexBuffers,
+    BuffersBuilder,
+};
+use lyon::tessellation::{
+    FillTessellator,
+    FillOptions,
+};
 use varint::ZigZag;
 
 use crate::render::{
@@ -14,18 +17,17 @@ use crate::render::{
 
 use crate::vector_tile::mod_Tile::GeomType;
 
-pub enum Integer {
-    Command,
-    Parameter,
+fn area(path: &Path) -> f32 {
+    let points = path.points();
+    let mut area = 0f32;
+    for i in 0..points.len() - 1 {
+        area += points[i].x * points[i + 1].y;
+    }
+    for i in 0..points.len() - 1 {
+        area -= points[i + 1].x * points[i].y;
+    }
+    area + points[points.len() - 1].x * points[1].y - points[points.len() - 1].y * points[1].x
 }
-
-pub enum Command {
-    MoveTo(u32, u32),
-    LineTo(u32, u32),
-    ClosePath,
-}
-
-pub struct Parameter(u32);
 
 fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, cursor: &mut usize, gcursor: &mut Point) -> Path {
     let mut builder = Path::builder();
@@ -39,14 +41,13 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
         let count = value >> 3;
         match value & 0x07 {
             1 => {
-                for i in 0..count {
+                for _ in 0..count {
                     let x = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
                     let y = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
                     *gcursor += vector(x, y);
-                    println!("{:?}", gcursor);
-                    builder.move_to(*gcursor - vector(1.0, 1.0));
+                    builder.move_to(*gcursor * 4.0 - vector(1.0, 1.0));
                 }
                 match geometry_type {
                     GeomType::POINT => return builder.build(),
@@ -54,14 +55,13 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
                 }
             },
             2 => {
-                for i in 0..count {
+                for _ in 0..count {
                     let x = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
                     let y = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
                     *gcursor += vector(x, y);
-                    println!("{:?}", gcursor);
-                    builder.line_to(*gcursor - vector(1.0, 1.0));
+                    builder.line_to(*gcursor * 4.0 - vector(1.0, 1.0));
                 }
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),
@@ -74,7 +74,15 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),
                     GeomType::LINESTRING => panic!("This is a bug. Please report it."),
-                    GeomType::POLYGON => return builder.build(),
+                    GeomType::POLYGON => {
+                        let path = builder.build();
+                        if area(&path) < 0f32 {
+                            println!("KEKKEKEKEKEKEK");
+                            return path;
+                        } else {
+                            return path;
+                        }
+                    },
                     _ => panic!("This is a bug. Please report it."),
                 }
             },

@@ -20,11 +20,11 @@ use glium::glutin::dpi::LogicalSize;
 enum CLI {
     #[structopt(name = "import_map")]
     ImportMap {
-        path: String,
+        _path: String,
     },
     #[structopt(name = "inspect_tile")]
     InspectTile {
-        path: String,
+        _path: String,
     },
 }
 
