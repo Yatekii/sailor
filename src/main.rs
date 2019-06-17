@@ -37,24 +37,10 @@ fn main() {
 
     let z = 8;
     let (x, y) = crate::vector_tile::math::deg2num(47.3769, 8.5417, z);
-    let zxy: String = format!("/{}/{}/{}", z, x, y);
-    std::fs::create_dir_all(format!("cache{}", zxy)).expect("Could not create cache directories.");
+    // let (x, y) = crate::vector_tile::math::deg2num(40.7128, 74.0060, z);
 
-    let request_url = format!("https://api.maptiler.com/tiles/v3{}.pbf?key=t2mP0OQnprAXkW20R6Wd", zxy);
-    println!("{}", request_url);
-    let mut resp = reqwest::get(&request_url).expect("Could not load tile.");
-    if resp.status() != reqwest::StatusCode::OK {
-        panic!("Tile request failed.");
-    }
-    let mut data: Vec<u8> = vec![];
-    resp.copy_to(&mut data).expect("Could not read http response to buffer.");
-    let pbf = format!("cache{}.pbf", zxy);
-    let mut file = std::fs::File::create(&pbf).expect("Could not create pbf file.");
-
-    use std::io::Write;
-    file.write_all(&data[..]).expect("Could not write bytes.");
-
-    let layers = crate::vector_tile::vector_tile_to_mesh(pbf);
+    let data = vector_tile::fetch_tile_data(z, x, y);
+    let layers = crate::vector_tile::vector_tile_to_mesh(&data);
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let context = glium::glutin::ContextBuilder::new().with_vsync(true);

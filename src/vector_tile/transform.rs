@@ -4,20 +4,13 @@ use lyon::tessellation::geometry_builder::VertexBuffers;
 use crate::render::Vertex;
 use std::time;
 
-use std::fs::File;
-use std::io::Read;
-
-pub fn vector_tile_to_mesh(path: impl Into<String>) -> Vec<crate::render::Layer> {
+pub fn vector_tile_to_mesh(data: &Vec<u8>) -> Vec<crate::render::Layer> {
     let t = time::Instant::now();
-    let mut f = File::open(path.into()).expect("Unable to open file.");
-    let mut buffer = Vec::new();
-    // read the whole file
-    f.read_to_end(&mut buffer).expect("Unable to read file.");
 
     // we can build a bytes reader directly out of the bytes
-    let mut reader = BytesReader::from_bytes(&buffer);
+    let mut reader = BytesReader::from_bytes(&data);
 
-    let tile = Tile::from_reader(&mut reader, &buffer).expect("Cannot read Tile object.");
+    let tile = Tile::from_reader(&mut reader, &data).expect("Cannot read Tile object.");
 
     let mut layers = vec![];
 
