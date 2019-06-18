@@ -1,4 +1,8 @@
 use std::f32::consts::PI;
+use lyon::math::{
+    Point,
+    point,
+};
 
 fn deg2rad(deg: f32) -> f32 {
     2.0 * PI * deg / 360.0
@@ -29,4 +33,28 @@ pub fn num2deg(xtile: u32, ytile: u32, zoom: u32) -> (f32, f32) {
     let lat_rad = ((PI * (1f32 - 2f32 * ytile as f32 / n)).sinh()).atan();
     let lat_deg = rad2deg(lat_rad);
     (lat_deg, lon_deg)
+}
+
+pub struct BoundingBox {
+    topleft: Point,
+    bottomright: Point,
+}
+
+impl BoundingBox {
+    pub fn new(topleft: Point, bottomright: Point) -> Self {
+        Self {
+            topleft,
+            bottomright,
+        }
+    }
+
+    pub fn get_tile_boundaries_for_zoom_level(&self, z: u32) -> ((u32, u32), (u32, u32)) {
+        (deg2num(self.topleft.x, self.topleft.y, z), deg2num(self.bottomright.x, self.bottomright.y, z))
+    }
+}
+
+#[test]
+fn get_tile_boundaries_for_8_zoom() {
+    let bb = BoundingBox::new(point(47.607371, 6.114297), point(46.047108, 10.212341));
+    dbg!(bb.get_tile_boundaries_for_zoom_level(8));
 }
