@@ -3,7 +3,7 @@ use lyon::tessellation::geometry_builder::VertexConstructor;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
-    position: [f32; 2],
+    pub position: [f32; 2],
 }
 
 implement_vertex!(Vertex, position);
@@ -17,8 +17,6 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         assert!(!vertex.position.y.is_nan());
         // println!("{:?}", vertex.position);
         Vertex {
-            // (ugly hack) tweak the vertext position so that the logo fits roughly
-            // within the (-1.0, 1.0) range.
             position: vertex.position.to_array(),
         }
     }

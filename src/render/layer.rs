@@ -3,6 +3,7 @@ use lyon::tessellation::geometry_builder::{
 };
 
 use crate::render::Vertex;
+use lyon::math::Point;
 
 pub struct Layer {
     pub name: String,
@@ -32,14 +33,15 @@ impl Layer {
         self.gpu_data = Some((vertex_buffer, indices));
     }
 
-    pub fn draw(&self, target: &mut impl glium::Surface, program: &glium::Program) {
+    pub fn draw(&self, target: &mut impl glium::Surface, program: &glium::Program, pan: Point) {
         if let Some(gpu_data) = &self.gpu_data {
             target.draw(
                 &gpu_data.0,
                 &gpu_data.1,
                 &program,
                 &uniform! {
-                    layer_color: self.color.clone()
+                    layer_color: self.color.clone(),
+                    pan: (pan.x, pan.y),
                 },
                 &Default::default(),
             ).unwrap();

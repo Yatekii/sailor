@@ -10,6 +10,8 @@ use structopt::StructOpt;
 use glium::Surface;
 use glium::glutin::dpi::LogicalSize;
 
+use crate::vector_tile::*;
+
 #[derive(StructOpt)]
 #[structopt(
     name = "Sailor",
@@ -35,11 +37,17 @@ fn main() {
     // }
 
     let z = 8;
-    let (x, y) = crate::vector_tile::math::deg2num(47.3769, 8.5417, z);
-    // let (x, y) = crate::vector_tile::math::deg2num(40.7128, 74.0060, z);
+    let (x, y) = dbg!(math::deg2tile(47.3769, 8.5417, z));
+    let num = dbg!(math::deg2num(47.3769, 8.5417, z));
+    let tile = math::tile_to_global_space(z, x, y, lyon::math::point(0.0, 0.0));
+    dbg!(tile);
+    let zurich = math::num_to_global_space(z, x as f32, y as f32);
+    dbg!(zurich);
+    let zurich: lyon::math::Point = lyon::math::point(10720.039, 7120.0513);
+    // let (x, y) = crate::vector_tile::math::deg2num(40.7128, 74.0060, z); // NY
 
     let data = vector_tile::fetch_tile_data(z, x, y);
-    let mut layers = crate::vector_tile::vector_tile_to_mesh(&data);
+    let mut layers = crate::vector_tile::vector_tile_to_mesh(z, x, y, &data);
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let context = glium::glutin::ContextBuilder::new().with_vsync(true);
@@ -61,10 +69,13 @@ fn main() {
             break;
         }
 
+        let pan = zurich.clone() * -1.0;
+        let pan = lyon::math::point(0.0, 0.0f32);
+
         let mut target = display.draw();
         target.clear_color(0.8, 0.8, 0.8, 1.0);
         for layer in &layers {
-            layer.draw(&mut target, &program);
+            layer.draw(&mut target, &program, pan);
         }
 
         target.finish().unwrap();
