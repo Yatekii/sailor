@@ -41,23 +41,20 @@ fn main() {
     // }
 
     let z = 8;
-    let (x, y) = dbg!(math::deg2tile(47.3769, 8.5417, z));
-    let num = math::deg2num(47.3769, 8.5417, z);
-    dbg!(num);
-    let tile = math::tile_to_global_space(z, x, y, lyon::math::point(0.0, 0.0));
-    dbg!(tile);
-    let zurich = math::num_to_global_space(z, num.x, num.y);
-    dbg!(zurich);
+    let tile_id = math::deg2tile(47.3769, 8.5417, z);
+    let tile_coordinate = math::deg2num(47.3769, 8.5417, z);
+    let tile = math::tile_to_global_space(&tile_id, lyon::math::point(0.0, 0.0));
+    let zurich = math::num_to_global_space(&tile_coordinate);
     // let zurich: lyon::math::Point = lyon::math::point(0.525754,0.35115147);
     // let (x, y) = crate::vector_tile::math::deg2num(40.7128, 74.0060, z); // NY
 
-    let data = vector_tile::fetch_tile_data(z, x, y);
-    let mut layers = crate::vector_tile::vector_tile_to_mesh(z, x, y, &data);
-    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y, &vector_tile::fetch_tile_data(z, x+1, y)));
-    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x, y+1, &vector_tile::fetch_tile_data(z, x, y+1)));
-    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y+1, &vector_tile::fetch_tile_data(z, x+1, y+1)));
-    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x, y+2, &vector_tile::fetch_tile_data(z, x, y+2)));
-    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y+2, &vector_tile::fetch_tile_data(z, x+1, y+2)));
+    let data = vector_tile::fetch_tile_data(&tile_id);
+    let mut layers = crate::vector_tile::vector_tile_to_mesh(&tile_id, &data);
+    // layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y, &vector_tile::fetch_tile_data(z, x+1, y)));
+    // layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x, y+1, &vector_tile::fetch_tile_data(z, x, y+1)));
+    // layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y+1, &vector_tile::fetch_tile_data(z, x+1, y+1)));
+    // layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x, y+2, &vector_tile::fetch_tile_data(z, x, y+2)));
+    // layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y+2, &vector_tile::fetch_tile_data(z, x+1, y+2)));
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let context = glium::glutin::ContextBuilder::new().with_vsync(true);

@@ -11,9 +11,7 @@ implement_vertex!(Vertex, position);
 
 // A very simple vertex constructor that only outputs the vertex position
 pub struct LayerVertexCtor {
-    pub z: u32,
-    pub x: u32,
-    pub y: u32,
+    pub tile_id: math::TileId,
 }
 
 impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
@@ -22,7 +20,7 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         assert!(!vertex.position.y.is_nan());
         // println!("{:?}", vertex.position);
         Vertex {
-            position: math::tile_to_global_space(self.z, self.x, self.y, vertex.position).to_array(),
+            position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
         }
     }
 }

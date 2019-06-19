@@ -21,7 +21,7 @@ use crate::render::{
 
 use crate::vector_tile::mod_Tile::GeomType;
 
-pub fn vector_tile_to_mesh(z: u32, x: u32, y: u32, data: &Vec<u8>) -> Vec<crate::render::Layer> {
+pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate::render::Layer> {
     let t = time::Instant::now();
 
     // we can build a bytes reader directly out of the bytes
@@ -36,9 +36,7 @@ pub fn vector_tile_to_mesh(z: u32, x: u32, y: u32, data: &Vec<u8>) -> Vec<crate:
 
         for feature in &layer.features {
             let mut tmesh = geometry_commands_to_drawable(
-                z,
-                x,
-                y,
+                tile_id,
                 feature.type_pb,
                 &feature.geometry,
                 tile.layers[0].extent
@@ -90,7 +88,7 @@ fn area(path: &Path) -> f32 {
     area + points[points.len() - 1].x * points[1].y - points[points.len() - 1].y * points[1].x
 }
 
-fn parse_one_to_path(z: u32, x: u32, y: u32, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, cursor: &mut usize, gcursor: &mut Point) -> Path {
+fn parse_one_to_path(tile_id: &math::TileId, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, cursor: &mut usize, gcursor: &mut Point) -> Path {
     let mut builder = Path::builder();
 
     while *cursor < geometry.len() {
@@ -154,7 +152,7 @@ fn parse_one_to_path(z: u32, x: u32, y: u32, geometry_type: GeomType, geometry: 
     panic!("This is a bug. Please report it.");
 }
 
-fn geometry_commands_to_drawable(z: u32, x: u32, y: u32, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32) -> VertexBuffers<Vertex, u16> {
+fn geometry_commands_to_drawable(tile_id: &math::TileId, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32) -> VertexBuffers<Vertex, u16> {
     let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
     let mut cursor = 0;
 
@@ -162,7 +160,7 @@ fn geometry_commands_to_drawable(z: u32, x: u32, y: u32, geometry_type: GeomType
 
     if geometry_type == GeomType::POLYGON {
         while cursor < geometry.len() {
-            let path = parse_one_to_path(z, x, y, geometry_type, geometry, extent, &mut cursor, &mut c);
+            let path = parse_one_to_path(tile_id, geometry_type, geometry, extent, &mut cursor, &mut c);
             
             let mut tessellator = FillTessellator::new();
             let mut tmesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
@@ -170,7 +168,7 @@ fn geometry_commands_to_drawable(z: u32, x: u32, y: u32, geometry_type: GeomType
                 .tessellate_path(
                     &path,
                     &FillOptions::tolerance(0.0001),
-                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { z, x, y }),
+                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone() }),
                 )
                 .expect("Failed to tesselate path.");
 

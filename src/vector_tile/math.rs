@@ -13,13 +13,11 @@ fn deg2rad(deg: f32) -> f32 {
 //     360.0 * rad / (2.0 * PI)
 // }
 
-pub fn deg2tile(lat_deg: f32, lon_deg: f32, zoom: u32) -> (u32, u32) {
-    let point = deg2num(lat_deg, lon_deg, zoom);
-
-    (point.x as u32, point.y as u32)
+pub fn deg2tile(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileId {
+    deg2num(lat_deg, lon_deg, zoom).into()
 }
 
-pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> Point {
+pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileCoordinate {
     let lat_rad = deg2rad(lat_deg);
     let n = 2f32.powi(zoom as i32);
     let xtile = (lon_deg + 180.0) / 360.0 * n;
@@ -29,7 +27,7 @@ pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> Point {
         ).ln() / PI
     ) / 2.0 * n;
 
-    point(xtile, ytile)
+    TileCoordinate::new(zoom, xtile, ytile)
 }
 
 // pub fn num2deg(xtile: u32, ytile: u32, zoom: u32) -> (f32, f32) {
@@ -40,12 +38,12 @@ pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> Point {
 //     (lat_deg, lon_deg)
 // }
 
-pub fn tile_to_global_space(z: u32, x: u32, y: u32, point: Point) -> Point {
-    (point + vector(x as f32, y as f32)) * 1.0/2f32.powi(z as i32)
+pub fn tile_to_global_space(coordinate: &TileId, point: Point) -> Point {
+    (point + vector(coordinate.x as f32, coordinate.y as f32)) * 1.0/2f32.powi(coordinate.z as i32)
 }
 
-pub fn num_to_global_space(z: u32, x: f32, y: f32) -> Point {
-    point(0.0, 0.0) + vector(x, y) * 1.0/2f32.powi(z as i32)
+pub fn num_to_global_space(coordinate: &TileCoordinate) -> Point {
+    point(0.0, 0.0) + vector(coordinate.x, coordinate.y) * 1.0/2f32.powi(coordinate.z as i32)
 }
 
 // pub fn global_to_tile_space(z: u32, x: u32, y: u32, point: Point) -> Point {
@@ -65,8 +63,79 @@ impl BoundingBox {
         }
     }
 
-    pub fn get_tile_boundaries_for_zoom_level(&self, z: u32) -> ((u32, u32), (u32, u32)) {
+    pub fn get_tile_boundaries_for_zoom_level(&self, z: u32) -> (TileId, TileId) {
         (deg2tile(self.topleft.x, self.topleft.y, z), deg2tile(self.bottomright.x, self.bottomright.y, z))
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct TileId {
+    pub z: u32,
+    pub x: u32,
+    pub y: u32,
+}
+
+impl TileId {
+    pub fn new(z: u32, x: u32, y: u32) -> Self {
+        Self {
+            z, x, y
+        }
+    }
+}
+
+impl From<TileCoordinate> for TileId {
+    fn from(value: TileCoordinate) -> Self {
+        Self {
+            z: value.z,
+            x: value.x as u32,
+            y: value.y as u32,
+        }
+    }
+}
+
+impl std::fmt::Display for TileId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}/{}/{}", self.z, self.x, self.y)
+    } 
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct TileCoordinate {
+    pub z: u32,
+    pub x: f32,
+    pub y: f32,
+}
+
+impl TileCoordinate {
+    pub fn new(z: u32, x: f32, y: f32) -> Self {
+        Self {
+            z, x, y
+        }
+    }
+}
+
+impl From<TileId> for TileCoordinate {
+    fn from(value: TileId) -> Self {
+        Self {
+            z: value.z,
+            x: value.x as f32,
+            y: value.y as f32,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct TileField {
+    pub topleft: TileId,
+    pub bottomright: TileId,
+}
+
+impl TileField {
+    pub fn new(topleft: TileId, bottomright: TileId) -> Self {
+        Self {
+            topleft,
+            bottomright,
+        }
     }
 }
 
