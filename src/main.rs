@@ -49,11 +49,16 @@ fn main() {
 
     let data = vector_tile::fetch_tile_data(z, x, y);
     let mut layers = crate::vector_tile::vector_tile_to_mesh(z, x, y, &data);
+    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y, &vector_tile::fetch_tile_data(z, x+1, y)));
+    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x, y+1, &vector_tile::fetch_tile_data(z, x, y+1)));
+    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y+1, &vector_tile::fetch_tile_data(z, x+1, y+1)));
+    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x, y+2, &vector_tile::fetch_tile_data(z, x, y+2)));
+    layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y+2, &vector_tile::fetch_tile_data(z, x+1, y+2)));
 
     let mut events_loop = glium::glutin::EventsLoop::new();
     let context = glium::glutin::ContextBuilder::new().with_vsync(true);
     let window = glium::glutin::WindowBuilder::new()
-        .with_dimensions(LogicalSize { width: 400.0, height: 400.0 })
+        .with_dimensions(LogicalSize { width: 1200.0, height: 1200.0 })
         .with_decorations(true)
         .with_title("lyon + glium basic example");
     let display = glium::Display::new(window, context, &events_loop).unwrap();
