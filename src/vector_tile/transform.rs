@@ -106,7 +106,7 @@ fn parse_one_to_path(z: u32, x: u32, y: u32, geometry_type: GeomType, geometry: 
                     let dy = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
                     *gcursor += vector(dx, dy);
-                    builder.move_to(math::tile_to_global_space(z, x, y, *gcursor));
+                    builder.move_to(*gcursor);
                     // println!("{}", math::tile_to_global_space(z, x, y, *gcursor)); // (1.7231445,0.74121094)
                 }
                 match geometry_type {
@@ -121,7 +121,7 @@ fn parse_one_to_path(z: u32, x: u32, y: u32, geometry_type: GeomType, geometry: 
                     let dy = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
                     *cursor += 1;
                     *gcursor += vector(dx, dy);
-                    builder.line_to(math::tile_to_global_space(z, x, y, *gcursor));
+                    builder.line_to(*gcursor);
                     // println!("{}", math::tile_to_global_space(z, x, y, *gcursor));
                 }
                 match geometry_type {
@@ -158,7 +158,7 @@ fn geometry_commands_to_drawable(z: u32, x: u32, y: u32, geometry_type: GeomType
     let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
     let mut cursor = 0;
 
-    let mut c = math::tile_to_global_space(z, x, y, point(0f32, 0f32));
+    let mut c = point(0f32, 0f32);
 
     if geometry_type == GeomType::POLYGON {
         while cursor < geometry.len() {
@@ -170,7 +170,7 @@ fn geometry_commands_to_drawable(z: u32, x: u32, y: u32, geometry_type: GeomType
                 .tessellate_path(
                     &path,
                     &FillOptions::tolerance(0.0001),
-                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor),
+                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { z, x, y }),
                 )
                 .expect("Failed to tesselate path.");
 

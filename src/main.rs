@@ -42,7 +42,7 @@ fn main() {
     dbg!(num);
     let tile = math::tile_to_global_space(z, x, y, lyon::math::point(0.0, 0.0));
     dbg!(tile);
-    let zurich = math::num_to_global_space(z, x as f32, y as f32);
+    let zurich = math::num_to_global_space(z, num.x, num.y);
     dbg!(zurich);
     // let zurich: lyon::math::Point = lyon::math::point(0.525754,0.35115147);
     // let (x, y) = crate::vector_tile::math::deg2num(40.7128, 74.0060, z); // NY
