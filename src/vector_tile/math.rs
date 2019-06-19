@@ -41,11 +41,11 @@ pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> Point {
 // }
 
 pub fn tile_to_global_space(z: u32, x: u32, y: u32, point: Point) -> Point {
-    (point + vector(x as f32, y as f32) * 2f32.powi(z as i32)) / 4.0
+    (point + vector(x as f32, y as f32)) * 1.0/2f32.powi(z as i32)
 }
 
 pub fn num_to_global_space(z: u32, x: f32, y: f32) -> Point {
-    (point(0.0, 0.0) + vector(x, y) * 2f32.powi(z as i32)) / 4.0
+    point(0.0, 0.0) + vector(x, y) * 1.0/2f32.powi(z as i32)
 }
 
 // pub fn global_to_tile_space(z: u32, x: u32, y: u32, point: Point) -> Point {

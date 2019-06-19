@@ -2,14 +2,13 @@ use crate::vector_tile::*;
 use quick_protobuf::{MessageRead, BytesReader};
 use std::time;
 
-use lyon_tess2 as tess2;
-use tess2::path::Path;
+use lyon::path::Path;
 use lyon::math::*;
-use tess2::tessellation::geometry_builder::{
+use lyon::tessellation::geometry_builder::{
     VertexBuffers,
     BuffersBuilder,
 };
-use tess2::{
+use lyon::tessellation::{
     FillTessellator,
     FillOptions,
 };
@@ -108,7 +107,7 @@ fn parse_one_to_path(z: u32, x: u32, y: u32, geometry_type: GeomType, geometry: 
                     *cursor += 1;
                     *gcursor += vector(dx, dy);
                     builder.move_to(math::tile_to_global_space(z, x, y, *gcursor));
-                    // println!("{}", math::tile_to_global_space(z, x, y, *gcursor)); // (10720.039,7120.0513)
+                    // println!("{}", math::tile_to_global_space(z, x, y, *gcursor)); // (1.7231445,0.74121094)
                 }
                 match geometry_type {
                     GeomType::POINT => return builder.build(),
@@ -166,18 +165,14 @@ fn geometry_commands_to_drawable(z: u32, x: u32, y: u32, geometry_type: GeomType
             let path = parse_one_to_path(z, x, y, geometry_type, geometry, extent, &mut cursor, &mut c);
             
             let mut tessellator = FillTessellator::new();
-            let mut receiver: VertexBuffers<Point, u16> = VertexBuffers::new();
             let mut tmesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
             tessellator
                 .tessellate_path(
                     &path,
-                    &FillOptions::tolerance(0.01),
-                    &mut lyon::tessellation::geometry_builder::simple_builder(&mut receiver),
+                    &FillOptions::tolerance(0.0001),
+                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor),
                 )
                 .expect("Failed to tesselate path.");
-
-            tmesh.vertices = receiver.vertices.iter().map(|p| Vertex { position: [p.x, p.y] }).collect::<Vec<_>>();
-            tmesh.indices = receiver.indices;
 
             for index in 0..tmesh.indices.len() {
                 tmesh.indices[index] += mesh.vertices.len() as u16;
