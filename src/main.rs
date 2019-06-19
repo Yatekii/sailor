@@ -11,6 +11,10 @@ use glium::Surface;
 use glium::glutin::dpi::LogicalSize;
 
 use crate::vector_tile::*;
+use lyon::math::{
+    point,
+    vector,
+};
 
 #[derive(StructOpt)]
 #[structopt(
@@ -58,7 +62,7 @@ fn main() {
     let mut events_loop = glium::glutin::EventsLoop::new();
     let context = glium::glutin::ContextBuilder::new().with_vsync(true);
     let window = glium::glutin::WindowBuilder::new()
-        .with_dimensions(LogicalSize { width: 1200.0, height: 1200.0 })
+        .with_dimensions(LogicalSize { width: 600.0, height: 600.0 })
         .with_decorations(true)
         .with_title("lyon + glium basic example");
     let display = glium::Display::new(window, context, &events_loop).unwrap();
@@ -68,15 +72,16 @@ fn main() {
     }
     
     let program = glium::Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
+    let mut pan = zurich.clone() * -1.0;
+
+    let mut mouse_down = false;
+    let mut last_pos = glium::glutin::dpi::LogicalPosition::new(0.0, 0.0);
 
     let mut status = true;
     loop {
         if !status {
             break;
         }
-
-        let pan = zurich.clone() * -1.0;
-        
 
         let mut target = display.draw();
         target.clear_color(0.8, 0.8, 0.8, 1.0);
@@ -87,14 +92,35 @@ fn main() {
         target.finish().unwrap();
 
         events_loop.poll_events(|event| {
-            use glium::glutin::{Event, WindowEvent};
+            use glium::glutin::{Event, WindowEvent, ElementState, MouseButton};
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::Destroyed => { status = false }
                     WindowEvent::KeyboardInput {
                         input: glium::glutin::KeyboardInput { virtual_keycode: Some(glium::glutin::VirtualKeyCode::Escape), .. },
                         ..
-                    } => { status = false }
+                    } | WindowEvent::CloseRequested => { status = false },
+                    WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
+                        mouse_down = true;
+                    },
+                    WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
+                        mouse_down = false;
+                    },
+                    WindowEvent::CursorMoved { position, .. } => {
+                        let mut delta = vector(0.0, 0.0);
+                        delta.x = (position.x - last_pos.x) as f32;
+                        delta.y = (position.y - last_pos.y) as f32;
+
+                        let world_to_px = 1.0 / 2.0f32.powi(z as i32) / 600.0 * 2.0;
+                        delta *= world_to_px;
+
+                        println!("{:?}", delta);
+
+                        last_pos = position;
+                        if mouse_down {
+                            pan += delta;
+                        }
+                    }
                     _ => (),
                 }
                 _ => (),
