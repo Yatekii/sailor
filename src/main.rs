@@ -114,8 +114,6 @@ fn main() {
                         let world_to_px = 1.0 / 2.0f32.powi(z as i32) / 600.0 * 2.0;
                         delta *= world_to_px;
 
-                        println!("{:?}", delta);
-
                         last_pos = position;
                         if mouse_down {
                             pan += delta;
