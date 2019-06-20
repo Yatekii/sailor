@@ -67,7 +67,7 @@ fn main() {
     let display = glium::Display::new(window, context, &events_loop).unwrap();
     let program = glium::Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
 
-    let mut painter = crate::painter::Painter::new(&display, &program);
+    let mut painter = crate::render::painter::Painter::new(&display, &program);
     let mut pan = zurich.clone();
 
     let mut screen = math::Screen::new(pan, 600, 600);

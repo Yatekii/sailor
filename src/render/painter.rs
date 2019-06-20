@@ -35,6 +35,7 @@ impl<'a> Painter<'a> {
             self.tile_field = tile_field;
             cache.fetch_tiles(screen);
             self.tiles = cache.get_tiles(screen);
+            dbg!(&self.tiles.len());
 
             for tile in &mut self.tiles {
                 for layer in &mut tile.layers {

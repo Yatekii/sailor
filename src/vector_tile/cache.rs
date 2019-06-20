@@ -15,10 +15,10 @@ impl TileCache {
     pub fn fetch_tiles(&mut self, screen: &math::Screen) {
         let tile_field = screen.get_tile_boundaries_for_zoom_level(8);
         tile_field.iter().for_each(|tile_id| {
-            let data = crate::vector_tile::fetch_tile_data(&tile_id);
-            let layers = crate::vector_tile::vector_tile_to_mesh(&tile_id, &data);
-
             if !self.cache.contains_key(&tile_id) {
+                dbg!(&tile_id);
+                let data = crate::vector_tile::fetch_tile_data(&tile_id);
+                let layers = crate::vector_tile::vector_tile_to_mesh(&tile_id, &data);
                 self.cache.insert(tile_id, Tile { layers });
             }
         })
