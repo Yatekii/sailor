@@ -2,6 +2,7 @@ use std::f32::consts::PI;
 use lyon::math::{
     Point,
     point,
+    Vector,
     vector,
 };
 
@@ -30,12 +31,16 @@ pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileCoordinate {
     TileCoordinate::new(zoom, xtile, ytile)
 }
 
-// pub fn num2deg(xtile: u32, ytile: u32, zoom: u32) -> (f32, f32) {
-//     let n = 2f32.powi(zoom as i32);
-//     let lon_deg = xtile as f32 / n * 360.0 - 180.0;
-//     let lat_rad = ((PI * (1f32 - 2f32 * ytile as f32 / n)).sinh()).atan();
+// pub fn num2deg(tile_coordinate: &TileCoordinate) -> Point {
+//     let n = 2f32.powi(tile_coordinate.z as i32);
+//     let lon_deg = tile_coordinate.x as f32 / n * 360.0 - 180.0;
+//     let lat_rad = ((PI * (1f32 - 2f32 * tile_coordinate.y as f32 / n)).sinh()).atan();
 //     let lat_deg = rad2deg(lat_rad);
-//     (lat_deg, lon_deg)
+//     point(lat_deg, lon_deg)
+// }
+
+// pub fn tile2deg(tile_coordinate: &TileId) -> Point {
+//     num2deg(&tile_coordinate.clone().into())
 // }
 
 pub fn tile_to_global_space(coordinate: &TileId, point: Point) -> Point {
@@ -46,25 +51,43 @@ pub fn num_to_global_space(coordinate: &TileCoordinate) -> Point {
     point(0.0, 0.0) + vector(coordinate.x, coordinate.y) * 1.0/2f32.powi(coordinate.z as i32)
 }
 
+pub fn global_to_num_space(point: &Point, z: u32) -> TileCoordinate {
+    let p = *point / 2f32.powi(-(z as i32));
+    TileCoordinate::new(z, p.x, p.y)
+}
+
 // pub fn global_to_tile_space(z: u32, x: u32, y: u32, point: Point) -> Point {
 //     point - vector(x as f32, y as f32) * 2f32.powi(z as i32)
 // }
 
-pub struct BoundingBox {
-    topleft: Point,
-    bottomright: Point,
+pub struct Screen {
+    center: Point,
+    width: u32,
+    height: u32,
 }
 
-impl BoundingBox {
-    pub fn new(topleft: Point, bottomright: Point) -> Self {
+impl Screen {
+    pub fn new(center: Point, width: u32, height: u32) -> Self {
         Self {
-            topleft,
-            bottomright,
+            center,
+            width,
+            height,
         }
     }
 
-    pub fn get_tile_boundaries_for_zoom_level(&self, z: u32) -> (TileId, TileId) {
-        (deg2tile(self.topleft.x, self.topleft.y, z), deg2tile(self.bottomright.x, self.bottomright.y, z))
+    pub fn move_center(&mut self, delta: &Vector) {
+        self.center += *delta;
+    }
+
+    pub fn get_tile_boundaries_for_zoom_level(&self, z: u32) -> TileField {
+        let px_to_world = self.width as f32 / 2.0 * 2.0f32.powi(-(z as i32));
+        let py_to_world = self.height as f32 / 2.0 * 2.0f32.powi(-(z as i32));
+
+        let middle_tile: TileId = global_to_num_space(&self.center, z).into();
+        TileField::new(
+            middle_tile - TileId::new(z, px_to_world.ceil() as u32, py_to_world.ceil() as u32),
+            middle_tile + TileId::new(z, px_to_world.ceil() as u32, py_to_world.ceil() as u32)
+        )
     }
 }
 
@@ -97,6 +120,44 @@ impl std::fmt::Display for TileId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}/{}/{}", self.z, self.x, self.y)
     } 
+}
+
+impl std::ops::Add for TileId {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        assert_eq!(self.z, other.z);
+        Self {
+            z: self.z,
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+impl std::ops::AddAssign for TileId {
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
+}
+
+impl std::ops::Sub for TileId {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        assert_eq!(self.z, other.z);
+        Self {
+            z: self.z,
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+}
+
+impl std::ops::SubAssign for TileId {
+    fn sub_assign(&mut self, other: Self) {
+        *self = *self - other;
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -137,10 +198,44 @@ impl TileField {
             bottomright,
         }
     }
+
+    pub fn iter<'a>(&'a self) -> TileIterator<'a> {
+        TileIterator {
+            tile_field: self,
+            current_tile: self.topleft,
+        }
+    }
+}
+
+pub struct TileIterator<'a> {
+    tile_field: &'a TileField,
+    current_tile: TileId,
+}
+
+impl<'a> Iterator for TileIterator<'a> {
+    type Item = TileId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for _ in self.current_tile.x..self.tile_field.bottomright.x + 1 {
+            let c = self.current_tile;
+            self.current_tile = self.current_tile + TileId::new(self.current_tile.z, 1, 0);
+            return Some(c)
+        }
+        if self.current_tile.y < self.tile_field.bottomright.y {
+            self.current_tile = TileId::new(self.current_tile.z, self.tile_field.topleft.x + 1, self.current_tile.y + 1);
+            let c = self.current_tile - TileId::new(self.current_tile.z, 1, 0);
+            Some(c)
+        } else {
+            None
+        }
+    }
 }
 
 #[test]
 fn get_tile_boundaries_for_8_zoom() {
-    let bb = BoundingBox::new(point(47.607371, 6.114297), point(46.047108, 10.212341));
-    dbg!(bb.get_tile_boundaries_for_zoom_level(8));
+    let bb = Screen::new(point(47.607371, 6.114297), 800, 800);
+    let tile_field = bb.get_tile_boundaries_for_zoom_level(8);
+    let tiles = tile_field.iter().collect::<Vec<_>>();
+
+    assert_eq!(tiles.len(), 25);
 }

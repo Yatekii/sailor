@@ -5,11 +5,23 @@ use lyon::tessellation::geometry_builder::{
 use crate::render::Vertex;
 use lyon::math::Point;
 
+#[derive(Debug)]
 pub struct Layer {
     pub name: String,
     pub mesh: VertexBuffers<Vertex, u16>,
     pub color: [f32; 3],
     gpu_data: Option<(glium::VertexBuffer<Vertex>, glium::IndexBuffer<u16>)>,
+}
+
+impl Clone for Layer {
+    fn clone(&self) -> Layer {
+        Layer {
+            name: self.name.clone(),
+            mesh: self.mesh.clone(),
+            color: self.color,
+            gpu_data: None,
+        }
+    }
 }
 
 impl Layer {

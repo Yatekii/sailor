@@ -88,7 +88,7 @@ fn area(path: &Path) -> f32 {
     area + points[points.len() - 1].x * points[1].y - points[points.len() - 1].y * points[1].x
 }
 
-fn parse_one_to_path(tile_id: &math::TileId, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, cursor: &mut usize, gcursor: &mut Point) -> Path {
+fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, cursor: &mut usize, gcursor: &mut Point) -> Path {
     let mut builder = Path::builder();
 
     while *cursor < geometry.len() {
@@ -160,7 +160,7 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, geometry_type: GeomType
 
     if geometry_type == GeomType::POLYGON {
         while cursor < geometry.len() {
-            let path = parse_one_to_path(tile_id, geometry_type, geometry, extent, &mut cursor, &mut c);
+            let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
             
             let mut tessellator = FillTessellator::new();
             let mut tmesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();

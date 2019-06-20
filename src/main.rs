@@ -7,12 +7,10 @@ extern crate lyon;
 
 use structopt::StructOpt;
 
-use glium::Surface;
 use glium::glutin::dpi::LogicalSize;
 
 use crate::vector_tile::*;
 use lyon::math::{
-    point,
     vector,
 };
 
@@ -43,13 +41,17 @@ fn main() {
     let z = 8;
     let tile_id = math::deg2tile(47.3769, 8.5417, z);
     let tile_coordinate = math::deg2num(47.3769, 8.5417, z);
-    let tile = math::tile_to_global_space(&tile_id, lyon::math::point(0.0, 0.0));
+    dbg!(tile_id);
     let zurich = math::num_to_global_space(&tile_coordinate);
+
+    let mut cache = crate::vector_tile::cache::TileCache::new();
+
     // let zurich: lyon::math::Point = lyon::math::point(0.525754,0.35115147);
     // let (x, y) = crate::vector_tile::math::deg2num(40.7128, 74.0060, z); // NY
 
-    let data = vector_tile::fetch_tile_data(&tile_id);
-    let mut layers = crate::vector_tile::vector_tile_to_mesh(&tile_id, &data);
+    // let data = vector_tile::fetch_tile_data(&tile_id);
+
+    // let mut layers = crate::vector_tile::vector_tile_to_mesh(&tile_id, &data);
     // layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y, &vector_tile::fetch_tile_data(z, x+1, y)));
     // layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x, y+1, &vector_tile::fetch_tile_data(z, x, y+1)));
     // layers.extend(crate::vector_tile::vector_tile_to_mesh(z, x+1, y+1, &vector_tile::fetch_tile_data(z, x+1, y+1)));
@@ -63,13 +65,12 @@ fn main() {
         .with_decorations(true)
         .with_title("lyon + glium basic example");
     let display = glium::Display::new(window, context, &events_loop).unwrap();
-
-    for layer in &mut layers {
-        layer.load(&display)
-    }
-    
     let program = glium::Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
-    let mut pan = zurich.clone() * -1.0;
+
+    let mut painter = crate::painter::Painter::new(&display, &program);
+    let mut pan = zurich.clone();
+
+    let mut screen = math::Screen::new(pan, 600, 600);
 
     let mut mouse_down = false;
     let mut last_pos = glium::glutin::dpi::LogicalPosition::new(0.0, 0.0);
@@ -80,13 +81,7 @@ fn main() {
             break;
         }
 
-        let mut target = display.draw();
-        target.clear_color(0.8, 0.8, 0.8, 1.0);
-        for layer in &layers {
-            layer.draw(&mut target, &program, pan);
-        }
-
-        target.finish().unwrap();
+        painter.paint(&mut cache, &screen, z, pan);
 
         events_loop.poll_events(|event| {
             use glium::glutin::{Event, WindowEvent, ElementState, MouseButton};
@@ -113,7 +108,8 @@ fn main() {
 
                         last_pos = position;
                         if mouse_down {
-                            pan += delta;
+                            pan -= delta;
+                            screen.move_center(&delta);
                         }
                     }
                     _ => (),
