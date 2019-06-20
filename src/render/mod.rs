@@ -8,5 +8,5 @@ pub use vertex::{
 };
 
 pub use layer::{
-    Layer,
+    RenderLayer,
 };

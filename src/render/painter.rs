@@ -6,9 +6,10 @@ use crate::vector_tile::{
         TileCache,
     },
 };
+use crate::render::layer::RenderLayer;
 
 pub struct Painter<'a> {
-    tiles: Vec<Tile>,
+    render_layers: Vec<RenderLayer>,
     tile_field: math::TileField,
     display: &'a glium::Display,
     program: &'a glium::Program,
@@ -17,7 +18,7 @@ pub struct Painter<'a> {
 impl<'a> Painter<'a> {
     pub fn new(display: &'a glium::Display, program: &'a glium::Program) -> Self {
         Self {
-            tiles: vec![],
+            render_layers: vec![],
             tile_field: math::TileField::new(math::TileId::new(8, 0, 0), math::TileId::new(8, 0, 0)),
             display,
             program,
@@ -34,21 +35,15 @@ impl<'a> Painter<'a> {
         if self.tile_field != tile_field {
             self.tile_field = tile_field;
             cache.fetch_tiles(screen);
-            self.tiles = cache.get_tiles(screen);
-            dbg!(&self.tiles.len());
-
-            for tile in &mut self.tiles {
-                for layer in &mut tile.layers {
-                    layer.load(&mut self.display);
-                    layer.draw(&mut target, &mut self.program, pan * -1.0);
-                }
-            }
-        } else {
-            for tile in &mut self.tiles {
-                for layer in &mut tile.layers {
-                    layer.draw(&mut target, &mut self.program, pan * -1.0);
-                }
-            }
+            self.render_layers = cache
+                .get_tiles(screen)
+                .into_iter()
+                .flat_map(|tile| tile.layers.into_iter().map(|layer| RenderLayer::new(layer, &self.display)))
+                .collect::<Vec<_>>();
+            dbg!(&self.render_layers.len());
+        }
+        for rl in &mut self.render_layers {
+            rl.draw(&mut target, &mut self.program, pan * -1.0);
         }
 
         target.finish().unwrap();

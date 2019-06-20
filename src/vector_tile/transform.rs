@@ -21,7 +21,14 @@ use crate::render::{
 
 use crate::vector_tile::mod_Tile::GeomType;
 
-pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate::render::Layer> {
+#[derive(Debug, Clone)]
+pub struct Layer {
+    pub name: String,
+    pub mesh: VertexBuffers<Vertex, u16>,
+    pub color: [f32; 3],
+}
+
+pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate::vector_tile::transform::Layer> {
     let t = time::Instant::now();
 
     // we can build a bytes reader directly out of the bytes
@@ -54,17 +61,17 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
 
         match &layer.name.to_string()[..] {
             "water" | "park" | "landcover" | "landuse" => {
-                layers.push(crate::render::Layer::new(
-                    layer.name.to_string(),
-                    mesh,
-                    match &layer.name[..] {
+                layers.push(crate::vector_tile::transform::Layer {
+                    name: layer.name.to_string(),
+                    mesh: mesh,
+                    color: match &layer.name[..] {
                         "water" => BLUE,
                         "landcover" => GREEN,
                         "landuse" => YELLOW,
                         "park" => GREEN,
                         _ => panic!("This is a bug. Please report it."),
                     }
-                ))
+                })
             },
             _ => {}
         }

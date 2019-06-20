@@ -1,5 +1,5 @@
 mod vector_tile;
-mod transform;
+pub mod transform;
 pub mod math;
 mod fetch;
 pub mod cache;

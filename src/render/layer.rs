@@ -4,59 +4,44 @@ use lyon::tessellation::geometry_builder::{
 
 use crate::render::Vertex;
 use lyon::math::Point;
+use crate::vector_tile::transform::Layer;
 
 #[derive(Debug)]
-pub struct Layer {
-    pub name: String,
-    pub mesh: VertexBuffers<Vertex, u16>,
-    pub color: [f32; 3],
-    gpu_data: Option<(glium::VertexBuffer<Vertex>, glium::IndexBuffer<u16>)>,
+pub struct RenderLayer {
+    pub layer: Layer,
+    gpu_data: (glium::VertexBuffer<Vertex>, glium::IndexBuffer<u16>),
 }
 
-impl Clone for Layer {
-    fn clone(&self) -> Layer {
-        Layer {
-            name: self.name.clone(),
-            mesh: self.mesh.clone(),
-            color: self.color,
-            gpu_data: None,
-        }
-    }
-}
-
-impl Layer {
-    pub fn new(name: String, mesh: VertexBuffers<Vertex, u16>, color: [f32; 3]) -> Self {
+impl RenderLayer {
+    pub fn new(layer: Layer, display: &glium::Display) -> Self {
+        let gpu_data = Self::load(&layer, display);
         Self {
-            name,
-            mesh,
-            color,
-            gpu_data: None,
+            layer,
+            gpu_data,
         }
     }
 
-    pub fn load(&mut self, display: &glium::Display) {
-        println!("Loading layer {}.", self.name);
-        let vertex_buffer = glium::VertexBuffer::new(display, &self.mesh.vertices).unwrap();
+    fn load(layer: &Layer, display: &glium::Display) -> (glium::VertexBuffer<Vertex>, glium::IndexBuffer<u16>) {
+        println!("Loading layer {}.", layer.name);
+        let vertex_buffer = glium::VertexBuffer::new(display, &layer.mesh.vertices).unwrap();
         let indices = glium::IndexBuffer::new(
             display,
             glium::index::PrimitiveType::TrianglesList,
-            &self.mesh.indices,
+            &layer.mesh.indices,
         ).unwrap();
-        self.gpu_data = Some((vertex_buffer, indices));
+        (vertex_buffer, indices)
     }
 
     pub fn draw(&self, target: &mut impl glium::Surface, program: &glium::Program, pan: Point) {
-        if let Some(gpu_data) = &self.gpu_data {
-            target.draw(
-                &gpu_data.0,
-                &gpu_data.1,
-                &program,
-                &uniform! {
-                    layer_color: self.color.clone(),
-                    pan: (pan.x, pan.y),
-                },
-                &Default::default(),
-            ).unwrap();
-        }
+        target.draw(
+            &self.gpu_data.0,
+            &self.gpu_data.1,
+            &program,
+            &uniform! {
+                layer_color: self.layer.color.clone(),
+                pan: (pan.x, pan.y),
+            },
+            &Default::default(),
+        ).unwrap();
     }
 }
