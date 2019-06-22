@@ -17,7 +17,6 @@ impl TileCache {
         let tile_field = screen.get_tile_boundaries_for_zoom_level(8).iter().collect::<Vec<_>>();
         let data = tile_field.par_iter().filter_map(|tile_id| {
             if !self.cache.contains_key(&tile_id) {
-                dbg!(&tile_id);
                 let data = crate::vector_tile::fetch_tile_data(&tile_id);
                 let layers = crate::vector_tile::vector_tile_to_mesh(&tile_id, &data);
                 return Some((tile_id.clone(), layers));

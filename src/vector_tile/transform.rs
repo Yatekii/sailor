@@ -14,9 +14,9 @@ use lyon::tessellation::{
 };
 use varint::ZigZag;
 
-use crate::render::{
+use crate::drawing::vertex::{
     Vertex,
-    LayerVertexCtor,
+    LayerVertexCtor
 };
 
 use crate::vector_tile::mod_Tile::GeomType;

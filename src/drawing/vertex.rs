@@ -7,6 +7,10 @@ pub struct Vertex {
     pub position: [f32; 2],
 }
 
+pub fn vertex(x: f32, y: f32) -> Vertex {
+    Vertex { position: [x, y] }
+}
+
 implement_vertex!(Vertex, position);
 
 // A very simple vertex constructor that only outputs the vertex position

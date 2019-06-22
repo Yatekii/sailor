@@ -17,3 +17,7 @@ nom = "5.0.0-beta2"
 notify = "5.0.0-pre.0"
 crossbeam-channel = "*"
 take_mut = "*"
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"] }
+pretty_env_logger = "0.3.0"
+log = "0.4.6"
+glsl-to-spirv = "0.1"

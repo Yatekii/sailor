@@ -1,5 +1,6 @@
 mod vector_tile;
 mod render;
+mod drawing;
 
 #[macro_use]
 extern crate glium;
@@ -13,25 +14,43 @@ use crate::vector_tile::*;
 use lyon::math::{
     vector,
 };
-
-#[derive(StructOpt)]
-#[structopt(
-    name = "Sailor",
-    about = "Sailing weather and route tooling",
-    author = "Noah Hüsser <yatekii@yatekii.ch>"
-)]
-enum CLI {
-    #[structopt(name = "import_map")]
-    ImportMap {
-        _path: String,
-    },
-    #[structopt(name = "inspect_tile")]
-    InspectTile {
-        _path: String,
-    },
-}
+use crate::drawing::vertex::vertex;
+use crate::vector_tile::math::TileId;
 
 fn main() {
+    let mut painter = drawing::Painter::init();
+
+    let z = 8;
+    let tile_id = math::deg2tile(47.3769, 8.5417, z);
+    let tile_coordinate = math::deg2num(47.3769, 8.5417, z);
+    dbg!(tile_id);
+    let zurich = math::num_to_global_space(&tile_coordinate);
+
+    dbg!(zurich);
+
+    let data = vector_tile::fetch_tile_data(&tile_id);
+
+    let mut layers = crate::vector_tile::vector_tile_to_mesh(&tile_id, &data);
+    let id = tile_id - TileId::new(z, 0, 1);
+    layers.extend(crate::vector_tile::vector_tile_to_mesh(&id, &vector_tile::fetch_tile_data(&id)));
+
+
+    painter.set_buffers(&layers[0].mesh.vertices, &layers[0].mesh.indices);
+
+    // painter.set_buffers(&vec![
+    //     vertex(0.0 / 256.0, -0.5 / 256.0),
+    //     vertex(0.5 / 256.0, 0.5 / 256.0),
+    //     vertex(-0.5 / 256.0, 0.5 / 256.0)
+    // ], &vec![2, 1, 0]);
+
+    // dbg!(vec![vertex(0.0, -0.5), vertex(0.5, 0.5), vertex(-0.5, 0.5)]);
+
+    loop {
+        painter.update_view();
+    }
+}
+
+fn mainf() {
     // let matches = CLI::from_args();
     // match matches {
     //     CLI::ImportMap { path } => osm::import::region(path),

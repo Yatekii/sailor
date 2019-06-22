@@ -46,9 +46,7 @@ impl<'a> Painter<'a> {
         for rl in &mut self.render_layers {
             if css_cache.update() {
                 println!("Cache update");
-                dbg!(&rl.layer.color);
                 take_mut::take(&mut rl.layer, |layer| layer.with_style(css_cache));
-                dbg!(&rl.layer.color);
             }
             rl.draw(&mut target, &mut self.program, pan * -1.0);
         }

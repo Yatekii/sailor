@@ -2,7 +2,7 @@ use lyon::tessellation::geometry_builder::{
     VertexBuffers,
 };
 
-use crate::render::Vertex;
+use crate::drawing::vertex::Vertex;
 use lyon::math::Point;
 use crate::vector_tile::transform::Layer;
 
@@ -32,9 +32,7 @@ impl RenderLayer {
         (vertex_buffer, indices)
     }
 
-    pub fn draw(&self, target: &mut impl glium::Surface, program: &glium::Program, pan: Point) {
-        dbg!(&self.layer.color);
-        
+    pub fn draw(&self, target: &mut impl glium::Surface, program: &glium::Program, pan: Point) {        
         target.draw(
             &self.gpu_data.0,
             &self.gpu_data.1,
