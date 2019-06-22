@@ -42,7 +42,7 @@ impl Layer {
     }
 
     pub fn with_style(mut self, cache: &RulesCache) -> Self {
-        dbg!(cache);
+        dbg!(&cache.rules);
         let rules = cache.get_matching_rules(&Selector {
             typ: Some("layer".into()),
             id: None,

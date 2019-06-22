@@ -82,6 +82,8 @@ fn main() {
             break;
         }
 
+        css_cache.update();
+
         painter.paint(&mut cache, &css_cache, &screen, z, pan);
 
         events_loop.poll_events(|event| {

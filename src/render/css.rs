@@ -24,6 +24,14 @@ use nom::character::complete::char;
 use nom::combinator::map_res;
 use nom::IResult;
 
+use crossbeam_channel::unbounded;
+use notify::{
+    RecursiveMode,
+    RecommendedWatcher,
+    Watcher
+};
+use std::time::Duration;
+
 pub fn parse_styles(style: &str) -> Vec<Rule> {
     dbg!(style);
     let (_, result) = rules(style)
@@ -31,22 +39,56 @@ pub fn parse_styles(style: &str) -> Vec<Rule> {
     result
 }
 
-#[derive(Debug)]
 pub struct RulesCache {
     pub rules: Vec<Rule>,
+    rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
+    watcher: RecommendedWatcher,
 }
 
 impl RulesCache {
     pub fn load_from_file(filename: impl Into<String>) -> Self {
-        let contents = std::fs::read_to_string(std::path::Path::new(&filename.into()))
+        let filename = filename.into();
+
+        let contents = std::fs::read_to_string(std::path::Path::new(&filename.clone()))
             .expect("Something went wrong reading the file");
+
+        let (tx, rx) = unbounded();
+
+        // Automatically select the best implementation for your platform.
+        // You can also access each implementation directly e.g. INotifyWatcher.
+        let mut watcher: RecommendedWatcher = Watcher::new_immediate(tx).expect("Could not start watcher.");
+
+        // Add a path to be watched. All files and directories at that path and
+        // below will be monitored for changes.
+        watcher.watch(&filename, RecursiveMode::Recursive).expect("Could not start watching file.");
+
         Self {
-            rules: parse_styles(&contents)
+            rules: parse_styles(&contents),
+            rx,
+            watcher,
         }
     }
 
     pub fn get_matching_rules(&self, selector: &Selector) -> Vec<&Rule> {
         self.rules.iter().filter(|rule| selector.matches(&rule.selector)).collect()
+    }
+
+    pub fn update(&mut self) {
+        match self.rx.try_recv() {
+            Ok(Ok(notify::event::Event { paths, .. })) => {
+                self.reload_from_file(&paths[0].as_path());
+                println!("changed: {:?}", paths[0]);
+            },
+            Ok(Err(err)) => (),
+            Err(err) => (),
+        };
+    }
+
+    fn reload_from_file(&mut self, filename: &std::path::Path) {
+        let contents = std::fs::read_to_string(filename)
+            .expect("Something went wrong reading the file");
+
+        self.rules = parse_styles(&contents);
     }
 }
 
