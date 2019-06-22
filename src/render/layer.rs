@@ -33,6 +33,8 @@ impl RenderLayer {
     }
 
     pub fn draw(&self, target: &mut impl glium::Surface, program: &glium::Program, pan: Point) {
+        dbg!(&self.layer.color);
+        
         target.draw(
             &self.gpu_data.0,
             &self.gpu_data.1,

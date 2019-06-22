@@ -84,7 +84,7 @@ fn main() {
 
         css_cache.update();
 
-        painter.paint(&mut cache, &css_cache, &screen, z, pan);
+        painter.paint(&mut cache, &mut css_cache, &screen, z, pan);
 
         events_loop.poll_events(|event| {
             use glium::glutin::{Event, WindowEvent, ElementState, MouseButton};

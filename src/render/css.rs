@@ -42,7 +42,7 @@ pub fn parse_styles(style: &str) -> Vec<Rule> {
 pub struct RulesCache {
     pub rules: Vec<Rule>,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
-    watcher: RecommendedWatcher,
+    _watcher: RecommendedWatcher,
 }
 
 impl RulesCache {
@@ -65,7 +65,7 @@ impl RulesCache {
         Self {
             rules: parse_styles(&contents),
             rx,
-            watcher,
+            _watcher: watcher,
         }
     }
 
@@ -73,15 +73,16 @@ impl RulesCache {
         self.rules.iter().filter(|rule| selector.matches(&rule.selector)).collect()
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self) -> bool {
         match self.rx.try_recv() {
             Ok(Ok(notify::event::Event { paths, .. })) => {
                 self.reload_from_file(&paths[0].as_path());
                 println!("changed: {:?}", paths[0]);
+                true
             },
-            Ok(Err(err)) => (),
-            Err(err) => (),
-        };
+            Ok(Err(err)) => panic!("Something went wrong with the watcher."),
+            Err(err) => false,
+        }
     }
 
     fn reload_from_file(&mut self, filename: &std::path::Path) {
@@ -119,8 +120,6 @@ impl Default for Selector {
 
 impl Selector {
     pub fn matches(&self, other: &Selector) -> bool {
-        dbg!(self);
-        dbg!(other);
         if let Some(t1) = &other.typ {
             if let Some(t2) = &self.typ {
                 if t1 != t2 { return false; }

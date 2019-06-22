@@ -42,7 +42,6 @@ impl Layer {
     }
 
     pub fn with_style(mut self, cache: &RulesCache) -> Self {
-        dbg!(&cache.rules);
         let rules = cache.get_matching_rules(&Selector {
             typ: Some("layer".into()),
             id: None,
@@ -94,7 +93,7 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
         const YELLOW: [f32; 3] = [1.0, 0.894, 0.408];
 
         match &layer.name.to_string()[..] {
-            "water" | "park" | "landcover" | "landuse" => {
+            "water" => { // | "park" | "landcover" | "landuse"
                 layers.push(crate::vector_tile::transform::Layer {
                     name: layer.name.to_string(),
                     mesh: mesh,

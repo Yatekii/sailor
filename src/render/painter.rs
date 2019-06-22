@@ -26,7 +26,7 @@ impl<'a> Painter<'a> {
         }
     }
 
-    pub fn paint(&mut self, cache: &mut TileCache, css_cache: &RulesCache, screen: &math::Screen, z: u32, pan: Point) {
+    pub fn paint(&mut self, cache: &mut TileCache, css_cache: &mut RulesCache, screen: &math::Screen, z: u32, pan: Point) {
         let tile_field = screen.get_tile_boundaries_for_zoom_level(z);
 
         use crate::glium::Surface;
@@ -44,6 +44,12 @@ impl<'a> Painter<'a> {
             dbg!(&self.render_layers.len());
         }
         for rl in &mut self.render_layers {
+            if css_cache.update() {
+                println!("Cache update");
+                dbg!(&rl.layer.color);
+                take_mut::take(&mut rl.layer, |layer| layer.with_style(css_cache));
+                dbg!(&rl.layer.color);
+            }
             rl.draw(&mut target, &mut self.program, pan * -1.0);
         }
 
