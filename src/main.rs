@@ -45,6 +45,7 @@ fn main() {
     let zurich = math::num_to_global_space(&tile_coordinate);
 
     let mut cache = crate::vector_tile::cache::TileCache::new();
+    let mut css_cache = crate::render::css::RulesCache::load_from_file("config/style.css");
 
     // let zurich: lyon::math::Point = lyon::math::point(0.525754,0.35115147);
     // let (x, y) = crate::vector_tile::math::deg2num(40.7128, 74.0060, z); // NY
@@ -81,7 +82,7 @@ fn main() {
             break;
         }
 
-        painter.paint(&mut cache, &screen, z, pan);
+        painter.paint(&mut cache, &css_cache, &screen, z, pan);
 
         events_loop.poll_events(|event| {
             use glium::glutin::{Event, WindowEvent, ElementState, MouseButton};

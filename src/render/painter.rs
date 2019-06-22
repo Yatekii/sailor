@@ -7,6 +7,7 @@ use crate::vector_tile::{
     },
 };
 use crate::render::layer::RenderLayer;
+use crate::render::css::RulesCache;
 
 pub struct Painter<'a> {
     render_layers: Vec<RenderLayer>,
@@ -25,7 +26,7 @@ impl<'a> Painter<'a> {
         }
     }
 
-    pub fn paint(&mut self, cache: &mut TileCache, screen: &math::Screen, z: u32, pan: Point) {
+    pub fn paint(&mut self, cache: &mut TileCache, css_cache: &RulesCache, screen: &math::Screen, z: u32, pan: Point) {
         let tile_field = screen.get_tile_boundaries_for_zoom_level(z);
 
         use crate::glium::Surface;
@@ -38,7 +39,7 @@ impl<'a> Painter<'a> {
             self.render_layers = cache
                 .get_tiles(screen)
                 .into_iter()
-                .flat_map(|tile| tile.layers.into_iter().map(|layer| RenderLayer::new(layer, &self.display)))
+                .flat_map(|tile| tile.layers.into_iter().map(|layer| RenderLayer::new(layer.with_style(css_cache), &self.display)))
                 .collect::<Vec<_>>();
             dbg!(&self.render_layers.len());
         }

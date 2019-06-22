@@ -21,11 +21,45 @@ use crate::render::{
 
 use crate::vector_tile::mod_Tile::GeomType;
 
+use crate::render::css::RulesCache;
+use crate::render::css::Selector;
+use crate::render::css::CSSValue;
+
 #[derive(Debug, Clone)]
 pub struct Layer {
     pub name: String,
     pub mesh: VertexBuffers<Vertex, u16>,
     pub color: [f32; 3],
+}
+
+impl Layer {
+    pub fn new(name: String, mesh: VertexBuffers<Vertex, u16>) -> Self {
+        Self {
+            name,
+            mesh,
+            color: [0.0, 0.0, 0.0],
+        }
+    }
+
+    pub fn with_style(mut self, cache: &RulesCache) -> Self {
+        dbg!(cache);
+        let rules = cache.get_matching_rules(&Selector {
+            typ: Some("layer".into()),
+            id: None,
+            classes: vec![],
+            name: Some(self.name.clone()),
+        });
+        let background_color = rules
+            .iter()
+            .filter_map(|r| if r.kvs.contains_key("background-color") { Some(r.kvs["background-color"].clone()) } else { None })
+            .last();
+
+            if let Some(CSSValue::Color(bg)) = background_color {
+                self.color = [bg.r as f32 / 255.0, bg.g as f32 / 255.0, bg.b as f32 / 255.0];
+            }
+
+        self
+    }
 }
 
 pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate::vector_tile::transform::Layer> {
