@@ -1,3 +1,7 @@
+use crate::vector_tile::math::TileId;
+use crate::drawing::drawable_tile::DrawableTile;
+use std::collections::HashMap;
+
 use wgpu::{
     winit::{
         EventsLoop,
@@ -8,10 +12,19 @@ use wgpu::{
     ShaderModule,
     SwapChain,
     Device,
+    BindGroupLayout,
     BindGroup,
     RenderPipeline,
     Buffer,
     BufferUsage,
+};
+
+use crate::vector_tile::{
+    math,
+    cache::{
+        Tile,
+        TileCache,
+    },
 };
 
 use super::{
@@ -24,21 +37,22 @@ use super::{
     },
 };
 
+use crate::app_state::AppState;
+
 pub struct Painter {
-    events_loop: EventsLoop,
     device: Device,
     swap_chain: SwapChain,
-    bind_group: BindGroup,
+    bind_group_layout: BindGroupLayout,
     render_pipeline: RenderPipeline,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
     index_count: u32,
+    loaded_tiles: HashMap<TileId, DrawableTile>,
 }
 
 impl Painter {
-    pub fn init() -> Self {
-        let events_loop = EventsLoop::new();
-
+    /// Initializes the entire draw machinery.
+    pub fn init(events_loop: &EventsLoop) -> Self {
         #[cfg(not(feature = "gl"))]
         let (_window, instance, size, surface) = {
             use wgpu::winit::Window;
@@ -102,26 +116,6 @@ impl Painter {
             ]
         });
 
-        let mx_ref: &[f32; 16] = &[0.0; 16];
-        let uniform_buf = device
-            .create_buffer_mapped(
-                16,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
-            )
-            .fill_from_slice(mx_ref);
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer {
-                        buffer: &uniform_buf,
-                        range: 0 .. 64,
-                    },
-                },
-            ],
-        });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
         });
@@ -188,15 +182,39 @@ impl Painter {
         device.get_queue().submit(&[init_command_buf]);
 
         Self {
-            events_loop,
             vertex_buffer,
             index_buffer,
             device,
             swap_chain,
-            bind_group,
+            bind_group_layout,
             render_pipeline,
             index_count: 0,
+            loaded_tiles: HashMap::new()
         }
+    }
+
+    /// Creates a new bind group containing all the relevant uniform buffers.
+    fn create_bind_group(&self) -> BindGroup {
+        let mx_ref: &[f32; 16] = &[0.0; 16];
+        let uniform_buf = self.device
+            .create_buffer_mapped(
+                16,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+            )
+            .fill_from_slice(mx_ref);
+
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &self.bind_group_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &uniform_buf,
+                        range: 0 .. 64,
+                    },
+                },
+            ],
+        })
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.
@@ -226,12 +244,55 @@ impl Painter {
         self.index_count = indices.len() as u32;
     }
 
-    pub fn update_view(&mut self) {
+    pub fn load_tiles(&mut self, app_state: &mut AppState) {
+        let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
+
+        for tile_id in tile_field.iter() {
+            if !self.loaded_tiles.contains_key(&tile_id) {
+                app_state.tile_cache.fetch_tile(&tile_id);
+                if let Some(tile) = app_state.tile_cache.try_get_tile(&tile_id) {
+                    self.loaded_tiles.insert(tile_id, DrawableTile {
+                        vertex_buffer: self.device
+                            .create_buffer_mapped(tile.layers[0].mesh.vertices.len(), wgpu::BufferUsage::VERTEX)
+                            .fill_from_slice(&tile.layers[0].mesh.vertices),
+                        index_buffer: self.device
+                            .create_buffer_mapped(tile.layers[0].mesh.indices.len(), wgpu::BufferUsage::INDEX)
+                            .fill_from_slice(&tile.layers[0].mesh.indices),
+                        index_count: tile.layers[0].mesh.indices.len() as u32,
+                        bind_group: self.create_bind_group(),
+                    });
+                } else {
+                    log::error!("Could not read tile from cache. This is a bug. Please report it!");
+                }
+            }
+        }
+    }
+
+    pub fn paint(&mut self) {
+        
+
+        // if app_state.tile_field != tile_field {
+        //     app_state.tile_field = tile_field;
+        //     app_state.tile_cache.fetch_tiles(app_state.screen);
+            // self.render_layers = app_state.tile_cache
+            //     .get_tiles(app_state.screen)
+            //     .into_iter()
+            //     .flat_map(|tile| tile.layers.into_iter().map(|layer| RenderLayer::new(layer.with_style(css_cache), &self.display)))
+            //     .collect::<Vec<_>>();
+            // dbg!(&self.render_layers.len());
+        // }
+        // for rl in &mut self.render_layers {
+        //     if css_cache.update() {
+        //         println!("Cache update");
+        //         take_mut::take(&mut rl.layer, |layer| layer.with_style(css_cache));
+        //     }
+        //     rl.draw(&mut target, &mut self.program, pan * -1.0);
+        // }
+
         let frame = self.swap_chain.get_next_texture();
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-
         {
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
@@ -241,11 +302,12 @@ impl Painter {
                 }],
                 depth_stencil_attachment: None,
             });
-            rpass.set_pipeline(&self.render_pipeline);
-            rpass.set_bind_group(0, &self.bind_group, &[]);
-            rpass.set_index_buffer(&self.index_buffer, 0);
-            rpass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
-            rpass.draw_indexed(0 .. self.index_count, 0, 0 .. 1);
+
+            render_pass.set_pipeline(&self.render_pipeline);
+
+            for drawable_tile in self.loaded_tiles.values_mut() {
+                drawable_tile.paint(&mut render_pass);
+            }
         }
 
         self.device.get_queue().submit(&[encoder.finish()]);
