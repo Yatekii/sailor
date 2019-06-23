@@ -45,6 +45,30 @@ fn main() {
 
     // dbg!(vec![vertex(0.0, -0.5), vertex(0.5, 0.5), vertex(-0.5, 0.5)]);
 
+    let mut cache = crate::vector_tile::cache::TileCache::new();
+    let mut screen = math::Screen::new(zurich, 600, 600);
+
+    cache.fetch_tiles(&screen);
+    let layers = cache
+        .get_tiles(&screen)
+        .into_iter()
+        .flat_map(|tile| tile.layers.into_iter())
+        .collect::<Vec<_>>();
+
+    dbg!(&layers.len());
+    
+    let mut v = vec![];
+    let mut i = vec![];
+
+    for rl in layers {
+        if rl.name == "water" {
+            v.extend(rl.mesh.vertices);
+            i.extend(rl.mesh.indices);
+        }
+    }
+
+    painter.set_buffers(&v, &i);
+
     loop {
         painter.update_view();
     }

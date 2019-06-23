@@ -29,7 +29,7 @@ pub struct Painter {
     render_pipeline: RenderPipeline,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
-    vertex_count: u32,
+    index_count: u32,
 }
 
 impl Painter {
@@ -152,7 +152,7 @@ impl Painter {
             swap_chain,
             bind_group,
             render_pipeline,
-            vertex_count: 0,
+            index_count: 0,
         }
     }
 
@@ -180,7 +180,7 @@ impl Painter {
             .create_buffer_mapped(indices.len(), wgpu::BufferUsage::INDEX)
             .fill_from_slice(&indices);
 
-        self.vertex_count = vertices.len() as u32;
+        self.index_count = indices.len() as u32;
     }
 
     pub fn update_view(&mut self) {
@@ -202,7 +202,7 @@ impl Painter {
             rpass.set_bind_group(0, &self.bind_group, &[]);
             rpass.set_index_buffer(&self.index_buffer, 0);
             rpass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
-            rpass.draw(0 .. self.vertex_count, 0 .. 1);
+            rpass.draw_indexed(0 .. self.index_count, 0, 0 .. 1);
         }
 
         self.device.get_queue().submit(&[encoder.finish()]);
