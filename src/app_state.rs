@@ -16,8 +16,7 @@ pub struct AppState {
     pub css_cache: RulesCache,
     pub screen: Screen,
     pub tile_field: TileField,
-    pub zoom: u32, 
-    pub pan: Point,
+    pub zoom: u32,
 }
 
 impl AppState {
@@ -28,13 +27,13 @@ impl AppState {
         height: u32,
         zoom: u32,
     ) -> Self {
+        dbg!(&center);
         Self {
             tile_cache: TileCache::new(),
             css_cache: RulesCache::try_load_from_file(style).expect("Unable to load the style file. Please consult the log."),
             screen: Screen::new(center, width, height),
             tile_field: TileField::new(TileId::new(8, 0, 0), TileId::new(8, 0, 0)),
             zoom,
-            pan: Point::new(0.0, 0.0)
         }
     }
 }

@@ -1,3 +1,4 @@
+use lyon::math::Point;
 use crate::vector_tile::math::TileId;
 use crate::drawing::drawable_tile::DrawableTile;
 use std::collections::HashMap;
@@ -42,12 +43,13 @@ use crate::app_state::AppState;
 pub struct Painter {
     device: Device,
     swap_chain: SwapChain,
-    bind_group_layout: BindGroupLayout,
     render_pipeline: RenderPipeline,
     vertex_buffer: Buffer,
     index_buffer: Buffer,
     index_count: u32,
     loaded_tiles: HashMap<TileId, DrawableTile>,
+    bind_group: BindGroup,
+    uniform_buffer: Buffer,
 }
 
 impl Painter {
@@ -114,6 +116,21 @@ impl Painter {
                     ty: wgpu::BindingType::UniformBuffer,
                 },
             ]
+        });
+
+        let uniform_buffer = Self::create_uniform_buffer(&device, &Point::new(1.0, 0.0));
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &uniform_buffer,
+                        range: 0 .. 8,
+                    },
+                },
+            ],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -186,35 +203,22 @@ impl Painter {
             index_buffer,
             device,
             swap_chain,
-            bind_group_layout,
             render_pipeline,
             index_count: 0,
-            loaded_tiles: HashMap::new()
+            loaded_tiles: HashMap::new(),
+            bind_group,
+            uniform_buffer,
         }
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_bind_group(&self) -> BindGroup {
-        let mx_ref: &[f32; 16] = &[0.0; 16];
-        let uniform_buf = self.device
+    fn create_uniform_buffer(device: &Device, pan: &Point) -> Buffer {
+        device
             .create_buffer_mapped(
-                16,
+                2,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
-            .fill_from_slice(mx_ref);
-
-        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &self.bind_group_layout,
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer {
-                        buffer: &uniform_buf,
-                        range: 0 .. 64,
-                    },
-                },
-            ],
-        })
+            .fill_from_slice(&[pan.x, pan.y])
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.
@@ -259,7 +263,6 @@ impl Painter {
                             .create_buffer_mapped(tile.layers[0].mesh.indices.len(), wgpu::BufferUsage::INDEX)
                             .fill_from_slice(&tile.layers[0].mesh.indices),
                         index_count: tile.layers[0].mesh.indices.len() as u32,
-                        bind_group: self.create_bind_group(),
                     });
                 } else {
                     log::error!("Could not read tile from cache. This is a bug. Please report it!");
@@ -268,29 +271,19 @@ impl Painter {
         }
     }
 
-    pub fn paint(&mut self) {
-        
-
-        // if app_state.tile_field != tile_field {
-        //     app_state.tile_field = tile_field;
-        //     app_state.tile_cache.fetch_tiles(app_state.screen);
-            // self.render_layers = app_state.tile_cache
-            //     .get_tiles(app_state.screen)
-            //     .into_iter()
-            //     .flat_map(|tile| tile.layers.into_iter().map(|layer| RenderLayer::new(layer.with_style(css_cache), &self.display)))
-            //     .collect::<Vec<_>>();
-            // dbg!(&self.render_layers.len());
-        // }
-        // for rl in &mut self.render_layers {
-        //     if css_cache.update() {
-        //         println!("Cache update");
-        //         take_mut::take(&mut rl.layer, |layer| layer.with_style(css_cache));
-        //     }
-        //     rl.draw(&mut target, &mut self.program, pan * -1.0);
-        // }
-
+    pub fn paint(&mut self, app_state: &AppState) {
         let frame = self.swap_chain.get_next_texture();
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        encoder.copy_buffer_to_buffer(
+            &Self::create_uniform_buffer(
+                &self.device,
+                &app_state.screen.center
+            ),
+            0,
+            &self.uniform_buffer,
+            0,
+            8
+        );
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -304,6 +297,7 @@ impl Painter {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
 
             for drawable_tile in self.loaded_tiles.values_mut() {
                 drawable_tile.paint(&mut render_pass);

@@ -21,6 +21,8 @@ use crate::drawing::vertex::vertex;
 use crate::vector_tile::math::TileId;
 
 fn main() {
+    pretty_env_logger::init();
+
     let mut events_loop = wgpu::winit::EventsLoop::new();
 
     let mut painter = drawing::Painter::init(&events_loop);
@@ -34,10 +36,47 @@ fn main() {
     let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), 600, 600, z);
 
     dbg!(zurich);
+    let mut status = true;
+    let mut mouse_down = false;
+    let mut last_pos = wgpu::winit::dpi::LogicalPosition::new(0.0, 0.0);
 
     loop {
+        events_loop.poll_events(|event| {
+            use wgpu::winit::{Event, WindowEvent, ElementState, MouseButton, KeyboardInput, VirtualKeyCode};
+            match event {
+                Event::WindowEvent { event, .. } => match event {
+                    WindowEvent::Destroyed => { status = false }
+                    WindowEvent::KeyboardInput {
+                        input: KeyboardInput { virtual_keycode: Some(VirtualKeyCode::Escape), .. },
+                        ..
+                    } | WindowEvent::CloseRequested => { status = false },
+                    WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
+                        mouse_down = true;
+                    },
+                    WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
+                        mouse_down = false;
+                    },
+                    WindowEvent::CursorMoved { position, .. } => {
+                        let mut delta = vector(0.0, 0.0);
+                        delta.x = (position.x - last_pos.x) as f32;
+                        delta.y = (position.y - last_pos.y) as f32;
+
+                        let world_to_px = 1.0 / 2.0f32.powi(z as i32) / 600.0 * 2.0;
+                        delta *= world_to_px;
+
+                        last_pos = position;
+                        if mouse_down {
+                            app_state.screen.center -= delta;
+                        }
+                    }
+                    _ => (),
+                }
+                _ => (),
+            }
+        });
+
         painter.load_tiles(&mut app_state);
-        painter.paint();
+        painter.paint(&app_state);
     }
 }
 
@@ -109,7 +148,7 @@ fn mainf() {
                         last_pos = position;
                         if mouse_down {
                             pan -= delta;
-                            screen.move_center(&delta);
+                            screen.center -= delta;
                         }
                     }
                     _ => (),

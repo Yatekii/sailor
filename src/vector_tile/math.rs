@@ -61,7 +61,7 @@ pub fn global_to_num_space(point: &Point, z: u32) -> TileCoordinate {
 // }
 
 pub struct Screen {
-    center: Point,
+    pub center: Point,
     width: u32,
     height: u32,
 }
@@ -73,10 +73,6 @@ impl Screen {
             width,
             height,
         }
-    }
-
-    pub fn move_center(&mut self, delta: &Vector) {
-        self.center -= *delta;
     }
 
     pub fn get_tile_boundaries_for_zoom_level(&self, z: u32) -> TileField {
