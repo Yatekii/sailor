@@ -20,4 +20,5 @@ void main() {
     gl_Position = vec4((position - vec2(0.52508926, 0.3486519)) * 256, 0.0, 1.0);
     gl_Position.xy -= vec2(1.0);
     gl_Position.y *= -1.0;
+    gl_Position.xy += vec2(2.0, -3.0);
 }

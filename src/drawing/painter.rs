@@ -80,20 +80,47 @@ impl Painter {
             power_preference: wgpu::PowerPreference::LowPower,
         });
 
-        let device = adapter.request_device(&wgpu::DeviceDescriptor {
+        let mut device = adapter.request_device(&wgpu::DeviceDescriptor {
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },
             limits: wgpu::Limits::default(),
         });
 
+        let mut init_encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+
         let (vs_module, fs_module) = Self::load_shader(&device).expect("Fatal Error. Unable to load shaders.");
 
-        let bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { bindings: &[] });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            bindings: &[
+                wgpu::BindGroupLayoutBinding {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::UniformBuffer,
+                },
+            ]
+        });
+
+        let mx_ref: &[f32; 16] = &[0.0; 16];
+        let uniform_buf = device
+            .create_buffer_mapped(
+                16,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+            )
+            .fill_from_slice(mx_ref);
+
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
-            bindings: &[],
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &uniform_buf,
+                        range: 0 .. 64,
+                    },
+                },
+            ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
@@ -149,10 +176,21 @@ impl Painter {
             },
         );
 
+        let vertex_buffer = device
+            .create_buffer_mapped(0, BufferUsage::VERTEX)
+            .fill_from_slice(&[] as &[Vertex]);
+
+        let index_buffer = device
+            .create_buffer_mapped(0, BufferUsage::INDEX)
+            .fill_from_slice(&[] as &[u16]);
+
+        let init_command_buf = init_encoder.finish();
+        device.get_queue().submit(&[init_command_buf]);
+
         Self {
             events_loop,
-            vertex_buffer: device.create_buffer_mapped(0, BufferUsage::VERTEX).fill_from_slice(&[] as &[Vertex]),
-            index_buffer: device.create_buffer_mapped(0, BufferUsage::INDEX).fill_from_slice(&[] as &[u16]),
+            vertex_buffer,
+            index_buffer,
             device,
             swap_chain,
             bind_group,
