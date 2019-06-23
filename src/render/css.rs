@@ -1,5 +1,7 @@
 extern crate nom;
 
+use nom::error::convert_error;
+use nom::error::VerboseError;
 use nom::InputTakeAtPosition;
 use nom::character::complete::multispace0;
 use nom::AsChar;
@@ -22,21 +24,37 @@ use nom::bytes::complete::{
 };
 use nom::character::complete::char;
 use nom::combinator::map_res;
-use nom::IResult;
+use nom::{
+    IResult,
+    Err,
+};
 
 use crossbeam_channel::unbounded;
 use notify::{
     RecursiveMode,
     RecommendedWatcher,
-    Watcher
+    Watcher,
+    EventKind,
+    event::{
+        ModifyKind,
+    },
 };
-use std::time::Duration;
+use std::collections::HashMap;
 
-pub fn parse_styles(style: &str) -> Vec<Rule> {
-    dbg!(style);
-    let (_, result) = rules(style)
-        .expect("Failed to parse stylesheet.");
-    result
+/// Tries to parse an entire stylesheet.
+pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
+    match rules::<VerboseError<&str>>(style) {
+        Ok((_, s)) => Some(s),
+        Err(Err::Error(e)) | Err(Err::Failure(e)) => {
+            log::info!("Failed to load stylesheet.");
+            log::info!("Trace: {}", convert_error(style, e));
+            None
+        },
+        Err(Err::Incomplete(_)) => {
+            log::info!("Unexpected EOF loading the stylesheet.");
+            None
+        }
+    }
 }
 
 pub struct RulesCache {
@@ -46,65 +64,122 @@ pub struct RulesCache {
 }
 
 impl RulesCache {
-    pub fn load_from_file(filename: impl Into<String>) -> Self {
+    /// Tries to create a new CSS rule cache from a given CSS file path.
+    pub fn try_load_from_file(filename: impl Into<String>) -> Option<Self> {
         let filename = filename.into();
 
         let contents = std::fs::read_to_string(std::path::Path::new(&filename.clone()))
             .expect("Something went wrong reading the file");
 
         let (tx, rx) = unbounded();
+        
+        let mut watcher: RecommendedWatcher = match Watcher::new_immediate(tx) {
+            Ok(watcher) => watcher,
+            Err(err) => {
+                log::info!("Failed to create a watcher:");
+                log::info!("{}", err);
+                return None;
+            },
+        };
 
-        // Automatically select the best implementation for your platform.
-        // You can also access each implementation directly e.g. INotifyWatcher.
-        let mut watcher: RecommendedWatcher = Watcher::new_immediate(tx).expect("Could not start watcher.");
+        match watcher.watch(&filename, RecursiveMode::Recursive) {
+            Ok(_) => {},
+            Err(err) => {
+                log::info!("Failed to start watching {}:", filename);
+                log::info!("{}", err);
+                return None;
+            },
+        };
 
-        // Add a path to be watched. All files and directories at that path and
-        // below will be monitored for changes.
-        watcher.watch(&filename, RecursiveMode::Recursive).expect("Could not start watching file.");
-
-        Self {
-            rules: parse_styles(&contents),
+        Some(Self {
+            rules: try_parse_styles(&contents)?,
             rx,
             _watcher: watcher,
-        }
+        })
     }
 
+    /// Returns all Rules that match a given selector.
+    /// 
+    /// E.g. `layer` does not match the `layer[zoom=5]` rule selector.
+    /// On the contrary, `layer[zoom=5]` matches the `layer` rule selector.
     pub fn get_matching_rules(&self, selector: &Selector) -> Vec<&Rule> {
         self.rules.iter().filter(|rule| selector.matches(&rule.selector)).collect()
     }
 
+    /// Updates the CSS cache from the watched file if there was any changes.
+    /// 
+    /// Returns whether a successful update happened.
+    /// Returns false if there was no changes or if the update failed.
     pub fn update(&mut self) -> bool {
         match self.rx.try_recv() {
-            Ok(Ok(notify::event::Event { paths, .. })) => {
-                self.reload_from_file(&paths[0].as_path());
-                println!("changed: {:?}", paths[0]);
-                true
+            Ok(Ok(notify::event::Event {
+                kind: EventKind::Modify(ModifyKind::Data(_)),
+                paths,
+                ..
+            })) => {
+                self.try_reload_from_file(&paths[0].as_path())
             },
-            Ok(Err(err)) => panic!("Something went wrong with the watcher."),
-            Err(err) => false,
+            // Everything is alright but file wasn't actually changed.
+            Ok(Ok(_)) => { false },
+            Ok(Err(err)) => {
+                log::info!("Something went wrong with the CSS file watcher:");
+                log::info!("{:?}", err);
+                false
+            },
+            Err(err) => {
+                log::info!("Something went wrong with the CSS file watcher:");
+                log::info!("{:?}", err);
+                false
+            },
         }
     }
 
-    fn reload_from_file(&mut self, filename: &std::path::Path) {
-        let contents = std::fs::read_to_string(filename)
-            .expect("Something went wrong reading the file");
-
-        self.rules = parse_styles(&contents);
+    /// Tries reloading the cached styles from a file.
+    /// 
+    /// Returns `true` if it succeeded.
+    /// Returns `false` in any error case.
+    fn try_reload_from_file(&mut self, filename: &std::path::Path) -> bool {
+        match std::fs::read_to_string(filename) {
+            Ok(contents) => {
+                self.rules = match try_parse_styles(&contents) {
+                    Some(rules) => rules,
+                    None => return false,
+                }
+            },
+            Err(err) => {
+                log::info!("Failed to read file at {:?}:", filename);
+                log::info!("{}", err);
+                return false;
+            },
+        }
+        true
     }
 }
 
+/// A single CSS rule including it's selector.
 #[derive(Debug)]
 pub struct Rule {
+    /// The selector that the rule is intended for.
     pub selector: Selector,
+    /// The key/value pairs the rule holds.
     pub kvs: std::collections::HashMap<String, CSSValue>,
 }
 
+/// A single CSS selector.
 #[derive(Debug)]
 pub struct Selector {
+    /// The type a selector matches.
+    /// E.g. `"layer"`.
     pub typ: Option<String>,
+    /// The id a selector matches.
+    /// E.g. `"0"`.
     pub id: Option<String>,
+    /// The classes a selector matches.
+    /// E.g. `["landmark", "forest"]`.
     pub classes: Vec<String>,
-    pub name: Option<String>,
+    /// The name a selector matches.
+    /// E.g. `"water"`.
+    pub any: HashMap<String, String>,
 }
 
 impl Default for Selector {
@@ -113,12 +188,49 @@ impl Default for Selector {
             typ: None,
             id: None,
             classes: vec![],
-            name: None,
+            any: HashMap::new(),
         }
     }
 }
 
 impl Selector {
+    /// Creates a new empty selector.
+    pub fn new() -> Self {
+        Self {
+            typ: None,
+            id: None,
+            classes: vec![],
+            any: HashMap::new(),
+        }
+    }
+
+    /// Makes the selector require the type `typ`.
+    pub fn with_type(mut self, typ: String) -> Self {
+        self.typ = Some(typ);
+        self
+    }
+
+    /// Makes the selector require the id `id`.
+    pub fn with_id(mut self, id: String) -> Self {
+        self.id = Some(id);
+        self
+    }
+
+    /// Makes the selector require the class `class`.
+    pub fn with_class(mut self, class: String) -> Self {
+        self.classes.push(class);
+        self
+    }
+
+    /// Makes the selector require the kv `key`/`value`.
+    pub fn with_any(mut self, key: String, value: String) -> Self {
+        self.any.insert(key, value);
+        self
+    }
+
+    /// Checks if a subset of criteria of this selector matches all the criteria of another.
+    /// 
+    /// Use example: layer.selector.matches(&landmark_selector)`.
     pub fn matches(&self, other: &Selector) -> bool {
         if let Some(t1) = &other.typ {
             if let Some(t2) = &self.typ {
@@ -136,9 +248,11 @@ impl Selector {
             }
         }
 
-        if let Some(n1) = &other.name {
-            if let Some(n2) = &self.name {
-                if n1 != n2 { return false; }
+        for (k, v) in &other.any {
+            if let Some(value) = self.any.get(k) {
+                if value != v {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -154,17 +268,21 @@ impl Selector {
     }
 }
 
+/// A single part of a selector.
+/// Used for parsing only.
 #[derive(Debug)]
-pub enum SelectorPart {
+enum SelectorPart {
     Class(String),
     Id(String),
     Any(String, String),
 }
 
-fn rules(input: &str) -> IResult<&str, Vec<Rule>> {
+/// Parses an entire set of rules.
+fn rules<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Vec<Rule>, E> {
     many0(rule)(input)
 }
 
+/// Munch all whitespace before and after `f`.
 fn whitespace<I, O, E, F>(f: F) -> impl Fn(I) -> IResult<I, O, E>
 where
     I: Clone + PartialEq + InputTakeAtPosition,
@@ -175,7 +293,9 @@ where
     delimited(multispace0, f, multispace0)
 }
 
-fn rule(input: &str) -> IResult<&str, Rule> {
+/// Parse a single rule.
+/// E.g. `layer[name=water]{ background-color: #FF0000; }`.
+fn rule<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Rule, E> {
     let (remaining, (selector, _, kvs, _)) = tuple((
         whitespace(selector),
         whitespace(char('{')),
@@ -183,37 +303,49 @@ fn rule(input: &str) -> IResult<&str, Rule> {
         whitespace(char('}'))
     ))(input)?;
 
-    Ok(("", Rule { selector, kvs }))
+    Ok((remaining, Rule { selector, kvs }))
 }
 
-fn selector(input: &str) -> IResult<&str, Selector> {
+/// Parse a single selector.
+/// E.g. `layer[name=water].class#id`.
+fn selector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Selector, E> {
     let mut selector: Selector = Default::default();
     
+    // Try parsing the type (Html tag) of a selector.
     let (remaining, typ) = take_while(|c| is_alphanumeric(c as u8))(input)?;
+
+    // The type is optional. So if no type was found, set the type to `None`.
     selector.typ = if typ.len() > 0 { Some(typ.into()) } else { None };
 
+    // Parse all the remaining selector parts.
     let (remaining, pairs) = many0(alt((class, id, any)))(remaining)?;
 
     for pair in pairs {
         match pair {
             SelectorPart::Class(v) => selector.classes.push(v),
             SelectorPart::Id(v) => selector.id = Some(v),
-            SelectorPart::Any(k, v) => if k == "name" { selector.name = Some(v); },
+            SelectorPart::Any(k, v) => { selector.any.insert(k, v); },
         }
     }
 
     Ok((remaining, selector))
 }
 
-fn class(input: &str) -> IResult<&str, SelectorPart> {
+/// Parse a single class name.
+/// E.g. `.class`.
+fn class<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorPart, E> {
     preceded(char('.'), take_while(|c| is_alphanumeric(c as u8)))(input).map(|(r, v)| (r, SelectorPart::Class(v.into())))
 }
 
-fn id(input: &str) -> IResult<&str, SelectorPart> {
+/// Parse a single id name.
+/// E.g. `#id`.
+fn id<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorPart, E> {
     preceded(char('#'), take_while(|c| is_alphanumeric(c as u8)))(input).map(|(r, v)| (r, SelectorPart::Id(v.into())))
 }
 
-fn any(input: &str) -> IResult<&str, SelectorPart> {
+/// Parse any CSS selector k/v pair.
+/// E.g. `[name=water]`
+fn any<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorPart, E> {
     let (remaining, _) = char('[')(input)?;
     let (remaining, name) = take_while(|c| is_alphanumeric(c as u8))(remaining)?;
     let (remaining, _) = char('=')(remaining)?;
@@ -222,12 +354,16 @@ fn any(input: &str) -> IResult<&str, SelectorPart> {
     Ok((remaining, SelectorPart::Any(name.into(), value.into())))
 }
 
-fn body(input: &str) -> IResult<&str, std::collections::HashMap::<String, CSSValue>> {
+/// Parses the body of a CSS rule.
+/// E.g. `{}`.
+fn body<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, std::collections::HashMap::<String, CSSValue>, E> {
     let mut hm = std::collections::HashMap::new();
     many0(kv)(input).map(|v| { v.1.into_iter().for_each(|v| { hm.insert(v.0.into(), v.1); }); (v.0, hm) })
 }
 
-fn kv(input: &str) -> IResult<&str, (&str, CSSValue)> {
+/// Parses a single CSS k/v pair.
+/// E.g. `background-color: #FF0000;`.
+fn kv<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (&'a str, CSSValue), E> {
     let (remaining, (kv, _)) = tuple((
         separated_pair(css_name, char(':'), css_value),
         char(';')
@@ -235,52 +371,66 @@ fn kv(input: &str) -> IResult<&str, (&str, CSSValue)> {
     Ok((remaining, kv))
 }
 
-fn css_name(input: &str) -> IResult<&str, &str> {
+/// Parses a CSS qualified name.
+/// Can contain alphanumeric characters and '-'.
+fn css_name<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
     whitespace(take_while(|c| is_alphanumeric(c as u8) || c == '-'))(input)
 }
 
-fn css_value(input: &str) -> IResult<&str, CSSValue> {
+/// Parses a single CSS qualified value.
+fn css_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
     alt((
         whitespace(hex_color),
         string,
     ))(input)
 }
 
+/// Any type of CSS value.
 #[derive(Debug, Clone)]
 pub enum CSSValue {
+    /// Represents any value as a string.
     String(String),
+    /// Represents a color.
     Color(Color),
+    Number(f64),
 }
 
-fn string(input: &str) -> IResult<&str, CSSValue> {
-  let (input, value) = whitespace(take_while(|c| is_alphanumeric(c as u8) || c == '-'))(input)?;
+/// Parses a single CSS qualified string.
+/// Can contain alphanumeric characters, '-' and spaces.
+fn string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+  let (input, value) = whitespace(take_while(|c| is_alphanumeric(c as u8) || c == '-' || c == ' '))(input)?;
 
   Ok((input, CSSValue::String(value.into())))
 }
 
+/// A struct to represent any RGB color.
 #[derive(Debug,PartialEq, Clone)]
 pub struct Color {
-  pub r:   u8,
+  pub r: u8,
   pub g: u8,
-  pub b:  u8,
+  pub b: u8,
 }
 
+/// Converts a hex string into an `u8`.
 fn from_hex(input: &str) -> Result<u8, std::num::ParseIntError> {
   u8::from_str_radix(input, 16)
 }
 
+/// `true` if `c` is a hexadecimal valid digit.
 fn is_hex_digit(c: char) -> bool {
   c.is_digit(16)
 }
 
-fn hex_primary(input: &str) -> IResult<&str, u8> {
+/// Parse an actual hex code.
+fn hex_primary<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E> {
   map_res(
     take_while_m_n(2, 2, is_hex_digit),
     from_hex
   )(input)
 }
 
-fn hex_color(input: &str) -> IResult<&str, CSSValue> {
+/// Parse a single hex color code including the `#`.
+fn hex_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
   let (input, _) = tag("#")(input)?;
   let (input, (r, g, b)) = tuple((hex_primary, hex_primary, hex_primary))(input)?;
 

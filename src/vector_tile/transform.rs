@@ -42,19 +42,32 @@ impl Layer {
     }
 
     pub fn with_style(mut self, cache: &RulesCache) -> Self {
-        let rules = cache.get_matching_rules(&Selector {
-            typ: Some("layer".into()),
-            id: None,
-            classes: vec![],
-            name: Some(self.name.clone()),
-        });
+        let rules = cache.get_matching_rules(
+            &Selector::new()
+                .with_type("layer".to_string())
+                .with_any("name".to_string(), self.name.clone())
+        );
         let background_color = rules
             .iter()
-            .filter_map(|r| if r.kvs.contains_key("background-color") { Some(r.kvs["background-color"].clone()) } else { None })
+            .filter_map(|r| r.kvs.get("background-color"))
             .last();
 
-            if let Some(CSSValue::Color(bg)) = background_color {
-                self.color = [bg.r as f32 / 255.0, bg.g as f32 / 255.0, bg.b as f32 / 255.0];
+            if let Some(color) = background_color {
+                match color {
+                    CSSValue::Color(bg) => {
+                        self.color = [bg.r as f32 / 255.0, bg.g as f32 / 255.0, bg.b as f32 / 255.0];
+                    },
+                    CSSValue::String(string) => {
+                        match &string[..] {
+                            "red" => self.color = [1.0, 0.0, 0.0],
+                            "blue" => self.color = [0.0, 0.0, 1.0],
+                            "green" => self.color = [0.0, 1.0, 0.0],
+                            // Other CSS colors to come later.
+                            _ => {},
+                        }
+                    },
+                    _ => {},
+                }
             }
 
         self

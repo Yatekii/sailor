@@ -5,6 +5,8 @@ mod drawing;
 #[macro_use]
 extern crate glium;
 extern crate lyon;
+// #[macro_use]
+// extern crate pfh;
 
 use structopt::StructOpt;
 
@@ -69,6 +71,8 @@ fn main() {
 
     painter.set_buffers(&v, &i);
 
+    dbg!(&i.len());
+
     loop {
         painter.update_view();
     }
@@ -88,7 +92,8 @@ fn mainf() {
     let zurich = math::num_to_global_space(&tile_coordinate);
 
     let mut cache = crate::vector_tile::cache::TileCache::new();
-    let mut css_cache = crate::render::css::RulesCache::load_from_file("config/style.css");
+    let mut css_cache = crate::render::css::RulesCache::try_load_from_file("config/style.css")
+        .expect("Could not load map style.");
 
     // let zurich: lyon::math::Point = lyon::math::point(0.525754,0.35115147);
     // let (x, y) = crate::vector_tile::math::deg2num(40.7128, 74.0060, z); // NY

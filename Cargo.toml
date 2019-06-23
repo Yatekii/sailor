@@ -21,3 +21,4 @@ wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"] }
 pretty_env_logger = "0.3.0"
 log = "0.4.6"
 glsl-to-spirv = "0.1"
+phf = { version = "*", features = ["macros"] }

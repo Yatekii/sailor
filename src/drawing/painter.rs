@@ -1,6 +1,9 @@
 use wgpu::{
     winit::{
         EventsLoop,
+        dpi::{
+            LogicalSize,
+        },
     },
     ShaderModule,
     SwapChain,
@@ -43,6 +46,7 @@ impl Painter {
             let instance = wgpu::Instance::new();
 
             let window = Window::new(&events_loop).unwrap();
+            //window.set_inner_size(LogicalSize { width: 600.0, height: 600.0 });
             let size = window
                 .get_inner_size()
                 .unwrap()
@@ -56,6 +60,7 @@ impl Painter {
         #[cfg(feature = "gl")]
         let (instance, size, surface) = {
             let wb = wgpu::winit::WindowBuilder::new();
+                //.with_dimensions(LogicalSize { width: 600.0, height: 600.0 });
             let cb = wgpu::glutin::ContextBuilder::new().with_vsync(true);
             let context = wgpu::glutin::WindowedContext::new_windowed(wb, cb, &events_loop).unwrap();
 
