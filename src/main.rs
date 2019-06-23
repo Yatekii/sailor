@@ -64,8 +64,9 @@ fn main() {
 
     for rl in layers {
         if rl.name == "water" {
+            let l = v.len();
             v.extend(rl.mesh.vertices);
-            i.extend(rl.mesh.indices);
+            i.extend(rl.mesh.indices.iter().map(|i| i + l as u16).collect::<Vec<u16>>());
         }
     }
 
