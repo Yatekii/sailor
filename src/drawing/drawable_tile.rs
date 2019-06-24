@@ -1,12 +1,15 @@
+use crate::drawing::drawable_layer::DrawableLayer;
 use wgpu::{
     RenderPass,
     Buffer,
+    BindGroup,
 };
 
 pub struct DrawableTile {
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
     pub index_count: u32,
+    pub layers: Vec<DrawableLayer>
 }
 
 impl DrawableTile {

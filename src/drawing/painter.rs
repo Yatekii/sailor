@@ -1,6 +1,9 @@
 use lyon::math::Point;
 use crate::vector_tile::math::TileId;
-use crate::drawing::drawable_tile::DrawableTile;
+use crate::drawing::{
+    drawable_tile::DrawableTile,
+    drawable_layer::DrawableLayer,
+};
 use std::collections::HashMap;
 
 use wgpu::{
@@ -48,7 +51,7 @@ pub struct Painter {
     index_buffer: Buffer,
     index_count: u32,
     loaded_tiles: HashMap<TileId, DrawableTile>,
-    bind_group: BindGroup,
+    bind_group_layout: BindGroupLayout,
     uniform_buffer: Buffer,
 }
 
@@ -120,18 +123,7 @@ impl Painter {
 
         let uniform_buffer = Self::create_uniform_buffer(&device, &Point::new(1.0, 0.0));
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer {
-                        buffer: &uniform_buffer,
-                        range: 0 .. 8,
-                    },
-                },
-            ],
-        });
+        let bind_group = Self::create_bind_group(&device, &bind_group_layout, &uniform_buffer);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
@@ -206,7 +198,7 @@ impl Painter {
             render_pipeline,
             index_count: 0,
             loaded_tiles: HashMap::new(),
-            bind_group,
+            bind_group_layout,
             uniform_buffer,
         }
     }
@@ -219,6 +211,21 @@ impl Painter {
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
             .fill_from_slice(&[pan.x, pan.y])
+    }
+
+    fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, uniform_buffer: &Buffer) -> BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: bind_group_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &uniform_buffer,
+                        range: 0 .. 8,
+                    },
+                },
+            ],
+        })
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.
@@ -254,7 +261,9 @@ impl Painter {
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
                 app_state.tile_cache.fetch_tile(&tile_id);
+                let css_cache = &app_state.css_cache;
                 if let Some(tile) = app_state.tile_cache.try_get_tile(&tile_id) {
+                    let mut vertex_count = 0;
                     self.loaded_tiles.insert(tile_id, DrawableTile {
                         vertex_buffer: self.device
                             .create_buffer_mapped(tile.layers[0].mesh.vertices.len(), wgpu::BufferUsage::VERTEX)
@@ -263,6 +272,14 @@ impl Painter {
                             .create_buffer_mapped(tile.layers[0].mesh.indices.len(), wgpu::BufferUsage::INDEX)
                             .fill_from_slice(&tile.layers[0].mesh.indices),
                         index_count: tile.layers[0].mesh.indices.len() as u32,
+                        layers: tile.layers
+                            .iter()
+                            .map(|l| {
+                                let vc = l.mesh.indices.len() as u32;
+                                vertex_count += vc;
+                                DrawableLayer::from_layer(vertex_count - vc, vertex_count, l, css_cache)
+                            })
+                            .collect(),
                     });
                 } else {
                     log::error!("Could not read tile from cache. This is a bug. Please report it!");
@@ -296,8 +313,14 @@ impl Painter {
                 depth_stencil_attachment: None,
             });
 
+            let bind_group = Self::create_bind_group(
+                &self.device,
+                &self.bind_group_layout,
+                &Self::create_uniform_buffer(&self.device, &app_state.screen.center)
+            );
+
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.bind_group, &[]);
+            render_pass.set_bind_group(0, &bind_group, &[]);
 
             for drawable_tile in self.loaded_tiles.values_mut() {
                 drawable_tile.paint(&mut render_pass);

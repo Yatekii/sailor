@@ -411,6 +411,14 @@ pub struct Color {
   pub b: u8,
 }
 
+impl Color {
+    pub const WHITE: Color = Color { r: 255, g: 255, b: 255, };
+    pub const BLACK: Color = Color { r:   0, g:   0, b:   0, };
+    pub const RED:   Color = Color { r: 255, g:   0, b:   0, };
+    pub const GREEN: Color = Color { r:   0, g: 255, b:   0, };
+    pub const BLUE:  Color = Color { r:   0, g:   0, b: 255, };
+}
+
 /// Converts a hex string into an `u8`.
 fn from_hex(input: &str) -> Result<u8, std::num::ParseIntError> {
   u8::from_str_radix(input, 16)
