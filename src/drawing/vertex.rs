@@ -5,10 +5,11 @@ use crate::vector_tile::math;
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
     pub position: [f32; 2],
+    pub layer_id: u32,
 }
 
-pub fn vertex(x: f32, y: f32) -> Vertex {
-    Vertex { position: [x, y] }
+pub fn vertex(x: f32, y: f32, layer_id: u32) -> Vertex {
+    Vertex { position: [x, y], layer_id, }
 }
 
 implement_vertex!(Vertex, position);
@@ -16,6 +17,7 @@ implement_vertex!(Vertex, position);
 // A very simple vertex constructor that only outputs the vertex position
 pub struct LayerVertexCtor {
     pub tile_id: math::TileId,
+    pub layer_id: u32,
 }
 
 impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
@@ -25,6 +27,7 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         // println!("{:?}", vertex.position);
         Vertex {
             position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
+            layer_id: self.layer_id,
         }
     }
 }

@@ -84,12 +84,13 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
 
     let mut layers = vec![];
 
-    for layer in &tile.layers {
+    for (i, layer) in tile.layers.iter().enumerate() {
         let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
 
         for feature in &layer.features {
             let mut tmesh = geometry_commands_to_drawable(
                 tile_id,
+                i as u32,
                 feature.type_pb,
                 &feature.geometry,
                 tile.layers[0].extent
@@ -205,7 +206,7 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
     panic!("This is a bug. Please report it.");
 }
 
-fn geometry_commands_to_drawable(tile_id: &math::TileId, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32) -> VertexBuffers<Vertex, u16> {
+fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32) -> VertexBuffers<Vertex, u16> {
     let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
     let mut cursor = 0;
 
@@ -221,7 +222,7 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, geometry_type: GeomType
                 .tessellate_path(
                     &path,
                     &FillOptions::tolerance(0.0001),
-                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone() }),
+                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
                 )
                 .expect("Failed to tesselate path.");
 

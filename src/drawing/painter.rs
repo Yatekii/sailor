@@ -1,3 +1,5 @@
+use wgpu::CommandEncoder;
+use crate::drawing::drawable_layer::LayerData;
 use lyon::math::Point;
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
@@ -47,12 +49,8 @@ pub struct Painter {
     device: Device,
     swap_chain: SwapChain,
     render_pipeline: RenderPipeline,
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
-    index_count: u32,
     loaded_tiles: HashMap<TileId, DrawableTile>,
     bind_group_layout: BindGroupLayout,
-    uniform_buffer: Buffer,
 }
 
 impl Painter {
@@ -121,10 +119,6 @@ impl Painter {
             ]
         });
 
-        let uniform_buffer = Self::create_uniform_buffer(&device, &Point::new(1.0, 0.0));
-
-        let bind_group = Self::create_bind_group(&device, &bind_group_layout, &uniform_buffer);
-
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
         });
@@ -179,38 +173,64 @@ impl Painter {
             },
         );
 
-        let vertex_buffer = device
-            .create_buffer_mapped(0, BufferUsage::VERTEX)
-            .fill_from_slice(&[] as &[Vertex]);
-
-        let index_buffer = device
-            .create_buffer_mapped(0, BufferUsage::INDEX)
-            .fill_from_slice(&[] as &[u16]);
-
         let init_command_buf = init_encoder.finish();
         device.get_queue().submit(&[init_command_buf]);
 
         Self {
-            vertex_buffer,
-            index_buffer,
             device,
             swap_chain,
             render_pipeline,
-            index_count: 0,
             loaded_tiles: HashMap::new(),
             bind_group_layout,
-            uniform_buffer,
         }
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_uniform_buffer(device: &Device, pan: &Point) -> Buffer {
-        device
+    fn create_uniform_buffers(device: &Device, pan: &Point, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
+        let pan_len = 4 * 4;
+        let pan_buffer = device
             .create_buffer_mapped(
-                2,
+                pan_len / 4,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
-            .fill_from_slice(&[pan.x, pan.y])
+            .fill_from_slice(&[pan.x, pan.y, 0.0, 0.0]);
+        let layer_data_len = drawable_layers.len() * 4 * 4;
+        let layer_data_buffer = device
+            .create_buffer_mapped(
+                layer_data_len / 4 / 4,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+            )
+            .fill_from_slice(&drawable_layers.iter().map(|dl| dl.layer_data).collect::<Vec<_>>().as_slice());
+
+        vec![(pan_buffer, pan_len), (layer_data_buffer, layer_data_len)]
+    }
+
+    fn copy_uniform_buffers(device: &Device, encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>) -> Buffer{
+        let final_buffer = device
+            .create_buffer_mapped::<u8>(
+                Self::uniform_buffer_size() as usize,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+            )
+            .fill_from_slice(&[0; Self::uniform_buffer_size() as usize]);
+
+        let mut total_bytes = 0;
+        for (buffer, len) in source {
+            encoder.copy_buffer_to_buffer(
+                &buffer,
+                0,
+                &final_buffer,
+                total_bytes,
+                *len as u64
+            );
+            total_bytes += *len as u64;
+        }
+
+        final_buffer
+    }
+
+    const fn uniform_buffer_size() -> u64 {
+        4 * 4
+      + 4 * 4 * 30
     }
 
     fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, uniform_buffer: &Buffer) -> BindGroup {
@@ -221,7 +241,7 @@ impl Painter {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &uniform_buffer,
-                        range: 0 .. 8,
+                        range: 0 .. dbg!(Self::uniform_buffer_size()),
                     },
                 },
             ],
@@ -242,19 +262,6 @@ impl Painter {
 
     }
 
-    /// Sets the buffers to be drawn.
-    pub fn set_buffers(&mut self, vertices: &Vec<Vertex>, indices: &Vec<u16>) {
-        self.vertex_buffer = self.device
-            .create_buffer_mapped(vertices.len(), wgpu::BufferUsage::VERTEX)
-            .fill_from_slice(&vertices);
-
-        self.index_buffer = self.device
-            .create_buffer_mapped(indices.len(), wgpu::BufferUsage::INDEX)
-            .fill_from_slice(&indices);
-
-        self.index_count = indices.len() as u32;
-    }
-
     pub fn load_tiles(&mut self, app_state: &mut AppState) {
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
 
@@ -264,6 +271,28 @@ impl Painter {
                 let css_cache = &app_state.css_cache;
                 if let Some(tile) = app_state.tile_cache.try_get_tile(&tile_id) {
                     let mut vertex_count = 0;
+
+                    let layers = tile.layers
+                        .iter()
+                        .map(|l| {
+                            let vc = l.mesh.indices.len() as u32;
+                            vertex_count += vc;
+                            DrawableLayer::from_layer(vertex_count - vc, vertex_count, l, css_cache)
+                        })
+                        .collect();
+
+                    let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+                    let bind_group = Self::create_bind_group(
+                        &self.device,
+                        &self.bind_group_layout,
+                        &Self::copy_uniform_buffers(
+                            &self.device,
+                            &mut encoder,
+                            &Self::create_uniform_buffers(&self.device, &app_state.screen.center, &layers)
+                        )
+                    );
+                    encoder.finish();
+
                     self.loaded_tiles.insert(tile_id, DrawableTile {
                         vertex_buffer: self.device
                             .create_buffer_mapped(tile.layers[0].mesh.vertices.len(), wgpu::BufferUsage::VERTEX)
@@ -272,14 +301,8 @@ impl Painter {
                             .create_buffer_mapped(tile.layers[0].mesh.indices.len(), wgpu::BufferUsage::INDEX)
                             .fill_from_slice(&tile.layers[0].mesh.indices),
                         index_count: tile.layers[0].mesh.indices.len() as u32,
-                        layers: tile.layers
-                            .iter()
-                            .map(|l| {
-                                let vc = l.mesh.indices.len() as u32;
-                                vertex_count += vc;
-                                DrawableLayer::from_layer(vertex_count - vc, vertex_count, l, css_cache)
-                            })
-                            .collect(),
+                        bind_group: bind_group,
+                        layers: layers,
                     });
                 } else {
                     log::error!("Could not read tile from cache. This is a bug. Please report it!");
@@ -290,17 +313,8 @@ impl Painter {
 
     pub fn paint(&mut self, app_state: &AppState) {
         let frame = self.swap_chain.get_next_texture();
+        let t = std::time::Instant::now();
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-        encoder.copy_buffer_to_buffer(
-            &Self::create_uniform_buffer(
-                &self.device,
-                &app_state.screen.center
-            ),
-            0,
-            &self.uniform_buffer,
-            0,
-            8
-        );
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -313,14 +327,7 @@ impl Painter {
                 depth_stencil_attachment: None,
             });
 
-            let bind_group = Self::create_bind_group(
-                &self.device,
-                &self.bind_group_layout,
-                &Self::create_uniform_buffer(&self.device, &app_state.screen.center)
-            );
-
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &bind_group, &[]);
 
             for drawable_tile in self.loaded_tiles.values_mut() {
                 drawable_tile.paint(&mut render_pass);
@@ -328,5 +335,6 @@ impl Painter {
         }
 
         self.device.get_queue().submit(&[encoder.finish()]);
+        // dbg!(t.elapsed().as_millis());
     }
 }

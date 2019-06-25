@@ -6,15 +6,38 @@ use crate::render::css::{
 };
 use crate::vector_tile::transform::Layer;
 
+#[derive(Debug, Clone)]
 pub struct DrawableLayer {
     pub start_vertex: u32,
     pub end_vertex: u32,
-    pub background_color: Color,
+    pub layer_data: LayerData,
     pub layer_info: LayerInfo,
 }
 
+#[derive(Debug, Clone)]
 pub struct LayerInfo {
     pub name: String,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct LayerData {
+    background_color: DrawableColor,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct DrawableColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl From<Color> for DrawableColor {
+    fn from(value: Color) -> Self {
+        Self {
+            r: value.r as f32 / 255.0, g: value.g as f32 / 255.0, b: value.b as f32 / 255.0, a: 1.0,
+        }
+    }
 }
 
 impl DrawableLayer {
@@ -22,7 +45,9 @@ impl DrawableLayer {
         let mut drawable_layer = Self {
             start_vertex,
             end_vertex,
-            background_color: Color::WHITE,
+            layer_data: LayerData {
+                background_color: Color::WHITE.into()
+            },
             layer_info: LayerInfo {
                 name: layer.name.clone(),
             },
@@ -45,13 +70,13 @@ impl DrawableLayer {
         if let Some(color) = background_color {
             match color {
                 CSSValue::Color(bg) => {
-                    self.background_color = bg.clone();
+                    self.layer_data.background_color = bg.clone().into();
                 },
                 CSSValue::String(string) => {
                     match &string[..] {
-                        "red" => self.background_color = Color::RED,
-                        "blue" => self.background_color = Color::GREEN,
-                        "green" => self.background_color = Color::BLUE,
+                        "red" => self.layer_data.background_color = Color::RED.into(),
+                        "blue" => self.layer_data.background_color = Color::GREEN.into(),
+                        "green" => self.layer_data.background_color = Color::BLUE.into(),
                         // Other CSS colors to come later.
                         _ => {},
                     }
