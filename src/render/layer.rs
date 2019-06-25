@@ -33,15 +33,15 @@ impl RenderLayer {
     }
 
     pub fn draw(&self, target: &mut impl glium::Surface, program: &glium::Program, pan: Point) {        
-        target.draw(
-            &self.gpu_data.0,
-            &self.gpu_data.1,
-            &program,
-            &uniform! {
-                layer_color: self.layer.color.clone(),
-                pan: (pan.x, pan.y),
-            },
-            &Default::default(),
-        ).unwrap();
+        // target.draw(
+        //     &self.gpu_data.0,
+        //     &self.gpu_data.1,
+        //     &program,
+        //     &uniform! {
+        //         layer_color: self.layer.color.clone(),
+        //         pan: (pan.x, pan.y),
+        //     },
+        //     &Default::default(),
+        // ).unwrap();
     }
 }

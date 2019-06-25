@@ -29,7 +29,6 @@ use crate::render::css::CSSValue;
 pub struct Layer {
     pub name: String,
     pub mesh: VertexBuffers<Vertex, u16>,
-    pub color: [f32; 3],
 }
 
 impl Layer {
@@ -37,7 +36,6 @@ impl Layer {
         Self {
             name,
             mesh,
-            color: [0.0, 0.0, 0.0],
         }
     }
 
@@ -52,23 +50,23 @@ impl Layer {
             .filter_map(|r| r.kvs.get("background-color"))
             .last();
 
-            if let Some(color) = background_color {
-                match color {
-                    CSSValue::Color(bg) => {
-                        self.color = [bg.r as f32 / 255.0, bg.g as f32 / 255.0, bg.b as f32 / 255.0];
-                    },
-                    CSSValue::String(string) => {
-                        match &string[..] {
-                            "red" => self.color = [1.0, 0.0, 0.0],
-                            "blue" => self.color = [0.0, 0.0, 1.0],
-                            "green" => self.color = [0.0, 1.0, 0.0],
-                            // Other CSS colors to come later.
-                            _ => {},
-                        }
-                    },
-                    _ => {},
-                }
-            }
+            // if let Some(color) = background_color {
+            //     match color {
+            //         CSSValue::Color(bg) => {
+            //             self.color = [bg.r as f32 / 255.0, bg.g as f32 / 255.0, bg.b as f32 / 255.0];
+            //         },
+            //         CSSValue::String(string) => {
+            //             match &string[..] {
+            //                 "red" => self.color = [1.0, 0.0, 0.0],
+            //                 "blue" => self.color = [0.0, 0.0, 1.0],
+            //                 "green" => self.color = [0.0, 1.0, 0.0],
+            //                 // Other CSS colors to come later.
+            //                 _ => {},
+            //             }
+            //         },
+            //         _ => {},
+            //     }
+            // }
 
         self
     }
@@ -85,6 +83,7 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
     let mut layers = vec![];
 
     for (i, layer) in tile.layers.iter().enumerate() {
+        dbg!(i);
         let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
 
         for feature in &layer.features {
@@ -106,22 +105,10 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
         const BLUE: [f32; 3] = [0.239, 0.824, 1.0f32];
         const YELLOW: [f32; 3] = [1.0, 0.894, 0.408];
 
-        match &layer.name.to_string()[..] {
-            "water"| "park" | "landcover" | "landuse" => { 
-                layers.push(crate::vector_tile::transform::Layer {
-                    name: layer.name.to_string(),
-                    mesh: mesh,
-                    color: match &layer.name[..] {
-                        "water" => BLUE,
-                        "landcover" => GREEN,
-                        "landuse" => YELLOW,
-                        "park" => GREEN,
-                        _ => panic!("This is a bug. Please report it."),
-                    }
-                })
-            },
-            _ => {}
-        }
+        layers.push(crate::vector_tile::transform::Layer {
+            name: layer.name.to_string(),
+            mesh: mesh,
+        });
     }
 
     println!("Took {} ms.", t.elapsed().as_millis());
