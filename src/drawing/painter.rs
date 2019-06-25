@@ -158,9 +158,14 @@ impl Painter {
                         offset: 0,
                         shader_location: 0,
                     },
+                    wgpu::VertexAttributeDescriptor {
+                        format: wgpu::VertexFormat::Uint,
+                        offset: 8,
+                        shader_location: 1,
+                    },
                 ],
             }],
-            sample_count: 1,
+            sample_count: 8,
         });
 
         let swap_chain = device.create_swap_chain(
@@ -293,14 +298,24 @@ impl Painter {
                     );
                     self.device.get_queue().submit(&[encoder.finish()]);
 
+                    let mut vertices = vec![];
+                    let mut indices = vec![];
+
+                    let mut offset = 0;
+                    for layer in &tile.layers {
+                        vertices.extend(layer.mesh.vertices.clone());
+                        indices.extend(layer.mesh.indices.iter().map(|i| i + offset));
+                        offset += layer.mesh.vertices.len() as u16;
+                    }
+
                     self.loaded_tiles.insert(tile_id, DrawableTile {
                         vertex_buffer: self.device
-                            .create_buffer_mapped(tile.layers[0].mesh.vertices.len(), wgpu::BufferUsage::VERTEX)
-                            .fill_from_slice(&tile.layers[0].mesh.vertices),
+                            .create_buffer_mapped(vertices.len(), wgpu::BufferUsage::VERTEX)
+                            .fill_from_slice(&vertices),
                         index_buffer: self.device
-                            .create_buffer_mapped(tile.layers[0].mesh.indices.len(), wgpu::BufferUsage::INDEX)
-                            .fill_from_slice(&tile.layers[0].mesh.indices),
-                        index_count: tile.layers[0].mesh.indices.len() as u32,
+                            .create_buffer_mapped(indices.len(), wgpu::BufferUsage::INDEX)
+                            .fill_from_slice(&indices),
+                        index_count: indices.len() as u32,
                         bind_group: bind_group,
                         layers: layers,
                     });

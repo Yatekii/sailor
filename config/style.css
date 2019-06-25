@@ -1,3 +1,15 @@
 layer[name=water] {
     background-color: #0000FF;
 }
+
+layer[name=park] {
+    background-color: #0F6E7A;
+}
+
+layer[name=landcover] {
+    background-color: #CCC91F;
+}
+
+layer[name=landuse] {
+    background-color: #A11414;
+}
