@@ -240,7 +240,7 @@ impl Painter {
                 wgpu::Binding {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
-                        buffer: &uniform_buffer,
+                        buffer: uniform_buffer,
                         range: 0 .. dbg!(Self::uniform_buffer_size()),
                     },
                 },
@@ -291,7 +291,7 @@ impl Painter {
                             &Self::create_uniform_buffers(&self.device, &app_state.screen.center, &layers)
                         )
                     );
-                    encoder.finish();
+                    self.device.get_queue().submit(&[encoder.finish()]);
 
                     self.loaded_tiles.insert(tile_id, DrawableTile {
                         vertex_buffer: self.device

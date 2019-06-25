@@ -15,9 +15,8 @@ layout(set = 0, binding = 0) uniform Locals {
 };
 
 void main() {
-    // gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
-    // outColor = vec4(pan, 0.0, 1.0);
-    // gl_Position = vec4(position * 256, 0.0, 1.0);
     gl_Position = vec4((position - pan) * 256, 0.0, 1.0);
     gl_Position.xy -= vec2(1.0);
+
+    outColor = layer_data[layer_id].background_color;
 }
