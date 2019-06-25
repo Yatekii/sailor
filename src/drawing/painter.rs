@@ -1,3 +1,4 @@
+use wgpu::Surface;
 use wgpu::CommandEncoder;
 use crate::drawing::drawable_layer::LayerData;
 use lyon::math::Point;
@@ -10,12 +11,14 @@ use std::collections::HashMap;
 
 use wgpu::{
     winit::{
+        Window,
         EventsLoop,
         dpi::{
             LogicalSize,
         },
     },
     ShaderModule,
+    SwapChainDescriptor,
     SwapChain,
     Device,
     BindGroupLayout,
@@ -46,7 +49,10 @@ use super::{
 use crate::app_state::AppState;
 
 pub struct Painter {
+    window: Window,
     device: Device,
+    surface: Surface,
+    swap_chain_descriptor: SwapChainDescriptor,
     swap_chain: SwapChain,
     render_pipeline: RenderPipeline,
     loaded_tiles: HashMap<TileId, DrawableTile>,
@@ -57,7 +63,7 @@ impl Painter {
     /// Initializes the entire draw machinery.
     pub fn init(events_loop: &EventsLoop) -> Self {
         #[cfg(not(feature = "gl"))]
-        let (_window, instance, size, surface) = {
+        let (window, instance, size, surface) = {
             use wgpu::winit::Window;
 
             let instance = wgpu::Instance::new();
@@ -168,21 +174,26 @@ impl Painter {
             sample_count: 8,
         });
 
+        let swap_chain_descriptor = wgpu::SwapChainDescriptor {
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            width: size.width.round() as u32,
+            height: size.height.round() as u32,
+        };
+
         let swap_chain = device.create_swap_chain(
             &surface,
-            &wgpu::SwapChainDescriptor {
-                usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-                format: wgpu::TextureFormat::Bgra8Unorm,
-                width: size.width.round() as u32,
-                height: size.height.round() as u32,
-            },
+            &swap_chain_descriptor,
         );
 
         let init_command_buf = init_encoder.finish();
         device.get_queue().submit(&[init_command_buf]);
 
         Self {
+            window,
             device,
+            surface,
+            swap_chain_descriptor,
             swap_chain,
             render_pipeline,
             loaded_tiles: HashMap::new(),
@@ -246,7 +257,7 @@ impl Painter {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: uniform_buffer,
-                        range: 0 .. dbg!(Self::uniform_buffer_size()),
+                        range: 0 .. Self::uniform_buffer_size(),
                     },
                 },
             ],
@@ -267,8 +278,23 @@ impl Painter {
 
     }
 
+    pub fn get_hidpi_factor(&self) -> f64 {
+        self.window.get_hidpi_factor()
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.swap_chain_descriptor.width = width;
+        self.swap_chain_descriptor.height = height;
+        self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
+
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        self.device.get_queue().submit(&[encoder.finish()]);
+    }
+
     pub fn load_tiles(&mut self, app_state: &mut AppState) {
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
+
+        let mut new_loaded_tiles = HashMap::new();
 
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
@@ -308,7 +334,7 @@ impl Painter {
                         offset += layer.mesh.vertices.len() as u16;
                     }
 
-                    self.loaded_tiles.insert(tile_id, DrawableTile {
+                    new_loaded_tiles.insert(tile_id, DrawableTile {
                         vertex_buffer: self.device
                             .create_buffer_mapped(vertices.len(), wgpu::BufferUsage::VERTEX)
                             .fill_from_slice(&vertices),
@@ -322,8 +348,15 @@ impl Painter {
                 } else {
                     log::error!("Could not read tile from cache. This is a bug. Please report it!");
                 }
+            } else {
+                if let Some((k, v)) = self.loaded_tiles.remove_entry(&tile_id) {
+                    new_loaded_tiles.insert(k, v);
+                }
             }
         }
+
+        self.loaded_tiles = new_loaded_tiles;
+        dbg!(self.loaded_tiles.len());
     }
 
     pub fn paint(&mut self, app_state: &AppState) {

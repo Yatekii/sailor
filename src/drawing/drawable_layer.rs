@@ -60,14 +60,12 @@ impl DrawableLayer {
         let rules = cache.get_matching_rules(
             &Selector::new()
                 .with_type("layer".to_string())
-                .with_any("name".to_string(), dbg!(self.layer_info.name.clone()))
+                .with_any("name".to_string(), self.layer_info.name.clone())
         );
         let background_color = rules
             .iter()
             .filter_map(|r| r.kvs.get("background-color"))
             .last();
-
-        dbg!(&background_color);
 
         if let Some(color) = background_color {
             match color {

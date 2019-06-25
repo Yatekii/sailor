@@ -12,8 +12,6 @@ pub fn vertex(x: f32, y: f32, layer_id: u32) -> Vertex {
     Vertex { position: [x, y], layer_id, }
 }
 
-implement_vertex!(Vertex, position);
-
 // A very simple vertex constructor that only outputs the vertex position
 pub struct LayerVertexCtor {
     pub tile_id: math::TileId,

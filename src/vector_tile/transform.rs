@@ -83,7 +83,6 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
     let mut layers = vec![];
 
     for (i, layer) in tile.layers.iter().enumerate() {
-        dbg!(i);
         let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
 
         for feature in &layer.features {
