@@ -25,7 +25,8 @@ fn main() {
     dbg!(tile_id);
     let zurich = math::num_to_global_space(&tile_coordinate);
 
-    let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), 600, 600, z);
+    let size = 600;
+    let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), size, size, z);
 
     dbg!(zurich);
     let mut status = true;
@@ -59,8 +60,8 @@ fn main() {
                         let mut delta = vector(0.0, 0.0);
                         delta.x = (position.x - last_pos.x) as f32;
                         delta.y = (position.y - last_pos.y) as f32;
-
-                        let world_to_px = 1.0 / 2.0f32.powi(z as i32) / 600.0 * 2.0;
+                        
+                        let world_to_px = 1.0 / 2.0f32.powi(z as i32) / size as f32 * 2.0;
                         delta *= world_to_px;
 
                         last_pos = position;
@@ -75,6 +76,11 @@ fn main() {
         });
 
         painter.load_tiles(&mut app_state);
+        painter.update_uniforms(&mut app_state);
         painter.paint(&app_state);
+
+        if !status {
+            break;
+        }
     }
 }

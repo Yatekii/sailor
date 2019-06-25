@@ -69,7 +69,7 @@ impl Painter {
             let instance = wgpu::Instance::new();
 
             let window = Window::new(&events_loop).unwrap();
-            //window.set_inner_size(LogicalSize { width: 600.0, height: 600.0 });
+            window.set_inner_size(LogicalSize { width: 600.0, height: 600.0 });
             let size = window
                 .get_inner_size()
                 .unwrap()
@@ -82,8 +82,8 @@ impl Painter {
 
         #[cfg(feature = "gl")]
         let (instance, size, surface) = {
-            let wb = wgpu::winit::WindowBuilder::new();
-                //.with_dimensions(LogicalSize { width: 600.0, height: 600.0 });
+            let wb = wgpu::winit::WindowBuilder::new()
+                .with_dimensions(LogicalSize { width: 600.0, height: 600.0 });
             let cb = wgpu::glutin::ContextBuilder::new().with_vsync(true);
             let context = wgpu::glutin::WindowedContext::new_windowed(wb, cb, &events_loop).unwrap();
 
@@ -291,6 +291,22 @@ impl Painter {
         self.device.get_queue().submit(&[encoder.finish()]);
     }
 
+    pub fn update_uniforms(&mut self, app_state: &mut AppState) {
+        for drawable_tile in self.loaded_tiles.values_mut() {
+            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+            drawable_tile.bind_group = Self::create_bind_group(
+                &self.device,
+                &self.bind_group_layout,
+                &Self::copy_uniform_buffers(
+                    &self.device,
+                    &mut encoder,
+                    &Self::create_uniform_buffers(&self.device, &app_state.screen.center, &drawable_tile.layers)
+                )
+            );
+            self.device.get_queue().submit(&[encoder.finish()]);
+        }
+    }
+
     pub fn load_tiles(&mut self, app_state: &mut AppState) {
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
 
@@ -356,7 +372,6 @@ impl Painter {
         }
 
         self.loaded_tiles = new_loaded_tiles;
-        dbg!(self.loaded_tiles.len());
     }
 
     pub fn paint(&mut self, app_state: &AppState) {
