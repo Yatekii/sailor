@@ -1,4 +1,4 @@
-use crate::render::css::{
+use crate::css::{
     RulesCache,
     Selector,
     CSSValue,

@@ -21,9 +21,11 @@ use crate::drawing::vertex::{
 
 use crate::vector_tile::mod_Tile::GeomType;
 
-use crate::render::css::RulesCache;
-use crate::render::css::Selector;
-use crate::render::css::CSSValue;
+use crate::css::{
+    RulesCache,
+    Selector,
+    CSSValue,
+};
 
 #[derive(Debug, Clone)]
 pub struct Layer {

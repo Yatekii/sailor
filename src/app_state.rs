@@ -9,7 +9,7 @@ use crate::vector_tile::{
         TileCache,
     },
 };
-use crate::render::css::RulesCache;
+use crate::css::RulesCache;
 
 pub struct AppState {
     pub tile_cache: TileCache,
