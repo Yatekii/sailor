@@ -13,9 +13,9 @@ use lyon::math::{
 fn main() {
     pretty_env_logger::init();
 
-    let z = 8;
-    let tile_id = math::deg2tile(47.3769, 8.5417, z);
-    let tile_coordinate = math::deg2num(47.3769, 8.5417, z);
+    let z = 8.0;
+    let tile_id = math::deg2tile(47.3769, 8.5417, z as u32);
+    let tile_coordinate = math::deg2num(47.3769, 8.5417, z as u32);
     dbg!(tile_id);
     let zurich = math::num_to_global_space(&tile_coordinate);
 
@@ -33,7 +33,7 @@ fn main() {
     let mut last_pos = wgpu::winit::dpi::LogicalPosition::new(0.0, 0.0);
 
     loop {
-        use wgpu::winit::{Event, WindowEvent, ElementState, MouseButton, KeyboardInput, VirtualKeyCode};
+        use wgpu::winit::{Event, WindowEvent, ElementState, MouseButton, MouseScrollDelta, KeyboardInput, VirtualKeyCode};
         events_loop.poll_events(|event| {
             match event {
                 Event::WindowEvent {
@@ -56,6 +56,12 @@ fn main() {
                     },
                     WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
                         mouse_down = false;
+                    },
+                    WindowEvent::MouseWheel { delta, .. } => {
+                        match delta {
+                            MouseScrollDelta::LineDelta(_x, y) => app_state.zoom += 0.1 * y,
+                            _ => ()
+                        }
                     },
                     WindowEvent::CursorMoved { position, .. } => {
                         let mut delta = vector(0.0, 0.0);

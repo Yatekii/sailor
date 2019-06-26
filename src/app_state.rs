@@ -16,7 +16,7 @@ pub struct AppState {
     pub css_cache: RulesCache,
     pub screen: Screen,
     pub tile_field: TileField,
-    pub zoom: u32,
+    pub zoom: f32,
 }
 
 impl AppState {
@@ -25,7 +25,7 @@ impl AppState {
         center: Point,
         width: u32,
         height: u32,
-        zoom: u32,
+        zoom: f32,
     ) -> Self {
         dbg!(&center);
         Self {

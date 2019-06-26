@@ -383,8 +383,8 @@ impl Painter {
 
     pub fn update_uniforms(&mut self, app_state: &mut AppState) {
         for drawable_tile in self.loaded_tiles.values_mut() {
-            let zoom_x = 2.0f32.powi(app_state.zoom as i32) / (app_state.screen.width as f32 / 2.0) * 256.0;
-            let zoom_y = 2.0f32.powi(app_state.zoom as i32) / (app_state.screen.height as f32 / 2.0) * 256.0;
+            let zoom_x = 2.0f32.powf(app_state.zoom) / (app_state.screen.width as f32 / 2.0) * 256.0;
+            let zoom_y = 2.0f32.powf(app_state.zoom) / (app_state.screen.height as f32 / 2.0) * 256.0;
 
             let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
             let bind_group = Self::create_bind_group(
