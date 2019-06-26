@@ -62,8 +62,8 @@ pub fn global_to_num_space(point: &Point, z: u32) -> TileCoordinate {
 
 pub struct Screen {
     pub center: Point,
-    width: u32,
-    height: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl Screen {
@@ -76,8 +76,8 @@ impl Screen {
     }
 
     pub fn get_tile_boundaries_for_zoom_level(&self, z: u32) -> TileField {
-        let px_to_world = self.width as f32 / 2.0 * 2.0f32.powi(-(z as i32));
-        let py_to_world = self.height as f32 / 2.0 * 2.0f32.powi(-(z as i32));
+        let px_to_world = self.width as f32 / 2.0 * 2.0f32.powi(-(z as i32)) + 1.0;
+        let py_to_world = self.height as f32 / 2.0 * 2.0f32.powi(-(z as i32)) + 1.0;
 
         let middle_tile: TileId = global_to_num_space(&self.center, z).into();
         TileField::new(

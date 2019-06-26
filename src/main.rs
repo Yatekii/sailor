@@ -15,10 +15,6 @@ use crate::vector_tile::math::TileId;
 fn main() {
     pretty_env_logger::init();
 
-    let mut events_loop = wgpu::winit::EventsLoop::new();
-
-    let mut painter = drawing::Painter::init(&events_loop);
-
     let z = 8;
     let tile_id = math::deg2tile(47.3769, 8.5417, z);
     let tile_coordinate = math::deg2num(47.3769, 8.5417, z);
@@ -26,6 +22,11 @@ fn main() {
     let zurich = math::num_to_global_space(&tile_coordinate);
 
     let size = 600;
+
+    let mut events_loop = wgpu::winit::EventsLoop::new();
+
+    let mut painter = drawing::Painter::init(&events_loop, size, size);
+
     let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), size, size, z);
 
     dbg!(zurich);
@@ -42,6 +43,8 @@ fn main() {
                     ..
                 } => {
                     let physical = size.to_physical(painter.get_hidpi_factor());
+                    app_state.screen.width = physical.width.round() as u32;
+                    app_state.screen.height = physical.height.round() as u32;
                     painter.resize(physical.width.round() as u32, physical.height.round() as u32);
                 },
                 Event::WindowEvent { event, .. } => match event {

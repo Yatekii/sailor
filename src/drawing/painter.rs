@@ -1,7 +1,10 @@
 use wgpu::Surface;
 use wgpu::CommandEncoder;
 use crate::drawing::drawable_layer::LayerData;
-use lyon::math::Point;
+use lyon::math::{
+    Point,
+    point,
+};
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
     drawable_tile::DrawableTile,
@@ -61,7 +64,7 @@ pub struct Painter {
 
 impl Painter {
     /// Initializes the entire draw machinery.
-    pub fn init(events_loop: &EventsLoop) -> Self {
+    pub fn init(events_loop: &EventsLoop, width: u32, height: u32) -> Self {
         #[cfg(not(feature = "gl"))]
         let (window, instance, size, surface) = {
             use wgpu::winit::Window;
@@ -69,7 +72,7 @@ impl Painter {
             let instance = wgpu::Instance::new();
 
             let window = Window::new(&events_loop).unwrap();
-            window.set_inner_size(LogicalSize { width: 600.0, height: 600.0 });
+            window.set_inner_size(LogicalSize { width: width as f64, height: height as f64 });
             let size = window
                 .get_inner_size()
                 .unwrap()
@@ -83,7 +86,7 @@ impl Painter {
         #[cfg(feature = "gl")]
         let (instance, size, surface) = {
             let wb = wgpu::winit::WindowBuilder::new()
-                .with_dimensions(LogicalSize { width: 600.0, height: 600.0 });
+                .with_dimensions(LogicalSize { width, height });
             let cb = wgpu::glutin::ContextBuilder::new().with_vsync(true);
             let context = wgpu::glutin::WindowedContext::new_windowed(wb, cb, &events_loop).unwrap();
 
@@ -202,7 +205,7 @@ impl Painter {
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_uniform_buffers(device: &Device, pan: &Point, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
+    fn create_uniform_buffers(device: &Device, pan: &Point, zoom: &Point, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
         let pan_len = 4 * 4;
         let pan_buffer = device
             .create_buffer_mapped(
@@ -210,6 +213,13 @@ impl Painter {
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
             .fill_from_slice(&[pan.x, pan.y, 0.0, 0.0]);
+        let zoom_len = 4 * 4;
+        let zoom_buffer = device
+            .create_buffer_mapped(
+                zoom_len / 4,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+            )
+            .fill_from_slice(&[zoom.x, zoom.y, 0.0, 0.0]);
         let layer_data_len = drawable_layers.len() * 4 * 4;
         let layer_data_buffer = device
             .create_buffer_mapped(
@@ -218,7 +228,7 @@ impl Painter {
             )
             .fill_from_slice(&drawable_layers.iter().map(|dl| dl.layer_data).collect::<Vec<_>>().as_slice());
 
-        vec![(pan_buffer, pan_len), (layer_data_buffer, layer_data_len)]
+        vec![(pan_buffer, pan_len), (zoom_buffer, zoom_len), (layer_data_buffer, layer_data_len)]
     }
 
     fn copy_uniform_buffers(device: &Device, encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>) -> Buffer{
@@ -246,6 +256,7 @@ impl Painter {
 
     const fn uniform_buffer_size() -> u64 {
         4 * 4
+      + 4 * 4
       + 4 * 4 * 30
     }
 
@@ -293,17 +304,22 @@ impl Painter {
 
     pub fn update_uniforms(&mut self, app_state: &mut AppState) {
         for drawable_tile in self.loaded_tiles.values_mut() {
+            let zoom_x = 2.0f32.powi(app_state.zoom as i32) / (app_state.screen.width as f32 / 2.0) * 256.0;
+            let zoom_y = 2.0f32.powi(app_state.zoom as i32) / (app_state.screen.height as f32 / 2.0) * 256.0;
+
             let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-            drawable_tile.bind_group = Self::create_bind_group(
+            let bind_group = Self::create_bind_group(
                 &self.device,
                 &self.bind_group_layout,
                 &Self::copy_uniform_buffers(
                     &self.device,
                     &mut encoder,
-                    &Self::create_uniform_buffers(&self.device, &app_state.screen.center, &drawable_tile.layers)
+                    &Self::create_uniform_buffers(&self.device, &app_state.screen.center, &point(zoom_x, zoom_y), &drawable_tile.layers)
                 )
             );
             self.device.get_queue().submit(&[encoder.finish()]);
+
+            drawable_tile.bind_group = bind_group;
         }
     }
 
@@ -335,10 +351,11 @@ impl Painter {
                         &Self::copy_uniform_buffers(
                             &self.device,
                             &mut encoder,
-                            &Self::create_uniform_buffers(&self.device, &app_state.screen.center, &layers)
+                            &Self::create_uniform_buffers(&self.device, &app_state.screen.center, &point(2f32.powi(app_state.zoom as i32), 2f32.powi(app_state.zoom as i32)), &layers)
                         )
                     );
                     self.device.get_queue().submit(&[encoder.finish()]);
+        
 
                     let mut vertices = vec![];
                     let mut indices = vec![];

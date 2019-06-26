@@ -11,12 +11,13 @@ struct LayerData {
 
 layout(set = 0, binding = 0) uniform Locals {
     vec2 pan;
+    vec2 _unused;
+    vec2 zoom;
     LayerData layer_data[30];
 };
 
 void main() {
-    gl_Position = vec4((position - pan) * 256, 0.0, 1.0);
-    gl_Position.xy -= vec2(1.0);
+    gl_Position = vec4((position - pan) * zoom, 0.0, 1.0);
 
     outColor = layer_data[layer_id].background_color;
 }
