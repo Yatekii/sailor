@@ -1,3 +1,13 @@
+use crossbeam_channel::unbounded;
+use notify::{
+    RecursiveMode,
+    RecommendedWatcher,
+    Watcher,
+    EventKind,
+    event::{
+        ModifyKind,
+    },
+};
 use wgpu::Surface;
 use wgpu::CommandEncoder;
 use lyon::math::{
@@ -51,6 +61,10 @@ pub struct Painter {
     render_pipeline: RenderPipeline,
     loaded_tiles: HashMap<TileId, DrawableTile>,
     bind_group_layout: BindGroupLayout,
+    vertex_shader: String,
+    fragment_shader: String,
+    rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
+    _watcher: RecommendedWatcher,
 }
 
 impl Painter {
@@ -104,7 +118,37 @@ impl Painter {
 
         let init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        let (vs_module, fs_module) = Self::load_shader(&device).expect("Fatal Error. Unable to load shaders.");
+        let (tx, rx) = unbounded();
+        
+        let mut watcher: RecommendedWatcher = match Watcher::new_immediate(tx) {
+            Ok(watcher) => watcher,
+            Err(err) => {
+                log::info!("Failed to create a watcher for the vertex shader:");
+                log::info!("{}", err);
+                panic!("Unable to load a vertex shader.");
+            },
+        };
+
+        let vertex_shader = "config/shader.vert".to_string();
+        let fragment_shader = "config/shader.frag".to_string();
+
+        match watcher.watch(&vertex_shader, RecursiveMode::Recursive) {
+            Ok(_) => {},
+            Err(err) => {
+                log::info!("Failed to start watching {}:", &vertex_shader);
+                log::info!("{}", err);
+            },
+        };
+
+        match watcher.watch(&fragment_shader, RecursiveMode::Recursive) {
+            Ok(_) => {},
+            Err(err) => {
+                log::info!("Failed to start watching {}:", &fragment_shader);
+                log::info!("{}", err);
+            },
+        };
+
+        let (vs_module, fs_module) = Self::load_shader(&device, &vertex_shader, &fragment_shader).expect("Fatal Error. Unable to load shaders.");
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
@@ -116,11 +160,50 @@ impl Painter {
             ]
         });
 
+        let render_pipeline = Self::create_render_pipeline(&device, &bind_group_layout, &vs_module, &fs_module);
+
+        let swap_chain_descriptor = wgpu::SwapChainDescriptor {
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            width: size.width.round() as u32,
+            height: size.height.round() as u32,
+        };
+
+        let swap_chain = device.create_swap_chain(
+            &surface,
+            &swap_chain_descriptor,
+        );
+
+        let init_command_buf = init_encoder.finish();
+        device.get_queue().submit(&[init_command_buf]);
+
+        Self {
+            window,
+            device,
+            surface,
+            swap_chain_descriptor,
+            swap_chain,
+            render_pipeline,
+            loaded_tiles: HashMap::new(),
+            bind_group_layout,
+            vertex_shader,
+            fragment_shader,
+            _watcher: watcher,
+            rx,
+        }
+    }
+
+    fn create_render_pipeline(
+        device: &Device,
+        bind_group_layout: &BindGroupLayout,
+        vs_module: &ShaderModule,
+        fs_module: &ShaderModule
+    ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
         });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &pipeline_layout,
             vertex_stage: wgpu::PipelineStageDescriptor {
                 module: &vs_module,
@@ -163,33 +246,7 @@ impl Painter {
                 ],
             }],
             sample_count: 8,
-        });
-
-        let swap_chain_descriptor = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8Unorm,
-            width: size.width.round() as u32,
-            height: size.height.round() as u32,
-        };
-
-        let swap_chain = device.create_swap_chain(
-            &surface,
-            &swap_chain_descriptor,
-        );
-
-        let init_command_buf = init_encoder.finish();
-        device.get_queue().submit(&[init_command_buf]);
-
-        Self {
-            window,
-            device,
-            surface,
-            swap_chain_descriptor,
-            swap_chain,
-            render_pipeline,
-            loaded_tiles: HashMap::new(),
-            bind_group_layout,
-        }
+        })
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
@@ -264,17 +321,41 @@ impl Painter {
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.
-    fn load_shader(device: &Device) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
-        let vs_bytes = load_glsl(&std::fs::read_to_string("src/drawing/shader.vert")?, ShaderStage::Vertex);
+    fn load_shader(device: &Device, vertex_shader: &str, fragment_shader: &str) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
+        let vs_bytes = load_glsl(&std::fs::read_to_string(vertex_shader)?, ShaderStage::Vertex);
         let vs_module = device.create_shader_module(vs_bytes.as_slice());
-        let fs_bytes = load_glsl(&std::fs::read_to_string("src/drawing/shader.frag")?, ShaderStage::Fragment);
+        let fs_bytes = load_glsl(&std::fs::read_to_string(fragment_shader)?, ShaderStage::Fragment);
         let fs_module = device.create_shader_module(fs_bytes.as_slice());
         Ok((vs_module, fs_module))
     }
 
     /// Reloads the shader if the file watcher has detected any change to the shader files.
-    pub fn update_shader(&mut self) {
-
+    pub fn update_shader(&mut self) -> bool {
+        match self.rx.try_recv() {
+            Ok(Ok(notify::event::Event {
+                kind: EventKind::Modify(ModifyKind::Data(_)),
+                ..
+            })) => {
+                if let Ok((vs_module, fs_module)) = Self::load_shader(&self.device, &self.vertex_shader, &self.fragment_shader) {
+                    self.render_pipeline = Self::create_render_pipeline(&self.device, &self.bind_group_layout, &vs_module, &fs_module);
+                    true
+                } else {
+                    false
+                }
+            },
+            // Everything is alright but file wasn't actually changed.
+            Ok(Ok(_)) => { false },
+            Ok(Err(err)) => {
+                log::info!("Something went wrong with the CSS file watcher:");
+                log::info!("{:?}", err);
+                false
+            },
+            Err(err) => {
+                log::info!("Something went wrong with the CSS file watcher:");
+                log::info!("{:?}", err);
+                false
+            },
+        }
     }
 
     pub fn update_styles(&mut self, rules_cache: &mut RulesCache) {

@@ -72,7 +72,7 @@ impl RulesCache {
         let mut watcher: RecommendedWatcher = match Watcher::new_immediate(tx) {
             Ok(watcher) => watcher,
             Err(err) => {
-                log::info!("Failed to create a watcher:");
+                log::info!("Failed to create a watcher for the stylesheet:");
                 log::info!("{}", err);
                 return None;
             },
