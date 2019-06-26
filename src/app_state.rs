@@ -36,4 +36,8 @@ impl AppState {
             zoom,
         }
     }
+
+    pub fn update(&mut self) -> bool {
+        self.css_cache.update()
+    }
 }

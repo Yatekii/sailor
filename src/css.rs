@@ -211,13 +211,13 @@ impl Selector {
     }
 
     /// Makes the selector require the id `id`.
-    pub fn with_id(mut self, id: String) -> Self {
+    pub fn _with_id(mut self, id: String) -> Self {
         self.id = Some(id);
         self
     }
 
     /// Makes the selector require the class `class`.
-    pub fn with_class(mut self, class: String) -> Self {
+    pub fn _with_class(mut self, class: String) -> Self {
         self.classes.push(class);
         self
     }
@@ -392,7 +392,6 @@ pub enum CSSValue {
     String(String),
     /// Represents a color.
     Color(Color),
-    Number(f64),
 }
 
 /// Parses a single CSS qualified string.
@@ -413,7 +412,7 @@ pub struct Color {
 
 impl Color {
     pub const WHITE: Color = Color { r: 255, g: 255, b: 255, };
-    pub const BLACK: Color = Color { r:   0, g:   0, b:   0, };
+    pub const _BLACK: Color = Color { r:   0, g:   0, b:   0, };
     pub const RED:   Color = Color { r: 255, g:   0, b:   0, };
     pub const GREEN: Color = Color { r:   0, g: 255, b:   0, };
     pub const BLUE:  Color = Color { r:   0, g:   0, b: 255, };

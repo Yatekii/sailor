@@ -33,47 +33,6 @@ pub struct Layer {
     pub mesh: VertexBuffers<Vertex, u16>,
 }
 
-impl Layer {
-    pub fn new(name: String, mesh: VertexBuffers<Vertex, u16>) -> Self {
-        Self {
-            name,
-            mesh,
-        }
-    }
-
-    pub fn with_style(mut self, cache: &RulesCache) -> Self {
-        let rules = cache.get_matching_rules(
-            &Selector::new()
-                .with_type("layer".to_string())
-                .with_any("name".to_string(), self.name.clone())
-        );
-        let background_color = rules
-            .iter()
-            .filter_map(|r| r.kvs.get("background-color"))
-            .last();
-
-            // if let Some(color) = background_color {
-            //     match color {
-            //         CSSValue::Color(bg) => {
-            //             self.color = [bg.r as f32 / 255.0, bg.g as f32 / 255.0, bg.b as f32 / 255.0];
-            //         },
-            //         CSSValue::String(string) => {
-            //             match &string[..] {
-            //                 "red" => self.color = [1.0, 0.0, 0.0],
-            //                 "blue" => self.color = [0.0, 0.0, 1.0],
-            //                 "green" => self.color = [0.0, 1.0, 0.0],
-            //                 // Other CSS colors to come later.
-            //                 _ => {},
-            //             }
-            //         },
-            //         _ => {},
-            //     }
-            // }
-
-        self
-    }
-}
-
 pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate::vector_tile::transform::Layer> {
     let t = time::Instant::now();
 
@@ -102,19 +61,12 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
             mesh.indices.extend(tmesh.indices);
         }
 
-        const GREEN: [f32; 3] = [0.035, 0.678, 0.431f32];
-        const BLUE: [f32; 3] = [0.239, 0.824, 1.0f32];
-        const YELLOW: [f32; 3] = [1.0, 0.894, 0.408];
-
         layers.push(crate::vector_tile::transform::Layer {
             name: layer.name.to_string(),
             mesh: mesh,
         });
     }
 
-    // println!("-----------------------------");
-    // dbg!(tile_id);
-    // dbg!(data.len());
     // dbg!(t.elapsed().as_millis());
 
     layers
@@ -150,7 +102,6 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
                     *cursor += 1;
                     *gcursor += vector(dx, dy);
                     builder.move_to(*gcursor);
-                    // println!("{}", math::tile_to_global_space(z, x, y, *gcursor)); // (1.7231445,0.74121094)
                 }
                 match geometry_type {
                     GeomType::POINT => return builder.build(),
@@ -165,7 +116,6 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
                     *cursor += 1;
                     *gcursor += vector(dx, dy);
                     builder.line_to(*gcursor);
-                    // println!("{}", math::tile_to_global_space(z, x, y, *gcursor));
                 }
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),

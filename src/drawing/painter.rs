@@ -1,6 +1,5 @@
 use wgpu::Surface;
 use wgpu::CommandEncoder;
-use crate::drawing::drawable_layer::LayerData;
 use lyon::math::{
     Point,
     point,
@@ -10,6 +9,7 @@ use crate::drawing::{
     drawable_tile::DrawableTile,
     drawable_layer::DrawableLayer,
 };
+use crate::css::RulesCache;
 use std::collections::HashMap;
 
 use wgpu::{
@@ -24,19 +24,10 @@ use wgpu::{
     SwapChainDescriptor,
     SwapChain,
     Device,
+    Buffer,
     BindGroupLayout,
     BindGroup,
     RenderPipeline,
-    Buffer,
-    BufferUsage,
-};
-
-use crate::vector_tile::{
-    math,
-    cache::{
-        Tile,
-        TileCache,
-    },
 };
 
 use super::{
@@ -67,8 +58,6 @@ impl Painter {
     pub fn init(events_loop: &EventsLoop, width: u32, height: u32) -> Self {
         #[cfg(not(feature = "gl"))]
         let (window, instance, size, surface) = {
-            use wgpu::winit::Window;
-
             let instance = wgpu::Instance::new();
 
             let window = Window::new(&events_loop).unwrap();
@@ -113,8 +102,7 @@ impl Painter {
             limits: wgpu::Limits::default(),
         });
 
-        let mut init_encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        let init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
         let (vs_module, fs_module) = Self::load_shader(&device).expect("Fatal Error. Unable to load shaders.");
 
@@ -289,6 +277,16 @@ impl Painter {
 
     }
 
+    pub fn update_styles(&mut self, rules_cache: &mut RulesCache) {
+        if rules_cache.update() {
+            for tile in self.loaded_tiles.values_mut() {
+                for drawable_layer in tile.layers.iter_mut() {
+                    drawable_layer.load_style(&rules_cache);
+                }
+            }
+        }
+    }
+
     pub fn get_hidpi_factor(&self) -> f64 {
         self.window.get_hidpi_factor()
     }
@@ -298,7 +296,7 @@ impl Painter {
         self.swap_chain_descriptor.height = height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        let encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         self.device.get_queue().submit(&[encoder.finish()]);
     }
 
