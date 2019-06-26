@@ -1,6 +1,5 @@
 use crate::vector_tile::*;
 use quick_protobuf::{MessageRead, BytesReader};
-use std::time;
 
 use lyon::path::Path;
 use lyon::math::*;
@@ -21,12 +20,6 @@ use crate::drawing::vertex::{
 
 use crate::vector_tile::mod_Tile::GeomType;
 
-use crate::css::{
-    RulesCache,
-    Selector,
-    CSSValue,
-};
-
 #[derive(Debug, Clone)]
 pub struct Layer {
     pub name: String,
@@ -34,7 +27,7 @@ pub struct Layer {
 }
 
 pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate::vector_tile::transform::Layer> {
-    let t = time::Instant::now();
+    // let t = std::time::Instant::now();
 
     // we can build a bytes reader directly out of the bytes
     let mut reader = BytesReader::from_bytes(&data);

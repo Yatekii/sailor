@@ -9,8 +9,6 @@ use crate::vector_tile::*;
 use lyon::math::{
     vector,
 };
-use crate::drawing::vertex::vertex;
-use crate::vector_tile::math::TileId;
 
 fn main() {
     pretty_env_logger::init();
@@ -81,7 +79,7 @@ fn main() {
         painter.update_styles(&mut app_state.css_cache);
         painter.load_tiles(&mut app_state);
         painter.update_uniforms(&mut app_state);
-        painter.paint(&app_state);
+        painter.paint();
 
         // Frame by frame stepping.
         // match std::io::stdin().read_line(&mut String::new()) {

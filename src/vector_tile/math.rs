@@ -2,7 +2,6 @@ use std::f32::consts::PI;
 use lyon::math::{
     Point,
     point,
-    Vector,
     vector,
 };
 

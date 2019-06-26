@@ -81,7 +81,6 @@ impl DrawableLayer {
                         _ => {},
                     }
                 },
-                _ => {},
             }
         }
     }

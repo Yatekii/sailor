@@ -389,9 +389,9 @@ impl Painter {
         self.loaded_tiles = new_loaded_tiles;
     }
 
-    pub fn paint(&mut self, app_state: &AppState) {
+    pub fn paint(&mut self) {
         let frame = self.swap_chain.get_next_texture();
-        let t = std::time::Instant::now();
+        // let t = std::time::Instant::now();
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
