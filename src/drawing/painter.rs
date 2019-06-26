@@ -362,7 +362,7 @@ impl Painter {
                         layers: layers,
                     });
                 } else {
-                    log::error!("Could not read tile from cache. This is a bug. Please report it!");
+                    log::info!("Could not read tile {} from cache.", tile_id);
                 }
             } else {
                 if let Some((k, v)) = self.loaded_tiles.remove_entry(&tile_id) {

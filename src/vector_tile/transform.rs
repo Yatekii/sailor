@@ -110,7 +110,10 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
         });
     }
 
-    println!("Took {} ms.", t.elapsed().as_millis());
+    // println!("-----------------------------");
+    // dbg!(tile_id);
+    // dbg!(data.len());
+    // dbg!(t.elapsed().as_millis());
 
     layers
 }
@@ -207,7 +210,7 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry
             tessellator
                 .tessellate_path(
                     &path,
-                    &FillOptions::tolerance(0.0001),
+                    &FillOptions::tolerance(0.0001).with_normals(false),
                     &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
                 )
                 .expect("Failed to tesselate path.");

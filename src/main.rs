@@ -79,6 +79,12 @@ fn main() {
         painter.update_uniforms(&mut app_state);
         painter.paint(&app_state);
 
+        // Frame by frame stepping.
+        // match std::io::stdin().read_line(&mut String::new()) {
+        //     Ok(_goes_into_input_above) => {},
+        //     Err(_no_updates_is_fine) => {},
+        // }
+
         if !status {
             break;
         }

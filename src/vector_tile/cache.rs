@@ -36,27 +36,31 @@ impl TileCache {
                 let mut i = 0;
                 for loader in &self.loaders {
                     if loader.0 == id {
-                        i += 1;
                         found = true;
                         break;
                     }
+                    i += 1;
                 }
                 if found {
                     let loader = self.loaders.remove(i);
                     if let Ok(layers) = loader.1.join() {
                         self.cache.insert(loader.2, Tile { layers: layers });
                     } else {
-                        log::error!("Failed to join tile loader thread.");
+                        log::error!("Failed to join tile loader thread. This could be a bug.");
                     }
                 }
             },
             Err(_) => ()
         }
         
+        // dbg!(self.loaders.len());
+
         let id = self.id;
         self.id += 1;
+
+        let loader = self.loaders.iter().filter(|l| l.2 == *tile_id).next();
         
-        if !self.cache.contains_key(&tile_id) {
+        if !self.cache.contains_key(&tile_id) && loader.is_none() {
             let tile_id_clone = tile_id.clone();
             let tx = self.channel.0.clone();
             self.loaders.push((
