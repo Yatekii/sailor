@@ -25,7 +25,10 @@ use nom::{
     Err,
 };
 
-use crossbeam_channel::unbounded;
+use crossbeam_channel::{
+    unbounded,
+    TryRecvError,
+};
 use notify::{
     RecursiveMode,
     RecommendedWatcher,
@@ -118,13 +121,13 @@ impl RulesCache {
             // Everything is alright but file wasn't actually changed.
             Ok(Ok(_)) => { false },
             Ok(Err(err)) => {
-                log::info!("Something went wrong with the CSS file watcher:");
-                log::info!("{:?}", err);
+                log::info!("Something went wrong with the CSS file watcher:\r\n{:?}", err);
                 false
             },
+            // This happens all the time when there is no new message.
+            Err(TryRecvError::Empty) => false,
             Err(err) => {
-                log::info!("Something went wrong with the CSS file watcher:");
-                log::info!("{:?}", err);
+                log::info!("Something went wrong with the CSS file watcher:\r\n{:?}", err);
                 false
             },
         }

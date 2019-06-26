@@ -3,34 +3,80 @@ use std::path::Path;
 use std::io::Read;
 use crate::vector_tile::math;
 
-pub fn fetch_tile_data(tile_id: &math::TileId) -> Vec<u8> {
+pub fn fetch_tile_data(tile_id: &math::TileId) -> Option<Vec<u8>> {
     let zxy: String = format!("{}", tile_id);
     let pbf = format!("cache/{}.pbf", zxy);
     if !is_in_cache(pbf.clone()) {
-        let data = fetch_tile_from_server(tile_id);
-        ensure_cache_structure(tile_id);
-        let mut file = File::create(&pbf).expect("Could not create pbf file.");
-
-        use std::io::Write;
-        file.write_all(&data[..]).expect("Could not write bytes.");
-        data
+        if let Some(data) = fetch_tile_from_server(tile_id) {
+            ensure_cache_structure(tile_id);
+            match File::create(&pbf) {
+                Ok(mut file) => {
+                    use std::io::Write;
+                    match file.write_all(&data[..]) {
+                        Ok(_) => {
+                            Some(data)
+                        },
+                        Err(e) => {
+                            log::error!("Unable to write pbf {}. Reason:\r\n{}", pbf, e);
+                            None
+                        },
+                    }
+                },
+                Err(e) => {
+                    log::error!("Could not create pbf {}. Reason:\r\n{}", pbf, e);
+                    None
+                }
+            }
+        } else {
+            None
+        }
     } else {
-        let mut f = File::open(pbf).expect("Unable to open file.");
-        let mut buffer = Vec::new();
-        f.read_to_end(&mut buffer).expect("Unable to read file.");
-        buffer
+        match File::open(&pbf) {
+            Ok(mut f) => {
+                let mut buffer = Vec::new();
+                match f.read_to_end(&mut buffer) {
+                    Ok(_) => {
+                        Some(buffer)
+                    },
+                    Err(e) => {
+                        log::error!("Unable to read {}. Reason:\r\n{}", pbf, e);
+                        None
+                    },
+                }
+            },
+            Err(e) => {
+                log::error!("Unable to open {}. Reason:\r\n{}", pbf, e);
+                None
+            }
+        }
     }
 }
 
-fn fetch_tile_from_server(tile_id: &math::TileId) -> Vec<u8> {
+fn fetch_tile_from_server(tile_id: &math::TileId) -> Option<Vec<u8>> {
     let request_url = format!("https://api.maptiler.com/tiles/v3/{}.pbf?key=t2mP0OQnprAXkW20R6Wd", tile_id);
-    let mut resp = reqwest::get(&request_url).expect("Could not load tile.");
-    if resp.status() != reqwest::StatusCode::OK {
-        panic!("Tile request failed.");
+    match reqwest::get(&request_url) {
+        Ok(mut resp) => {
+            if resp.status() != reqwest::StatusCode::OK {
+                log::warn!("Tile request failed for {}. Status was:\r\n{}", tile_id, resp.status());
+                None
+            } else {
+                let mut data: Vec<u8> = vec![];
+                match resp.copy_to(&mut data) {
+                    Ok(_) => {
+                        Some(data)
+                    },
+                    Err(e) => {
+                        log::warn!("Could not read http response for {} to buffer. Reason:\r\n{}", tile_id, e);
+                        None
+                    },
+                }
+            }
+        },
+        Err(err) => {
+            log::warn!("Http request for {} failed. Reason:\r\n{:?}", tile_id, err);
+            None
+        }
     }
-    let mut data: Vec<u8> = vec![];
-    resp.copy_to(&mut data).expect("Could not read http response to buffer.");
-    data
 }
 
 fn is_in_cache(path: impl Into<String>) -> bool {

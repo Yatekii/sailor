@@ -1,4 +1,8 @@
-use crossbeam_channel::unbounded;
+use wgpu::TextureView;
+use crossbeam_channel::{
+    unbounded,
+    TryRecvError,
+};
 use notify::{
     RecursiveMode,
     RecommendedWatcher,
@@ -59,6 +63,7 @@ pub struct Painter {
     swap_chain_descriptor: SwapChainDescriptor,
     swap_chain: SwapChain,
     render_pipeline: RenderPipeline,
+    multisampled_framebuffer: TextureView,
     loaded_tiles: HashMap<TileId, DrawableTile>,
     bind_group_layout: BindGroupLayout,
     vertex_shader: String,
@@ -169,6 +174,8 @@ impl Painter {
             height: size.height.round() as u32,
         };
 
+        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, 8);
+
         let swap_chain = device.create_swap_chain(
             &surface,
             &swap_chain_descriptor,
@@ -184,6 +191,7 @@ impl Painter {
             swap_chain_descriptor,
             swap_chain,
             render_pipeline,
+            multisampled_framebuffer,
             loaded_tiles: HashMap::new(),
             bind_group_layout,
             vertex_shader,
@@ -345,14 +353,14 @@ impl Painter {
             },
             // Everything is alright but file wasn't actually changed.
             Ok(Ok(_)) => { false },
+            // This happens all the time when there is no new message.
+            Err(TryRecvError::Empty) => false,
             Ok(Err(err)) => {
-                log::info!("Something went wrong with the CSS file watcher:");
-                log::info!("{:?}", err);
+                log::info!("Something went wrong with the shader file watcher:\r\n{:?}", err);
                 false
             },
             Err(err) => {
-                log::info!("Something went wrong with the CSS file watcher:");
-                log::info!("{:?}", err);
+                log::info!("Something went wrong with the shader file watcher:\r\n{:?}", err);
                 false
             },
         }
@@ -376,6 +384,7 @@ impl Painter {
         self.swap_chain_descriptor.width = width;
         self.swap_chain_descriptor.height = height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
+        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, 8);
 
         let encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         self.device.get_queue().submit(&[encoder.finish()]);
@@ -400,6 +409,25 @@ impl Painter {
 
             drawable_tile.bind_group = bind_group;
         }
+    }
+
+    fn create_multisampled_framebuffer(device: &Device, swap_chain_descriptor: &SwapChainDescriptor, sample_count: u32) -> wgpu::TextureView {
+        let multisampled_texture_extent = wgpu::Extent3d {
+            width: swap_chain_descriptor.width,
+            height: swap_chain_descriptor.height,
+            depth: 1,
+        };
+        let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
+            size: multisampled_texture_extent,
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: swap_chain_descriptor.format,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        };
+
+        device.create_texture(multisampled_frame_descriptor).create_default_view()
     }
 
     pub fn load_tiles(&mut self, app_state: &mut AppState) {
@@ -458,7 +486,7 @@ impl Painter {
                         layers: layers,
                     });
                 } else {
-                    log::info!("Could not read tile {} from cache.", tile_id);
+                    log::trace!("Could not read tile {} from cache.", tile_id);
                 }
             } else {
                 if let Some((k, v)) = self.loaded_tiles.remove_entry(&tile_id) {
@@ -471,29 +499,31 @@ impl Painter {
     }
 
     pub fn paint(&mut self) {
-        let frame = self.swap_chain.get_next_texture();
-        // let t = std::time::Instant::now();
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
-                    resolve_target: None,
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color::GREEN,
-                }],
-                depth_stencil_attachment: None,
-            });
+        if self.loaded_tiles.len() > 0 {
+            let frame = self.swap_chain.get_next_texture();
+            // let t = std::time::Instant::now();
+            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+            {
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: &frame.view,
+                        resolve_target: None,
+                        load_op: wgpu::LoadOp::Clear,
+                        store_op: wgpu::StoreOp::Store,
+                        clear_color: wgpu::Color::GREEN,
+                    }],
+                    depth_stencil_attachment: None,
+                });
 
-            render_pass.set_pipeline(&self.render_pipeline);
+                render_pass.set_pipeline(&self.render_pipeline);
 
-            for drawable_tile in self.loaded_tiles.values_mut() {
-                drawable_tile.paint(&mut render_pass);
+                for drawable_tile in self.loaded_tiles.values_mut() {
+                    drawable_tile.paint(&mut render_pass);
+                }
             }
-        }
 
-        self.device.get_queue().submit(&[encoder.finish()]);
-        // dbg!(t.elapsed().as_millis());
+            self.device.get_queue().submit(&[encoder.finish()]);
+            // dbg!(t.elapsed().as_millis());
+        }
     }
 }

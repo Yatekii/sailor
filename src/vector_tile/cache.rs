@@ -13,7 +13,7 @@ use std::sync::mpsc::{
 
 pub struct TileCache {
     cache: HashMap<math::TileId, Tile>,
-    loaders: Vec<(u64, JoinHandle<std::vec::Vec<crate::vector_tile::transform::Layer>>, TileId)>,
+    loaders: Vec<(u64, JoinHandle<Option<std::vec::Vec<crate::vector_tile::transform::Layer>>>, TileId)>,
     channel: (Sender<u64>, Receiver<u64>),
     id: u64,
 }
@@ -42,10 +42,15 @@ impl TileCache {
                 }
                 if found {
                     let loader = self.loaders.remove(i);
-                    if let Ok(layers) = loader.1.join() {
-                        self.cache.insert(loader.2, Tile { layers: layers });
-                    } else {
-                        log::error!("Failed to join tile loader thread. This could be a bug.");
+                    match loader.1.join() {
+                        Ok(layers) => {
+                            if let Some(layers) = layers {
+                                self.cache.insert(loader.2, Tile { layers: layers });
+                            }
+                        },
+                        Err(e) => {
+                            log::error!("Failed to join tile loader thread for {}. Reason:\r\n{:?}", loader.2, e);
+                        }
                     }
                 }
             },
@@ -65,10 +70,13 @@ impl TileCache {
             self.loaders.push((
                 id,
                 spawn(move|| {
-                    let data = crate::vector_tile::fetch_tile_data(&tile_id_clone);
-                    let layers = crate::vector_tile::vector_tile_to_mesh(&tile_id_clone, &data);
-                    tx.send(id).unwrap();
-                    layers
+                    if let Some(data) = crate::vector_tile::fetch_tile_data(&tile_id_clone) {
+                        let layers = crate::vector_tile::vector_tile_to_mesh(&tile_id_clone, &data);
+                        tx.send(id).unwrap();
+                        Some(layers)
+                    } else {
+                        None
+                    }
                 }),
                 tile_id.clone(),
             ));
