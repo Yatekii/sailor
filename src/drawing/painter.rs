@@ -523,8 +523,8 @@ impl Painter {
             {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: &frame.view,
-                        resolve_target: None,
+                        attachment: &self.multisampled_framebuffer,
+                        resolve_target: Some(&frame.view),
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
                         clear_color: wgpu::Color::GREEN,

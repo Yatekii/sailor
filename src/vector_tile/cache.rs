@@ -72,7 +72,10 @@ impl TileCache {
                 spawn(move|| {
                     if let Some(data) = crate::vector_tile::fetch_tile_data(&tile_id_clone) {
                         let layers = crate::vector_tile::vector_tile_to_mesh(&tile_id_clone, &data);
-                        tx.send(id).unwrap();
+                        match tx.send(id) {
+                            Err(_) => log::debug!("Could not send the tile load message. This most likely happened because the app was terminated."),
+                            _ => (),
+                        }
                         Some(layers)
                     } else {
                         None
