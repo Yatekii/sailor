@@ -269,28 +269,28 @@ impl Painter {
         let pan_buffer = device
             .create_buffer_mapped(
                 pan_len / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
             .fill_from_slice(&[screen.center.x, screen.center.y, 0.0, 0.0]);
         let zoom_len = 4 * 4;
         let zoom_buffer = device
             .create_buffer_mapped(
                 zoom_len / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
             .fill_from_slice(&[zoom.x, zoom.y, 0.0, 0.0]);
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device
             .create_buffer_mapped(
                 canvas_size_len / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
             .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
         let layer_data_len = drawable_layers.len() * 12 * 4;
         let layer_data_buffer = device
             .create_buffer_mapped(
                 layer_data_len / 12 / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
             .fill_from_slice(&drawable_layers.iter().map(|dl| dl.layer_data).collect::<Vec<_>>().as_slice());
 
