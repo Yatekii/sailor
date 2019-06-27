@@ -23,7 +23,20 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         Vertex {
             position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
             normal: vertex.normal.to_array(),
-            layer_id: self.layer_id,
+            layer_id: self.layer_id << 1 | 0,
+        }
+    }
+}
+
+impl VertexConstructor<tessellation::StrokeVertex, Vertex> for LayerVertexCtor {
+    fn new_vertex(&mut self, vertex: tessellation::StrokeVertex) -> Vertex {
+        assert!(!vertex.position.x.is_nan());
+        assert!(!vertex.position.y.is_nan());
+        // println!("{:?}", vertex.position);
+        Vertex {
+            position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
+            normal: vertex.normal.to_array(),
+            layer_id: self.layer_id << 1 | 1,
         }
     }
 }

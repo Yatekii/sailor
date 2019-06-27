@@ -20,6 +20,6 @@ layout(set = 0, binding = 0) uniform Locals {
 void main() {
     gl_Position = vec4((position - pan) * zoom, 0.0, 1.0);
 
-    outColor = layer_data[layer_id].background_color;
-    outColor = vec4(normal, 0.0, 1.0);
+    outColor = layer_data[layer_id >> 1].background_color;
+    // outColor = vec4(normal, 0.0, 1.0);
 }
