@@ -1,5 +1,7 @@
 layer[name=water] {
     background-color: #0000FF;
+    border-color: #0000FF;
+    border-width: 2px;
 }
 
 layer[name=park] {
@@ -12,4 +14,5 @@ layer[name=landcover] {
 
 layer[name=landuse] {
     background-color: #A11414;
+    border-color: red;
 }

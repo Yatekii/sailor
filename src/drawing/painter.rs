@@ -1,3 +1,4 @@
+use crate::vector_tile::math::Screen;
 use wgpu::TextureView;
 use crossbeam_channel::{
     unbounded,
@@ -263,33 +264,45 @@ impl Painter {
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_uniform_buffers(device: &Device, pan: &Point, zoom: &Point, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
+    fn create_uniform_buffers(device: &Device, screen: &Screen, zoom: &Point, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
         let pan_len = 4 * 4;
         let pan_buffer = device
             .create_buffer_mapped(
                 pan_len / 4,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
-            .fill_from_slice(&[pan.x, pan.y, 0.0, 0.0]);
+            .fill_from_slice(&[screen.center.x, screen.center.y, 0.0, 0.0]);
         let zoom_len = 4 * 4;
         let zoom_buffer = device
             .create_buffer_mapped(
                 zoom_len / 4,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
+            .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
+        let canvas_size_len = 4 * 4;
+        let canvas_size_buffer = device
+            .create_buffer_mapped(
+                canvas_size_len / 4,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+            )
             .fill_from_slice(&[zoom.x, zoom.y, 0.0, 0.0]);
-        let layer_data_len = drawable_layers.len() * 4 * 4;
+        let layer_data_len = drawable_layers.len() * 12 * 4;
         let layer_data_buffer = device
             .create_buffer_mapped(
-                layer_data_len / 4 / 4,
+                layer_data_len / 12 / 4,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
             .fill_from_slice(&drawable_layers.iter().map(|dl| dl.layer_data).collect::<Vec<_>>().as_slice());
 
-        vec![(pan_buffer, pan_len), (zoom_buffer, zoom_len), (layer_data_buffer, layer_data_len)]
+        vec![
+            (pan_buffer, pan_len),
+            (zoom_buffer, zoom_len),
+            (canvas_size_buffer, canvas_size_len),
+            (layer_data_buffer, layer_data_len)
+        ]
     }
 
-    fn copy_uniform_buffers(device: &Device, encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>) -> Buffer{
+    fn copy_uniform_buffers(device: &Device, encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>) -> Buffer {
         let final_buffer = device
             .create_buffer_mapped::<u8>(
                 Self::uniform_buffer_size() as usize,
@@ -315,7 +328,8 @@ impl Painter {
     const fn uniform_buffer_size() -> u64 {
         4 * 4
       + 4 * 4
-      + 4 * 4 * 30
+      + 4 * 4
+      + 12 * 4 * 30
     }
 
     fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, uniform_buffer: &Buffer) -> BindGroup {
@@ -407,7 +421,7 @@ impl Painter {
                 &Self::copy_uniform_buffers(
                     &self.device,
                     &mut encoder,
-                    &Self::create_uniform_buffers(&self.device, &app_state.screen.center, &point(zoom_x, zoom_y), &drawable_tile.layers)
+                    &Self::create_uniform_buffers(&self.device, &app_state.screen, &point(zoom_x, zoom_y), &drawable_tile.layers)
                 )
             );
             self.device.get_queue().submit(&[encoder.finish()]);
@@ -463,7 +477,7 @@ impl Painter {
                         &Self::copy_uniform_buffers(
                             &self.device,
                             &mut encoder,
-                            &Self::create_uniform_buffers(&self.device, &app_state.screen.center, &point(2f32.powi(app_state.zoom as i32), 2f32.powi(app_state.zoom as i32)), &layers)
+                            &Self::create_uniform_buffers(&self.device, &app_state.screen, &point(2f32.powi(app_state.zoom as i32), 2f32.powi(app_state.zoom as i32)), &layers)
                         )
                     );
                     self.device.get_queue().submit(&[encoder.finish()]);

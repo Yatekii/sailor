@@ -1,5 +1,6 @@
 extern crate nom;
 
+use nom::number::complete::float;
 use nom::error::convert_error;
 use nom::error::VerboseError;
 use nom::InputTakeAtPosition;
@@ -380,8 +381,14 @@ fn css_name<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a 
 fn css_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
     alt((
         whitespace(hex_color),
-        string,
+        whitespace(px_value),
+        whitespace(string),
     ))(input)
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Number {
+    Px(f32),
 }
 
 /// Any type of CSS value.
@@ -391,6 +398,7 @@ pub enum CSSValue {
     String(String),
     /// Represents a color.
     Color(Color),
+    Number(Number),
 }
 
 /// Parses a single CSS qualified string.
@@ -399,6 +407,13 @@ fn string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSVal
   let (input, value) = whitespace(take_while(|c| is_alphanumeric(c as u8) || c == '-' || c == ' '))(input)?;
 
   Ok((input, CSSValue::String(value.into())))
+}
+
+/// Parses a single CSS px value.
+fn px_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+  let (input, (value, _)) = tuple((float, tag("px")))(input)?;
+
+  Ok((input, CSSValue::Number(Number::Px(value))))
 }
 
 /// A struct to represent any RGB color.

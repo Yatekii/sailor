@@ -3,6 +3,7 @@ use crate::css::{
     Selector,
     CSSValue,
     Color,
+    Number,
 };
 use crate::vector_tile::transform::Layer;
 
@@ -22,6 +23,9 @@ pub struct LayerInfo {
 #[derive(Debug, Copy, Clone)]
 pub struct LayerData {
     background_color: DrawableColor,
+    border_color: DrawableColor,
+    border_width: f32,
+    _padding: [u32; 3],
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -46,7 +50,10 @@ impl DrawableLayer {
             start_vertex,
             end_vertex,
             layer_data: LayerData {
-                background_color: Color::WHITE.into()
+                background_color: Color::WHITE.into(),
+                border_color: Color::WHITE.into(),
+                border_width: 0.0,
+                _padding: [0; 3],
             },
             layer_info: LayerInfo {
                 name: layer.name.clone(),
@@ -78,9 +85,58 @@ impl DrawableLayer {
                         "blue" => self.layer_data.background_color = Color::GREEN.into(),
                         "green" => self.layer_data.background_color = Color::BLUE.into(),
                         // Other CSS colors to come later.
-                        _ => {},
+                        color => {
+                            log::info!("The color '{}' is currently not supported.", color)
+                        },
                     }
                 },
+                value => {
+                    log::info!("The value '{:?}' is currently not supported for 'background-color'.", value);
+                },
+            }
+        }
+
+        let border_color = rules
+            .iter()
+            .filter_map(|r| r.kvs.get("border-color"))
+            .last();
+
+        if let Some(color) = border_color {
+            match color {
+                CSSValue::Color(bg) => {
+                    self.layer_data.border_color = bg.clone().into();
+                    self.layer_data.border_color;
+                },
+                CSSValue::String(string) => {
+                    match &string[..] {
+                        "red" => self.layer_data.border_color = Color::RED.into(),
+                        "blue" => self.layer_data.border_color = Color::GREEN.into(),
+                        "green" => self.layer_data.border_color = Color::BLUE.into(),
+                        // Other CSS colors to come later.
+                        color => {
+                            log::info!("The color '{}' is currently not supported.", color)
+                        },
+                    }
+                },
+                value => {
+                    log::info!("The value '{:?}' is currently not supported for 'border-color'.", value);
+                },
+            }
+        }
+
+        let border_width = rules
+            .iter()
+            .filter_map(|r| r.kvs.get("border-width"))
+            .last();
+
+        if let Some(width) = border_width {
+            match width {
+                CSSValue::Number(number) => match number {
+                    Number::Px(px) => self.layer_data.border_width = px.clone().into()
+                },
+                value => {
+                    log::info!("The value '{:?}' is currently not supported for 'border-width'.", value);
+                }
             }
         }
     }
