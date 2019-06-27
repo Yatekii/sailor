@@ -563,10 +563,10 @@ impl Painter {
                     bottom_right.y = bottom_right.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0;
 
                     render_pass.set_scissor_rect(
-                        top_left.x as u32,
-                        top_left.y as u32,
-                        (bottom_right.x - top_left.x) as u32,
-                        (bottom_right.y - top_left.y) as u32
+                        top_left.x.round() as u32,
+                        top_left.y.round() as u32,
+                        (bottom_right.x - top_left.x).round() as u32,
+                        (bottom_right.y - top_left.y).round() as u32
                     );
                     drawable_tile.paint(&mut render_pass);
                 }

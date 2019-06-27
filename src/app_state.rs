@@ -27,7 +27,6 @@ impl AppState {
         height: u32,
         zoom: f32,
     ) -> Self {
-        dbg!(&center);
         Self {
             tile_cache: TileCache::new(),
             css_cache: RulesCache::try_load_from_file(style).expect("Unable to load the style file. Please consult the log."),

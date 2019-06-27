@@ -76,8 +76,8 @@ impl Screen {
 
     pub fn get_tile_boundaries_for_zoom_level(&self, z: f32) -> TileField {
         let z = z.min(14.0);
-        let px_to_world = self.width as f32 / 2.0 / 2.0f32.powi(z as i32) / 256.0 + 1.0;
-        let py_to_world = self.height as f32 / 2.0 / 2.0f32.powi(z as i32) / 256.0 + 1.0;
+        let px_to_world = self.width as f32 / 256.0;
+        let py_to_world = self.height as f32 / 256.0;
 
         let middle_tile: TileId = global_to_num_space(&self.center, z as u32).into();
         TileField::new(

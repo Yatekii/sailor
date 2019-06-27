@@ -14,9 +14,7 @@ fn main() {
     pretty_env_logger::init();
 
     let z = 8.0;
-    let tile_id = math::deg2tile(47.3769, 8.5417, z as u32);
     let tile_coordinate = math::deg2num(47.3769, 8.5417, z as u32);
-    dbg!(tile_id);
     let zurich = math::num_to_global_space(&tile_coordinate);
 
     let size = 600;
@@ -27,7 +25,6 @@ fn main() {
 
     let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), size, size, z);
 
-    dbg!(zurich);
     let mut status = true;
     let mut mouse_down = false;
     let mut last_pos = wgpu::winit::dpi::LogicalPosition::new(0.0, 0.0);
