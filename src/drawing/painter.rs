@@ -451,7 +451,7 @@ impl Painter {
 
     pub fn load_tiles(&mut self, app_state: &mut AppState) {
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
-
+        
         let mut new_loaded_tiles = HashMap::new();
 
         for tile_id in tile_field.iter() {
