@@ -1,5 +1,3 @@
-use crate::app_state::AppState;
-use crate::vector_tile::math::Screen;
 use crate::css::{
     RulesCache,
     Selector,

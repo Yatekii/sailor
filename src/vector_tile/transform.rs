@@ -25,7 +25,7 @@ use crate::vector_tile::mod_Tile::GeomType;
 #[derive(Debug, Clone)]
 pub struct Layer {
     pub name: String,
-    pub mesh: VertexBuffers<Vertex, u16>,
+    pub mesh: VertexBuffers<Vertex, u32>,
 }
 
 pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate::vector_tile::transform::Layer> {
@@ -40,7 +40,7 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
     let mut layers = vec![];
 
     for (i, layer) in tile.layers.iter().enumerate() {
-        let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
+        let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
 
         for feature in &layer.features {
             let mut tmesh = geometry_commands_to_drawable(
@@ -51,7 +51,7 @@ pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate:
                 tile.layers[0].extent
             );
             for index in 0..tmesh.indices.len() {
-                tmesh.indices[index] += mesh.vertices.len() as u16;
+                tmesh.indices[index] += mesh.vertices.len() as u32;
             }
             mesh.vertices.extend(tmesh.vertices);
             mesh.indices.extend(tmesh.indices);
@@ -143,8 +143,8 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
     panic!("This is a bug. Please report it.");
 }
 
-fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32) -> VertexBuffers<Vertex, u16> {
-    let mut mesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
+fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32) -> VertexBuffers<Vertex, u32> {
+    let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
     let mut cursor = 0;
 
     let mut c = point(0f32, 0f32);
@@ -154,7 +154,7 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry
             let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
             
             let mut tessellator = FillTessellator::new();
-            let mut tmesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
+            let mut tmesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
             tessellator
                 .tessellate_path(
                     &path,
@@ -164,13 +164,13 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry
                 .expect("Failed to tesselate path.");
 
             for index in 0..tmesh.indices.len() {
-                tmesh.indices[index] += mesh.vertices.len() as u16;
+                tmesh.indices[index] += mesh.vertices.len() as u32;
             }
             mesh.vertices.extend(tmesh.vertices);
             mesh.indices.extend(tmesh.indices);
 
             let mut tessellator = StrokeTessellator::new();
-            let mut tmesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
+            let mut tmesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
             tessellator
                 .tessellate_path(
                     &path,
@@ -180,7 +180,7 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry
                 .expect("Failed to tesselate path.");
 
             for index in 0..tmesh.indices.len() {
-                tmesh.indices[index] += mesh.vertices.len() as u16;
+                tmesh.indices[index] += mesh.vertices.len() as u32;
             }
             mesh.vertices.extend(tmesh.vertices);
             mesh.indices.extend(tmesh.indices);

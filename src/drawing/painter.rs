@@ -237,7 +237,7 @@ impl Painter {
                 write_mask: wgpu::ColorWrite::ALL,
             }],
             depth_stencil_state: None,
-            index_format: wgpu::IndexFormat::Uint16,
+            index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Vertex,
@@ -488,7 +488,7 @@ impl Painter {
                     for layer in &tile.layers {
                         vertices.extend(layer.mesh.vertices.clone());
                         indices.extend(layer.mesh.indices.iter().map(|i| i + offset));
-                        offset += layer.mesh.vertices.len() as u16;
+                        offset += layer.mesh.vertices.len() as u32;
                     }
 
                     new_loaded_tiles.insert(tile_id, DrawableTile {
