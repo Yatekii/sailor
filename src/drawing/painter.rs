@@ -278,14 +278,14 @@ impl Painter {
                 zoom_len / 4,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
-            .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
+            .fill_from_slice(&[zoom.x, zoom.y, 0.0, 0.0]);
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device
             .create_buffer_mapped(
                 canvas_size_len / 4,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
-            .fill_from_slice(&[zoom.x, zoom.y, 0.0, 0.0]);
+            .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
         let layer_data_len = drawable_layers.len() * 12 * 4;
         let layer_data_buffer = device
             .create_buffer_mapped(
@@ -385,11 +385,11 @@ impl Painter {
         }
     }
 
-    pub fn update_styles(&mut self, rules_cache: &mut RulesCache) {
-        if rules_cache.update() {
+    pub fn update_styles(&mut self, zoom: f32, css_cache: &mut RulesCache) {
+        if css_cache.update() {
             for tile in self.loaded_tiles.values_mut() {
                 for drawable_layer in tile.layers.iter_mut() {
-                    drawable_layer.load_style(&rules_cache);
+                    drawable_layer.load_style(zoom, css_cache);
                 }
             }
         }
@@ -457,18 +457,16 @@ impl Painter {
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
                 app_state.tile_cache.fetch_tile(&tile_id);
-                let css_cache = &app_state.css_cache;
-                if let Some(tile) = app_state.tile_cache.try_get_tile(&tile_id) {
+                let tile_cache = &mut app_state.tile_cache;
+                if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
                     let mut vertex_count = 0;
 
-                    let layers = tile.layers
-                        .iter()
-                        .map(|l| {
-                            let vc = l.mesh.indices.len() as u32;
-                            vertex_count += vc;
-                            DrawableLayer::from_layer(vertex_count - vc, vertex_count, l, css_cache)
-                        })
-                        .collect();
+                    let mut layers = vec![];
+                    for l in &tile.layers {
+                        let vc = l.mesh.indices.len() as u32;
+                        vertex_count += vc;
+                        layers.push(DrawableLayer::from_layer(vertex_count - vc, vertex_count, l, app_state.zoom, &mut app_state.css_cache))
+                    }
 
                     let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
                     let bind_group = Self::create_bind_group(

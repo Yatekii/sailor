@@ -1,3 +1,5 @@
+use crate::app_state::AppState;
+use crate::vector_tile::math::Screen;
 use crate::css::{
     RulesCache,
     Selector,
@@ -45,7 +47,7 @@ impl From<Color> for DrawableColor {
 }
 
 impl DrawableLayer {
-    pub fn from_layer(start_vertex: u32, end_vertex: u32, layer: &Layer, cache: &RulesCache) -> Self {
+    pub fn from_layer(start_vertex: u32, end_vertex: u32, layer: &Layer, zoom: f32, css_cache: &mut RulesCache) -> Self {
         let mut drawable_layer = Self {
             start_vertex,
             end_vertex,
@@ -59,15 +61,16 @@ impl DrawableLayer {
                 name: layer.name.clone(),
             },
         };
-        drawable_layer.load_style(cache);
+        drawable_layer.load_style(zoom, css_cache);
         drawable_layer
     }
 
-    pub fn load_style(&mut self, cache: &RulesCache) {
-        let rules = cache.get_matching_rules(
+    pub fn load_style(&mut self, zoom: f32, css_cache: &mut RulesCache) {
+        let rules = css_cache.get_matching_rules(
             &Selector::new()
                 .with_type("layer".to_string())
                 .with_any("name".to_string(), self.layer_info.name.clone())
+                .with_any("zoom".to_string(), (zoom.floor() as u32).to_string())
         );
         let background_color = rules
             .iter()

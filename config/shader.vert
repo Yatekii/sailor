@@ -26,7 +26,7 @@ void main() {
     bool is_outline = (layer_id & 1) == 1;
     gl_Position = vec4((position - pan) * zoom, 0.0, 1.0);
     if(is_outline){
-        gl_Position.xy += normal / canvas_size * layer_data.border_width;
+        gl_Position.xy += normal / canvas_size * layer_data.border_width / 2;
         outColor = layer_data.outline_color;
     } else {
         outColor = layer_data.background_color;

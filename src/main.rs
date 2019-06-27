@@ -83,7 +83,7 @@ fn main() {
         });
 
         painter.update_shader();
-        painter.update_styles(&mut app_state.css_cache);
+        painter.update_styles(app_state.zoom, &mut app_state.css_cache);
         painter.load_tiles(&mut app_state);
         painter.update_uniforms(&mut app_state);
         painter.paint();

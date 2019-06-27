@@ -153,28 +153,12 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry
         while cursor < geometry.len() {
             let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
             
-            let mut tessellator = FillTessellator::new();
-            let mut tmesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
-            tessellator
-                .tessellate_path(
-                    &path,
-                    &FillOptions::tolerance(0.0001).with_normals(true),
-                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
-                )
-                .expect("Failed to tesselate path.");
-
-            for index in 0..tmesh.indices.len() {
-                tmesh.indices[index] += mesh.vertices.len() as u16;
-            }
-            mesh.vertices.extend(tmesh.vertices);
-            mesh.indices.extend(tmesh.indices);
-
-            // let mut tessellator = StrokeTessellator::new();
+            // let mut tessellator = FillTessellator::new();
             // let mut tmesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
             // tessellator
             //     .tessellate_path(
             //         &path,
-            //         &StrokeOptions::default().with_line_width(0.0),
+            //         &FillOptions::tolerance(0.0001).with_normals(true),
             //         &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
             //     )
             //     .expect("Failed to tesselate path.");
@@ -184,6 +168,22 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry
             // }
             // mesh.vertices.extend(tmesh.vertices);
             // mesh.indices.extend(tmesh.indices);
+
+            let mut tessellator = StrokeTessellator::new();
+            let mut tmesh: VertexBuffers<Vertex, u16> = VertexBuffers::new();
+            tessellator
+                .tessellate_path(
+                    &path,
+                    &StrokeOptions::default().with_line_width(0.0),
+                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
+                )
+                .expect("Failed to tesselate path.");
+
+            for index in 0..tmesh.indices.len() {
+                tmesh.indices[index] += mesh.vertices.len() as u16;
+            }
+            mesh.vertices.extend(tmesh.vertices);
+            mesh.indices.extend(tmesh.indices);
         }
     }
 
