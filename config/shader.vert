@@ -1,7 +1,8 @@
 #version 450
 
 layout(location = 0) in vec2 position;
-layout(location = 1) in uint layer_id;
+layout(location = 1) in vec2 normal;
+layout(location = 2) in uint layer_id;
 
 layout(location = 0) out vec4 outColor;
 
@@ -20,4 +21,5 @@ void main() {
     gl_Position = vec4((position - pan) * zoom, 0.0, 1.0);
 
     outColor = layer_data[layer_id].background_color;
+    outColor = vec4(normal, 0.0, 1.0);
 }

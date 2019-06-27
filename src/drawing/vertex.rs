@@ -5,6 +5,7 @@ use crate::vector_tile::math;
 #[derive(Copy, Clone, Debug)]
 pub struct Vertex {
     pub position: [f32; 2],
+    pub normal: [f32; 2],
     pub layer_id: u32,
 }
 
@@ -21,6 +22,7 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         // println!("{:?}", vertex.position);
         Vertex {
             position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
+            normal: vertex.normal.to_array(),
             layer_id: self.layer_id,
         }
     }

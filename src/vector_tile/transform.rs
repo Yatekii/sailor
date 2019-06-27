@@ -155,7 +155,7 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry
             tessellator
                 .tessellate_path(
                     &path,
-                    &FillOptions::tolerance(0.0001).with_normals(false),
+                    &FillOptions::tolerance(0.0001).with_normals(true),
                     &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
                 )
                 .expect("Failed to tesselate path.");
