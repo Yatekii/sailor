@@ -85,7 +85,7 @@ fn main() {
         painter.update_styles(app_state.zoom, &mut app_state.css_cache);
         painter.load_tiles(&mut app_state);
         painter.update_uniforms(&mut app_state);
-        painter.paint();
+        painter.paint(&app_state);
 
         // Frame by frame stepping.
         // match std::io::stdin().read_line(&mut String::new()) {

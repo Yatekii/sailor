@@ -1,3 +1,4 @@
+use crate::vector_tile::math::TileId;
 use crate::drawing::drawable_layer::DrawableLayer;
 use wgpu::{
     RenderPass,
@@ -6,6 +7,7 @@ use wgpu::{
 };
 
 pub struct DrawableTile {
+    pub tile_id: TileId,
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
     pub index_count: u32,

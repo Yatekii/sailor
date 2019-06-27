@@ -18,6 +18,7 @@ use wgpu::CommandEncoder;
 use lyon::math::{
     Point,
     point,
+    vector,
 };
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
@@ -451,7 +452,7 @@ impl Painter {
 
     pub fn load_tiles(&mut self, app_state: &mut AppState) {
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
-        
+
         let mut new_loaded_tiles = HashMap::new();
 
         for tile_id in tile_field.iter() {
@@ -491,7 +492,7 @@ impl Painter {
                         offset += layer.mesh.vertices.len() as u32;
                     }
 
-                    new_loaded_tiles.insert(tile_id, DrawableTile {
+                    new_loaded_tiles.insert(tile_id.clone(), DrawableTile {
                         vertex_buffer: self.device
                             .create_buffer_mapped(vertices.len(), wgpu::BufferUsage::VERTEX)
                             .fill_from_slice(&vertices),
@@ -501,6 +502,7 @@ impl Painter {
                         index_count: indices.len() as u32,
                         bind_group: bind_group,
                         layers: layers,
+                        tile_id,
                     });
                 } else {
                     log::trace!("Could not read tile {} from cache.", tile_id);
@@ -515,7 +517,7 @@ impl Painter {
         self.loaded_tiles = new_loaded_tiles;
     }
 
-    pub fn paint(&mut self) {
+    pub fn paint(&mut self, app_state: &AppState) {
         if self.loaded_tiles.len() > 0 {
             let frame = self.swap_chain.get_next_texture();
             // let t = std::time::Instant::now();
@@ -534,7 +536,38 @@ impl Painter {
 
                 render_pass.set_pipeline(&self.render_pipeline);
 
+                let zoom_x = 2.0f32.powf(app_state.zoom) / (app_state.screen.width as f32 / 2.0) * 256.0;
+                let zoom_y = 2.0f32.powf(app_state.zoom) / (app_state.screen.height as f32 / 2.0) * 256.0;
+
                 for drawable_tile in self.loaded_tiles.values_mut() {
+                    // TODO: Fix hideous scissors!
+
+                    let top_left = crate::vector_tile::math::num_to_global_space(&drawable_tile.tile_id.into());
+                    let bottom_right = top_left + vector(
+                        1.0/2f32.powi(drawable_tile.tile_id.z as i32),
+                        1.0/2f32.powi(drawable_tile.tile_id.z as i32)
+                    );
+
+                    let mut top_left = top_left - app_state.screen.center;
+                    top_left.x *= zoom_x;
+                    top_left.y *= zoom_y;
+                    top_left += vector(1.0, 1.0);
+                    top_left.x = top_left.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0;
+                    top_left.y = top_left.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0;
+
+                    let mut bottom_right = bottom_right - app_state.screen.center;
+                    bottom_right.x *= zoom_x;
+                    bottom_right.y *= zoom_y;
+                    bottom_right += vector(1.0, 1.0);
+                    bottom_right.x = bottom_right.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0;
+                    bottom_right.y = bottom_right.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0;
+
+                    render_pass.set_scissor_rect(
+                        top_left.x as u32,
+                        top_left.y as u32,
+                        (bottom_right.x - top_left.x) as u32,
+                        (bottom_right.y - top_left.y) as u32
+                    );
                     drawable_tile.paint(&mut render_pass);
                 }
             }
