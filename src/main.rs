@@ -64,16 +64,11 @@ fn main() {
                         }
                     },
                     WindowEvent::CursorMoved { position, .. } => {
-                        let mut delta = vector(0.0, 0.0);
-                        delta.x = (position.x - last_pos.x) as f32;
-                        delta.y = (position.y - last_pos.y) as f32;
-                        // let px_to_world = self.width as f32 / 2.0 / 2.0f32.powi(z as i32) / 256.0 + 1;
-                        // let py_to_world = self.height as f32 / 2.0 / 2.0f32.powi(z as i32) / 256.0 + 1;
-                        let world_to_px = 1.0 / 2.0f32.powi(z as i32) / ((app_state.screen.width as f32) / 256.0);
-                        // dbg!(world_to_px);
-                        let world_to_py = 1.0 / 2.0f32.powi(z as i32) / ((app_state.screen.height as f32) / 256.0);
-                        delta.x *= world_to_px;
-                        delta.y *= world_to_py;
+                        let mut delta = vector((position.x - last_pos.x) as f32, (position.y - last_pos.y) as f32);
+                        let zoom_x = (app_state.screen.width as f32) / 256.0 / 2f32.powf(app_state.zoom) / 256.0 / 2.0 / 1.3;
+                        let zoom_y = (app_state.screen.height as f32) / 256.0 / 2f32.powf(app_state.zoom) / 256.0 / 2.0 / 1.3;
+                        delta.x *= zoom_x;
+                        delta.y *= zoom_y;
 
                         last_pos = position;
                         if mouse_down {
