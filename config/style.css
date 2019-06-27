@@ -1,7 +1,7 @@
 layer[name=water] {
     background-color: #0000FF;
-    border-color: #0000FF;
-    border-width: 1px;
+    border-color: red;
+    border-width: 3px;
 }
 
 layer[name=park] {
