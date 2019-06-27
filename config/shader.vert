@@ -18,7 +18,11 @@ layout(set = 0, binding = 0) uniform Locals {
 };
 
 void main() {
+    bool is_outline = (layer_id & 1) == 1;
     gl_Position = vec4((position - pan) * zoom, 0.0, 1.0);
+    if(is_outline){
+        gl_Position.xy += normal / 300.0;
+    }
 
     outColor = layer_data[layer_id >> 1].background_color;
     // outColor = vec4(normal, 0.0, 1.0);
