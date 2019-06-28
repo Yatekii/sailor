@@ -9,9 +9,9 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="134.38631pc"
-   height="76.646873pc"
-   viewBox="0 0 568.90202 324.47178"
+   width="174.38631pc"
+   height="116.64687pc"
+   viewBox="0 0 738.23535 493.80512"
    version="1.1"
    id="svg8"
    inkscape:version="0.92.4 (5da689c313, 2019-01-14)"
@@ -26,8 +26,8 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.35"
-     inkscape:cx="1334.1318"
-     inkscape:cy="934.35287"
+     inkscape:cx="1654.1318"
+     inkscape:cy="911.49579"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -39,10 +39,10 @@
      inkscape:window-x="70"
      inkscape:window-y="27"
      inkscape:window-maximized="1"
-     fit-margin-top="0"
-     fit-margin-left="0"
-     fit-margin-right="0"
-     fit-margin-bottom="0"
+     fit-margin-top="20"
+     fit-margin-left="20"
+     fit-margin-right="20"
+     fit-margin-bottom="20"
      units="pc" />
   <metadata
      id="metadata5">
@@ -60,7 +60,14 @@
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
      id="layer1"
-     transform="translate(297.29383,10.880063)">
+     transform="translate(381.9605,95.54673)">
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.26458332;stroke-opacity:1"
+       id="rect5074"
+       width="740.07739"
+       height="495.1488"
+       x="-382.71646"
+       y="-96.134491" />
     <rect
        id="rect4522"
        width="71.293159"
@@ -528,21 +535,7 @@
          y="232.05215"
          style="stroke-width:0.26458332"
          id="tspan4989">from the hash map</tspan></text>
-    <flowRoot
-       xml:space="preserve"
-       id="flowRoot4991"
-       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
-       transform="scale(0.26458333)"><flowRegion
-         id="flowRegion4993"><rect
-           id="rect4995"
-           width="638.41638"
-           height="436.38589"
-           x="406.08133"
-           y="799.27087" /></flowRegion><flowPara
-         id="flowPara4997">If the tile is presen in the hash map 2, do nothing on load.</flowPara><flowPara
-         id="flowPara5001">If it is not present, insert it and load vertex buffer.</flowPara><flowPara
-         id="flowPara5011">Remove all old items.</flowPara><flowPara
-         id="flowPara5007">Each frame iterate over hash map 2 and draw all loaded vertex buffers.</flowPara></flowRoot>    <path
+    <path
        style="fill:none;stroke:#000000;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
        d="m -26.192413,43.628487 -93.009797,13.363477 86.060788,75.370006 v 0"
        id="path5013"
@@ -573,5 +566,41 @@
          y="85.988678"
          style="stroke-width:0.26458332"
          id="tspan5027" /></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="89.753761"
+       y="231.94884"
+       id="text5062"><tspan
+         sodipodi:role="line"
+         id="tspan5060"
+         x="89.753761"
+         y="231.94884"
+         style="stroke-width:0.26458332">If the tile is presen in the hash map 2,</tspan><tspan
+         sodipodi:role="line"
+         x="89.753761"
+         y="245.17801"
+         style="stroke-width:0.26458332"
+         id="tspan5070">do nothing on load.</tspan><tspan
+         sodipodi:role="line"
+         x="89.753761"
+         y="258.40717"
+         style="stroke-width:0.26458332"
+         id="tspan5064">If it is not present, insert it and load vertex buffer.</tspan><tspan
+         sodipodi:role="line"
+         x="89.753761"
+         y="271.63632"
+         style="stroke-width:0.26458332"
+         id="tspan5066">Remove all old items.</tspan><tspan
+         sodipodi:role="line"
+         x="89.753761"
+         y="284.86551"
+         style="stroke-width:0.26458332"
+         id="tspan5068">Each frame iterate over hash map 2</tspan><tspan
+         sodipodi:role="line"
+         x="89.753761"
+         y="298.09467"
+         style="stroke-width:0.26458332"
+         id="tspan5072">and draw all loaded vertex buffers.</tspan></text>
   </g>
 </svg>
