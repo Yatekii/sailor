@@ -1,0 +1,577 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="134.38631pc"
+   height="76.646873pc"
+   viewBox="0 0 568.90202 324.47178"
+   version="1.1"
+   id="svg8"
+   inkscape:version="0.92.4 (5da689c313, 2019-01-14)"
+   sodipodi:docname="drawing_architecture.svg">
+  <defs
+     id="defs2" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="0.35"
+     inkscape:cx="1334.1318"
+     inkscape:cy="934.35287"
+     inkscape:document-units="mm"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     inkscape:snap-others="true"
+     inkscape:snap-nodes="true"
+     inkscape:snap-global="false"
+     inkscape:window-width="1850"
+     inkscape:window-height="1016"
+     inkscape:window-x="70"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     units="pc" />
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(297.29383,10.880063)">
+    <rect
+       id="rect4522"
+       width="71.293159"
+       height="72.049118"
+       x="-21.754122"
+       y="22.09391"
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.40892076;stroke-opacity:1" />
+    <rect
+       style="fill:#ff0000;fill-opacity:1;stroke:none;stroke-width:0.26458332;stroke-opacity:1"
+       id="rect4535"
+       width="27.214285"
+       height="27.214285"
+       x="-16.95746"
+       y="28.394335" />
+    <rect
+       style="fill:#0000ff;fill-opacity:1;stroke:none;stroke-width:0.26458332;stroke-opacity:1"
+       id="rect4535-3"
+       width="27.214285"
+       height="27.214285"
+       x="16.815853"
+       y="28.095644" />
+    <rect
+       style="fill:#03ff00;fill-opacity:1;stroke:none;stroke-width:0.26458332;stroke-opacity:1"
+       id="rect4535-3-6"
+       width="27.214285"
+       height="27.214285"
+       x="-17.379152"
+       y="61.762249" />
+    <rect
+       style="fill:#000004;fill-opacity:1;stroke:none;stroke-width:0.26458332;stroke-opacity:1"
+       id="rect4535-3-7"
+       width="27.214285"
+       height="27.214285"
+       x="16.016182"
+       y="62.06094" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="-10.583335"
+       y="43"
+       id="text4575"><tspan
+         sodipodi:role="line"
+         id="tspan4573"
+         x="-10.583335"
+         y="43"
+         style="stroke-width:0.26458332">L1</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="-10.878997"
+       y="78.22966"
+       id="text4575-5"><tspan
+         sodipodi:role="line"
+         id="tspan4573-3"
+         x="-10.878997"
+         y="78.22966"
+         style="stroke-width:0.26458332">L3</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="23.894817"
+       y="43.45586"
+       id="text4575-56"><tspan
+         sodipodi:role="line"
+         id="tspan4573-2"
+         x="23.894817"
+         y="43.45586"
+         style="stroke-width:0.26458332">L2</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="23.516838"
+       y="79.363594"
+       id="text4575-9"><tspan
+         sodipodi:role="line"
+         id="tspan4573-1"
+         x="23.516838"
+         y="79.363594"
+         style="fill:#ffffff;fill-opacity:1;stroke-width:0.26458332">L4</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="-18.520832"
+       y="19.1875"
+       id="text4613"><tspan
+         sodipodi:role="line"
+         x="-18.520832"
+         y="19.1875"
+         style="stroke-width:0.26458332"
+         id="tspan4615">T1</tspan></text>
+    <rect
+       style="fill:#ff0000;fill-opacity:1;stroke:none;stroke-width:0.22700433;stroke-opacity:1"
+       id="rect4535-2"
+       width="27.214285"
+       height="20.032738"
+       x="136.78252"
+       y="14.59878" />
+    <rect
+       style="fill:#0000ff;fill-opacity:1;stroke:none;stroke-width:0.23124777;stroke-opacity:1"
+       id="rect4535-3-3"
+       width="27.214285"
+       height="20.788691"
+       x="136.91595"
+       y="34.710804" />
+    <rect
+       style="fill:#03ff00;fill-opacity:1;stroke:none;stroke-width:0.21603137;stroke-opacity:1"
+       id="rect4535-3-6-7"
+       width="27.214285"
+       height="18.142857"
+       x="136.7388"
+       y="55.526218" />
+    <rect
+       style="fill:#000004;fill-opacity:1;stroke:none;stroke-width:0.23124777;stroke-opacity:1"
+       id="rect4535-3-7-5"
+       width="27.214285"
+       height="20.788691"
+       x="136.87224"
+       y="73.211815" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="143.15665"
+       y="29.204447"
+       id="text4575-92"><tspan
+         sodipodi:role="line"
+         id="tspan4573-28"
+         x="143.15665"
+         y="29.204447"
+         style="stroke-width:0.26458332">L1</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="142.86098"
+       y="67.835899"
+       id="text4575-5-9"><tspan
+         sodipodi:role="line"
+         id="tspan4573-3-7"
+         x="142.86098"
+         y="67.835899"
+         style="stroke-width:0.26458332">L3</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="143.99492"
+       y="50.071018"
+       id="text4575-56-3"><tspan
+         sodipodi:role="line"
+         id="tspan4573-2-6"
+         x="143.99492"
+         y="50.071018"
+         style="stroke-width:0.26458332">L2</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="143.61694"
+       y="87.112686"
+       id="text4575-9-1"><tspan
+         sodipodi:role="line"
+         id="tspan4573-1-2"
+         x="143.61694"
+         y="87.112686"
+         style="fill:#ffffff;fill-opacity:1;stroke-width:0.26458332">L4</tspan></text>
+    <g
+       transform="translate(-32.791267,94.033602)"
+       id="g4634-2">
+      <rect
+         style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.40892076;stroke-opacity:1"
+         y="20.204029"
+         x="10.373854"
+         height="72.049118"
+         width="71.293159"
+         id="rect4522-7" />
+      <rect
+         y="26.504454"
+         x="15.170515"
+         height="27.214285"
+         width="27.214285"
+         id="rect4535-0"
+         style="fill:#ff0000;fill-opacity:1;stroke:none;stroke-width:0.26458332;stroke-opacity:1" />
+      <rect
+         y="26.205763"
+         x="48.943829"
+         height="27.214285"
+         width="27.214285"
+         id="rect4535-3-9"
+         style="fill:#0000ff;fill-opacity:1;stroke:none;stroke-width:0.26458332;stroke-opacity:1" />
+      <rect
+         y="59.872368"
+         x="14.748823"
+         height="27.214285"
+         width="27.214285"
+         id="rect4535-3-6-3"
+         style="fill:#03ff00;fill-opacity:1;stroke:none;stroke-width:0.26458332;stroke-opacity:1" />
+      <rect
+         y="60.171059"
+         x="48.144157"
+         height="27.214285"
+         width="27.214285"
+         id="rect4535-3-7-6"
+         style="fill:#000004;fill-opacity:1;stroke:none;stroke-width:0.26458332;stroke-opacity:1" />
+      <text
+         id="text4575-0"
+         y="41.110119"
+         x="21.544641"
+         style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+         xml:space="preserve"><tspan
+           style="stroke-width:0.26458332"
+           y="41.110119"
+           x="21.544641"
+           id="tspan4573-6"
+           sodipodi:role="line">L1</tspan></text>
+      <text
+         id="text4575-5-2"
+         y="76.339783"
+         x="21.24898"
+         style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+         xml:space="preserve"><tspan
+           style="stroke-width:0.26458332"
+           y="76.339783"
+           x="21.24898"
+           id="tspan4573-3-6"
+           sodipodi:role="line">L3</tspan></text>
+      <text
+         id="text4575-56-1"
+         y="41.565979"
+         x="56.022793"
+         style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+         xml:space="preserve"><tspan
+           style="stroke-width:0.26458332"
+           y="41.565979"
+           x="56.022793"
+           id="tspan4573-2-8"
+           sodipodi:role="line">L2</tspan></text>
+      <text
+         id="text4575-9-7"
+         y="77.473717"
+         x="55.644814"
+         style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+         xml:space="preserve"><tspan
+           style="fill:#ffffff;fill-opacity:1;stroke-width:0.26458332"
+           y="77.473717"
+           x="55.644814"
+           id="tspan4573-1-9"
+           sodipodi:role="line">L4</tspan></text>
+      <text
+         id="text4613-2"
+         y="17.297619"
+         x="13.607143"
+         style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+         xml:space="preserve"><tspan
+           id="tspan4615-0"
+           style="stroke-width:0.26458332"
+           y="17.297619"
+           x="13.607143"
+           sodipodi:role="line">T2</tspan></text>
+    </g>
+    <rect
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.26379484;stroke-opacity:1"
+       id="rect4696"
+       width="88.069237"
+       height="188.98888"
+       x="-29.482536"
+       y="5.2019863" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="-31.75"
+       y="-0.089285791"
+       id="text4700"><tspan
+         sodipodi:role="line"
+         id="tspan4698"
+         x="-31.75"
+         y="-0.089285791"
+         style="stroke-width:0.26458332">HashMap&lt;id, Tile&gt;</tspan></text>
+    <rect
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.27339277;stroke-opacity:1"
+       id="rect4702"
+       width="79.744164"
+       height="202.20845"
+       x="103.19193"
+       y="3.3169048" />
+    <rect
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.26458332;stroke-opacity:1"
+       id="rect4704"
+       width="58.586308"
+       height="92.98214"
+       x="112.25893"
+       y="9.360117" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="-38.067326"
+       y="127.64378"
+       id="text4783"
+       transform="rotate(-90.670005)"><tspan
+         sodipodi:role="line"
+         id="tspan4781"
+         x="-38.067326"
+         y="127.64378"
+         style="stroke-width:0.26458332">DT1</tspan></text>
+    <rect
+       style="fill:#ff0000;fill-opacity:1;stroke:none;stroke-width:0.22700433;stroke-opacity:1"
+       id="rect4535-2-3"
+       width="27.214285"
+       height="20.032738"
+       x="136.97151"
+       y="111.73866" />
+    <rect
+       style="fill:#0000ff;fill-opacity:1;stroke:none;stroke-width:0.23124778;stroke-opacity:1"
+       id="rect4535-3-3-2"
+       width="27.214285"
+       height="20.788691"
+       x="137.10495"
+       y="131.85069" />
+    <rect
+       style="fill:#03ff00;fill-opacity:1;stroke:none;stroke-width:0.21603137;stroke-opacity:1"
+       id="rect4535-3-6-7-0"
+       width="27.214285"
+       height="18.142857"
+       x="136.9278"
+       y="152.66611" />
+    <rect
+       style="fill:#000004;fill-opacity:1;stroke:none;stroke-width:0.23124778;stroke-opacity:1"
+       id="rect4535-3-7-5-6"
+       width="27.214285"
+       height="20.788691"
+       x="137.06123"
+       y="170.3517" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="143.34564"
+       y="126.34432"
+       id="text4575-92-1"><tspan
+         sodipodi:role="line"
+         id="tspan4573-28-5"
+         x="143.34564"
+         y="126.34432"
+         style="stroke-width:0.26458332">L1</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="143.04997"
+       y="164.97578"
+       id="text4575-5-9-5"><tspan
+         sodipodi:role="line"
+         id="tspan4573-3-7-4"
+         x="143.04997"
+         y="164.97578"
+         style="stroke-width:0.26458332">L3</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="144.18391"
+       y="147.21091"
+       id="text4575-56-3-7"><tspan
+         sodipodi:role="line"
+         id="tspan4573-2-6-6"
+         x="144.18391"
+         y="147.21091"
+         style="stroke-width:0.26458332">L2</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="143.80594"
+       y="184.25258"
+       id="text4575-9-1-5"><tspan
+         sodipodi:role="line"
+         id="tspan4573-1-2-6"
+         x="143.80594"
+         y="184.25258"
+         style="fill:#ffffff;fill-opacity:1;stroke-width:0.26458332">L4</tspan></text>
+    <rect
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.26458332;stroke-opacity:1"
+       id="rect4704-9"
+       width="58.586311"
+       height="92.98214"
+       x="112.44791"
+       y="106.49999" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="-135.20279"
+       y="126.69685"
+       id="text4783-3"
+       transform="rotate(-90.670005)"><tspan
+         sodipodi:role="line"
+         id="tspan4781-7"
+         x="-135.20279"
+         y="126.69685"
+         style="stroke-width:0.26458332">DT2</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="102.28243"
+       y="-2.8392105"
+       id="text4700-4"><tspan
+         sodipodi:role="line"
+         id="tspan4698-5"
+         x="102.28243"
+         y="-2.8392105"
+         style="stroke-width:0.26458332">HashMap&lt;id, VertexBuffer&gt;</tspan></text>
+    <flowRoot
+       xml:space="preserve"
+       id="flowRoot4919"
+       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+       transform="scale(0.26458333)"><flowRegion
+         id="flowRegion4921"><rect
+           id="rect4923"
+           width="264.28574"
+           height="57.142868"
+           x="735.71429"
+           y="175.37683" /></flowRegion><flowPara
+         id="flowPara4925">Draw(target)</flowPara></flowRoot>    <flowRoot
+       transform="matrix(0.26458333,0,0,0.26458333,2.1584537,93.336463)"
+       xml:space="preserve"
+       id="flowRoot4919-2"
+       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"><flowRegion
+         id="flowRegion4921-5"><rect
+           id="rect4923-4"
+           width="264.28574"
+           height="57.142868"
+           x="735.71429"
+           y="175.37683" /></flowRegion><flowPara
+         id="flowPara4925-7">Draw(target)</flowPara></flowRoot>    <flowRoot
+       xml:space="preserve"
+       id="flowRoot4951"
+       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+       transform="matrix(0.26458333,0,0,0.26458333,2.2678571,1.889881)"><flowRegion
+         id="flowRegion4953"><rect
+           id="rect4955"
+           width="154.28569"
+           height="55.714283"
+           x="230"
+           y="168.23396" /></flowRegion><flowPara
+         id="flowPara4957">Load()</flowPara></flowRoot>    <flowRoot
+       xml:space="preserve"
+       id="flowRoot4951-4"
+       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+       transform="matrix(0.26458333,0,0,0.26458333,1.6329763,97.524395)"><flowRegion
+         id="flowRegion4953-4"><rect
+           id="rect4955-3"
+           width="154.28569"
+           height="55.714283"
+           x="230"
+           y="168.23396" /></flowRegion><flowPara
+         id="flowPara4957-0">Load()</flowPara></flowRoot>    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="-79.111778"
+       y="205.59383"
+       id="text4985"><tspan
+         sodipodi:role="line"
+         id="tspan4983"
+         x="-79.111778"
+         y="205.59383"
+         style="stroke-width:0.26458332">Each frame check if the view</tspan><tspan
+         sodipodi:role="line"
+         x="-79.111778"
+         y="218.823"
+         style="stroke-width:0.26458332"
+         id="tspan4987">changed and load correct tiles</tspan><tspan
+         sodipodi:role="line"
+         x="-79.111778"
+         y="232.05215"
+         style="stroke-width:0.26458332"
+         id="tspan4989">from the hash map</tspan></text>
+    <flowRoot
+       xml:space="preserve"
+       id="flowRoot4991"
+       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+       transform="scale(0.26458333)"><flowRegion
+         id="flowRegion4993"><rect
+           id="rect4995"
+           width="638.41638"
+           height="436.38589"
+           x="406.08133"
+           y="799.27087" /></flowRegion><flowPara
+         id="flowPara4997">If the tile is presen in the hash map 2, do nothing on load.</flowPara><flowPara
+         id="flowPara5001">If it is not present, insert it and load vertex buffer.</flowPara><flowPara
+         id="flowPara5011">Remove all old items.</flowPara><flowPara
+         id="flowPara5007">Each frame iterate over hash map 2 and draw all loaded vertex buffers.</flowPara></flowRoot>    <path
+       style="fill:none;stroke:#000000;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m -26.192413,43.628487 -93.009797,13.363477 86.060788,75.370006 v 0"
+       id="path5013"
+       inkscape:connector-curvature="0" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="-297.73825"
+       y="46.301182"
+       id="text5017"><tspan
+         sodipodi:role="line"
+         id="tspan5015"
+         x="-297.73825"
+         y="46.301182"
+         style="stroke-width:0.26458332">Polygons of T1/L1 can overlap</tspan><tspan
+         sodipodi:role="line"
+         x="-297.73825"
+         y="59.53035"
+         style="stroke-width:0.26458332"
+         id="tspan5019">with polygons of T2/L2 (they are</tspan><tspan
+         sodipodi:role="line"
+         x="-297.73825"
+         y="72.759514"
+         style="stroke-width:0.26458332"
+         id="tspan5023">not cut off at the edge of the tile).</tspan><tspan
+         sodipodi:role="line"
+         x="-297.73825"
+         y="85.988678"
+         style="stroke-width:0.26458332"
+         id="tspan5027" /></text>
+  </g>
+</svg>
