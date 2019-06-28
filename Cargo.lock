@@ -1730,6 +1730,7 @@ name = "sailor"
 version = "0.1.0"
 dependencies = [
  "crossbeam-channel 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "euclid 0.19.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "glsl-to-spirv 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "lyon 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",

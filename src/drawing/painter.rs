@@ -552,15 +552,15 @@ impl Painter {
                     top_left.x *= zoom_x;
                     top_left.y *= zoom_y;
                     top_left += vector(1.0, 1.0);
-                    top_left.x = top_left.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0;
-                    top_left.y = top_left.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0;
+                    top_left.x = top_left.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0 - 1.0;
+                    top_left.y = top_left.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0 - 1.0;
 
                     let mut bottom_right = bottom_right - app_state.screen.center;
                     bottom_right.x *= zoom_x;
                     bottom_right.y *= zoom_y;
                     bottom_right += vector(1.0, 1.0);
-                    bottom_right.x = bottom_right.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0;
-                    bottom_right.y = bottom_right.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0;
+                    bottom_right.x = bottom_right.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0 + 1.0;
+                    bottom_right.y = bottom_right.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0 + 1.0;
 
                     render_pass.set_scissor_rect(
                         top_left.x.round() as u32,
