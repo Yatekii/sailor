@@ -287,15 +287,13 @@ impl Painter {
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
             .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
-        dbg!(zoom.x);
-        dbg!(screen.center.x);
         let transform_len = 4 * 4 * 4;
         let transform_buffer = device
             .create_buffer_mapped(
                 transform_len / 4,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
-            .fill_from_slice(&dbg!(screen.global_to_screen(z).as_slice()));
+            .fill_from_slice(screen.global_to_screen(z).as_slice());
 
         let layer_data_len = drawable_layers.len() * 12 * 4;
         let layer_data_buffer = device
@@ -345,14 +343,33 @@ impl Painter {
       + 12 * 4 * 30
     }
 
-    fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, uniform_buffer: &Buffer) -> BindGroup {
+    fn create_bind_group(
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        bind_group_layout: &BindGroupLayout,
+        screen: &Screen,
+        z: f32,
+        layers: &Vec<DrawableLayer>
+    ) -> BindGroup {
+        let zoom_x = 2.0f32.powf(z) / (screen.width as f32 / 2.0) * 256.0;
+        let zoom_y = 2.0f32.powf(z) / (screen.height as f32 / 2.0) * 256.0;
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
             bindings: &[
                 wgpu::Binding {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
-                        buffer: uniform_buffer,
+                        buffer: &Self::copy_uniform_buffers(
+                            &device,
+                            encoder,
+                            &Self::create_uniform_buffers(
+                                &device,
+                                &screen,
+                                z,
+                                &point(zoom_x, zoom_y),
+                                layers
+                            )
+                        ),
                         range: 0 .. Self::uniform_buffer_size(),
                     },
                 },
@@ -417,28 +434,11 @@ impl Painter {
         self.swap_chain_descriptor.height = height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
         self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, 8);
-
-        let encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-        self.device.get_queue().submit(&[encoder.finish()]);
     }
 
-    pub fn update_uniforms(&mut self, app_state: &mut AppState) {
+    fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState) {
         for drawable_tile in self.loaded_tiles.values_mut() {
-            let zoom_x = 2.0f32.powf(app_state.zoom) / (app_state.screen.width as f32 / 2.0) * 256.0;
-            let zoom_y = 2.0f32.powf(app_state.zoom) / (app_state.screen.height as f32 / 2.0) * 256.0;
-
-            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-            let bind_group = Self::create_bind_group(
-                &self.device,
-                &self.bind_group_layout,
-                &Self::copy_uniform_buffers(
-                    &self.device,
-                    &mut encoder,
-                    &Self::create_uniform_buffers(&self.device, &app_state.screen, app_state.zoom, &point(zoom_x, zoom_y), &drawable_tile.layers)
-                )
-            );
-            self.device.get_queue().submit(&[encoder.finish()]);
-
+            let bind_group = Self::create_bind_group(&self.device, encoder, &self.bind_group_layout, &app_state.screen, app_state.zoom, &drawable_tile.layers);
             drawable_tile.bind_group = bind_group;
         }
     }
@@ -464,7 +464,7 @@ impl Painter {
 
     pub fn load_tiles(&mut self, app_state: &mut AppState) {
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
-
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         let mut new_loaded_tiles = HashMap::new();
 
         for tile_id in tile_field.iter() {
@@ -481,18 +481,8 @@ impl Painter {
                         layers.push(DrawableLayer::from_layer(vertex_count - vc, vertex_count, l, app_state.zoom, &mut app_state.css_cache))
                     }
 
-                    let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-                    let bind_group = Self::create_bind_group(
-                        &self.device,
-                        &self.bind_group_layout,
-                        &Self::copy_uniform_buffers(
-                            &self.device,
-                            &mut encoder,
-                            &Self::create_uniform_buffers(&self.device, &app_state.screen, app_state.zoom, &point(2f32.powi(app_state.zoom as i32), 2f32.powi(app_state.zoom as i32)), &layers)
-                        )
-                    );
-                    self.device.get_queue().submit(&[encoder.finish()]);
-        
+                    
+                    let bind_group = Self::create_bind_group(&self.device, &mut encoder, &self.bind_group_layout, &app_state.screen, app_state.zoom, &layers);
 
                     let mut vertices = vec![];
                     let mut indices = vec![];
@@ -527,13 +517,18 @@ impl Painter {
         }
 
         self.loaded_tiles = new_loaded_tiles;
+
+        self.device.get_queue().submit(&[encoder.finish()]);
     }
 
     pub fn paint(&mut self, app_state: &AppState) {
         if self.loaded_tiles.len() > 0 {
-            let frame = self.swap_chain.get_next_texture();
             // let t = std::time::Instant::now();
             let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+            // let t = std::time::Instant::now();
+            self.update_uniforms(&mut encoder, &app_state);
+            // dbg!(t.elapsed().as_micros());
+            let frame = self.swap_chain.get_next_texture();
             {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {

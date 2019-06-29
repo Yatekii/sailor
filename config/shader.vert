@@ -26,8 +26,9 @@ layout(set = 0, binding = 0) uniform Locals {
 void main() {
     LayerData layer_data = layer_datas[layer_id >> 1];
     bool is_outline = (layer_id & 1) == 1;
-    // gl_Position = vec4((position - pan) * zoom, 0.0, 1.0);
-    gl_Position = transform * vec4(position, 0.0, 1.0);
+    gl_Position = vec4((position - pan) * zoom, 0.0, 1.0);
+    // gl_Position = transform * vec4(position, 0.0, 1.0);
+    // gl_Position.xy -= vec2(1.0);
     if(is_outline){
         gl_Position.xy += normal / canvas_size * layer_data.border_width / 2;
         outColor = layer_data.outline_color;

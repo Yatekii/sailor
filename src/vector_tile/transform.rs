@@ -170,22 +170,22 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry
             mesh.vertices.extend(tmesh.vertices);
             mesh.indices.extend(tmesh.indices);
 
-            // Fill
-            let mut tessellator = FillTessellator::new();
-            let mut tmesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
-            tessellator
-                .tessellate_path(
-                    &path,
-                    &FillOptions::tolerance(0.0001).with_normals(true),
-                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
-                )
-                .expect("Failed to tesselate path.");
+            // // Fill
+            // let mut tessellator = FillTessellator::new();
+            // let mut tmesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
+            // tessellator
+            //     .tessellate_path(
+            //         &path,
+            //         &FillOptions::tolerance(0.0001).with_normals(true),
+            //         &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
+            //     )
+            //     .expect("Failed to tesselate path.");
 
-            for index in 0..tmesh.indices.len() {
-                tmesh.indices[index] += mesh.vertices.len() as u32;
-            }
-            mesh.vertices.extend(tmesh.vertices);
-            mesh.indices.extend(tmesh.indices);
+            // for index in 0..tmesh.indices.len() {
+            //     tmesh.indices[index] += mesh.vertices.len() as u32;
+            // }
+            // mesh.vertices.extend(tmesh.vertices);
+            // mesh.indices.extend(tmesh.indices);
         }
     }
 
