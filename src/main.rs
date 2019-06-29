@@ -4,6 +4,7 @@ mod app_state;
 mod css;
 
 extern crate lyon;
+extern crate nalgebra_glm as glm;
 
 use crate::vector_tile::*;
 use lyon::math::{

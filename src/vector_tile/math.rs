@@ -93,6 +93,14 @@ impl Screen {
             )
         )
     }
+
+    pub fn global_to_screen(&self, z: f32) -> glm::TMat4<f32> {
+        let zoom_x = 2.0f32.powf(z) / (self.width as f32 / 2.0) * 256.0;
+        let zoom_y = 2.0f32.powf(z) / (self.height as f32 / 2.0) * 256.0;
+        let zoom = glm::scaling(&glm::vec3(zoom_x, zoom_y, 1.0));
+        let position = glm::translation(&glm::vec3(self.center.x, self.center.y, 0.0));
+        zoom * position
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

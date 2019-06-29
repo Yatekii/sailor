@@ -265,7 +265,7 @@ impl Painter {
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_uniform_buffers(device: &Device, screen: &Screen, zoom: &Point, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
+    fn create_uniform_buffers(device: &Device, screen: &Screen, z: f32, zoom: &Point, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
         let pan_len = 4 * 4;
         let pan_buffer = device
             .create_buffer_mapped(
@@ -287,6 +287,16 @@ impl Painter {
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
             .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
+        dbg!(zoom.x);
+        dbg!(screen.center.x);
+        let transform_len = 4 * 4 * 4;
+        let transform_buffer = device
+            .create_buffer_mapped(
+                transform_len / 4,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
+            )
+            .fill_from_slice(&dbg!(screen.global_to_screen(z).as_slice()));
+
         let layer_data_len = drawable_layers.len() * 12 * 4;
         let layer_data_buffer = device
             .create_buffer_mapped(
@@ -299,6 +309,7 @@ impl Painter {
             (pan_buffer, pan_len),
             (zoom_buffer, zoom_len),
             (canvas_size_buffer, canvas_size_len),
+            (transform_buffer, transform_len),
             (layer_data_buffer, layer_data_len)
         ]
     }
@@ -330,6 +341,7 @@ impl Painter {
         4 * 4
       + 4 * 4
       + 4 * 4
+      + 4 * 4 * 4
       + 12 * 4 * 30
     }
 
@@ -422,7 +434,7 @@ impl Painter {
                 &Self::copy_uniform_buffers(
                     &self.device,
                     &mut encoder,
-                    &Self::create_uniform_buffers(&self.device, &app_state.screen, &point(zoom_x, zoom_y), &drawable_tile.layers)
+                    &Self::create_uniform_buffers(&self.device, &app_state.screen, app_state.zoom, &point(zoom_x, zoom_y), &drawable_tile.layers)
                 )
             );
             self.device.get_queue().submit(&[encoder.finish()]);
@@ -476,7 +488,7 @@ impl Painter {
                         &Self::copy_uniform_buffers(
                             &self.device,
                             &mut encoder,
-                            &Self::create_uniform_buffers(&self.device, &app_state.screen, &point(2f32.powi(app_state.zoom as i32), 2f32.powi(app_state.zoom as i32)), &layers)
+                            &Self::create_uniform_buffers(&self.device, &app_state.screen, app_state.zoom, &point(2f32.powi(app_state.zoom as i32), 2f32.powi(app_state.zoom as i32)), &layers)
                         )
                     );
                     self.device.get_queue().submit(&[encoder.finish()]);
