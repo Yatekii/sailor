@@ -1,3 +1,4 @@
+use crate::drawing::mesh::MeshBuilder;
 use crate::vector_tile::*;
 use quick_protobuf::{MessageRead, BytesReader};
 
@@ -25,47 +26,6 @@ use crate::vector_tile::mod_Tile::GeomType;
 #[derive(Debug, Clone)]
 pub struct Layer {
     pub name: String,
-    pub mesh: VertexBuffers<Vertex, u32>,
-}
-
-pub fn vector_tile_to_mesh(tile_id: &math::TileId, data: &Vec<u8>) -> Vec<crate::vector_tile::transform::Layer> {
-    // let t = std::time::Instant::now();
-
-    // we can build a bytes reader directly out of the bytes
-    let mut reader = BytesReader::from_bytes(&data);
-
-    let tile = Tile::from_reader(&mut reader, &data).expect("Cannot read Tile object.");
-    // dbg!(t.elapsed().as_millis());
-
-    let mut layers = vec![];
-
-    for (i, layer) in tile.layers.iter().enumerate() {
-        let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
-
-        for feature in &layer.features {
-            let mut tmesh = geometry_commands_to_drawable(
-                tile_id,
-                i as u32,
-                feature.type_pb,
-                &feature.geometry,
-                tile.layers[0].extent
-            );
-            for index in 0..tmesh.indices.len() {
-                tmesh.indices[index] += mesh.vertices.len() as u32;
-            }
-            mesh.vertices.extend(tmesh.vertices);
-            mesh.indices.extend(tmesh.indices);
-        }
-
-        layers.push(crate::vector_tile::transform::Layer {
-            name: layer.name.to_string(),
-            mesh: mesh,
-        });
-    }
-
-    // dbg!(t.elapsed().as_millis());
-
-    layers
 }
 
 fn area(path: &Path) -> f32 {
@@ -143,10 +103,15 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
     panic!("This is a bug. Please report it.");
 }
 
-fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry_type: GeomType, geometry: &Vec<u32>, extent: u32) -> VertexBuffers<Vertex, u32> {
-    let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
+pub fn geometry_commands_to_drawable<'a, 'l>(
+    builder: &'a mut MeshBuilder<'l>,
+    tile_id: &math::TileId,
+    layer_id: u32,
+    geometry_type: GeomType,
+    geometry: &Vec<u32>,
+    extent: u32
+) {
     let mut cursor = 0;
-
     let mut c = point(0f32, 0f32);
 
     if geometry_type == GeomType::POLYGON {
@@ -154,40 +119,26 @@ fn geometry_commands_to_drawable(tile_id: &math::TileId, layer_id: u32, geometry
             let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
             
             // Outline
+            builder.set_current_vertex_type(true);
             let mut tessellator = StrokeTessellator::new();
-            let mut tmesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
             tessellator
                 .tessellate_path(
                     &path,
                     &StrokeOptions::default().with_line_width(0.0),
-                    &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
+                    builder,
                 )
                 .expect("Failed to tesselate path.");
 
-            for index in 0..tmesh.indices.len() {
-                tmesh.indices[index] += mesh.vertices.len() as u32;
-            }
-            mesh.vertices.extend(tmesh.vertices);
-            mesh.indices.extend(tmesh.indices);
-
-            // // Fill
-            // let mut tessellator = FillTessellator::new();
-            // let mut tmesh: VertexBuffers<Vertex, u32> = VertexBuffers::new();
-            // tessellator
-            //     .tessellate_path(
-            //         &path,
-            //         &FillOptions::tolerance(0.0001).with_normals(true),
-            //         &mut BuffersBuilder::new(&mut tmesh, LayerVertexCtor { tile_id: tile_id.clone(), layer_id }),
-            //     )
-            //     .expect("Failed to tesselate path.");
-
-            // for index in 0..tmesh.indices.len() {
-            //     tmesh.indices[index] += mesh.vertices.len() as u32;
-            // }
-            // mesh.vertices.extend(tmesh.vertices);
-            // mesh.indices.extend(tmesh.indices);
+            // Fill
+            builder.set_current_vertex_type(false);
+            let mut tessellator = FillTessellator::new();
+            tessellator
+                .tessellate_path(
+                    &path,
+                    &FillOptions::tolerance(0.0001).with_normals(true),
+                    builder,
+                )
+                .expect("Failed to tesselate path.");
         }
     }
-
-    mesh
 }

@@ -81,10 +81,10 @@ fn main() {
 
         painter.update_shader();
         painter.update_styles(app_state.zoom, &mut app_state.css_cache);
-        // let t = std::time::Instant::now();
+        let t = std::time::Instant::now();
         // On full load needs 240ms. Bad!
         painter.load_tiles(&mut app_state);
-        // dbg!(t.elapsed().as_micros());
+        dbg!(t.elapsed().as_micros());
         // let t = std::time::Instant::now();
         painter.paint(&app_state);
 

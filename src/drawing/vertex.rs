@@ -1,9 +1,10 @@
+use crate::vector_tile::math::TileId;
 use lyon::tessellation;
 use lyon::tessellation::geometry_builder::VertexConstructor;
 use crate::vector_tile::math;
 
 #[derive(Copy, Clone, Debug)]
-pub struct Vertex {
+pub struct Vertex<> {
     pub position: [f32; 2],
     pub normal: [f32; 2],
     pub layer_id: u32,
@@ -13,6 +14,17 @@ pub struct Vertex {
 pub struct LayerVertexCtor {
     pub tile_id: math::TileId,
     pub layer_id: u32,
+    pub stroke: u32,
+}
+
+impl LayerVertexCtor {
+    pub fn new(tile_id: &TileId) -> Self {
+        Self {
+            tile_id: tile_id.clone(),
+            layer_id: 0,
+            stroke: 0,
+        }
+    }
 }
 
 impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
@@ -23,7 +35,7 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         Vertex {
             position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
             normal: vertex.normal.to_array(),
-            layer_id: self.layer_id << 1 | 0,
+            layer_id: self.layer_id << 1 | self.stroke,
         }
     }
 }
@@ -36,7 +48,7 @@ impl VertexConstructor<tessellation::StrokeVertex, Vertex> for LayerVertexCtor {
         Vertex {
             position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
             normal: vertex.normal.to_array(),
-            layer_id: self.layer_id << 1 | 1,
+            layer_id: self.layer_id << 1 | self.stroke,
         }
     }
 }

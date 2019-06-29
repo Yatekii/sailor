@@ -9,8 +9,6 @@ use crate::vector_tile::transform::Layer;
 
 #[derive(Debug, Clone)]
 pub struct DrawableLayer {
-    pub start_vertex: u32,
-    pub end_vertex: u32,
     pub layer_data: LayerData,
     pub layer_info: LayerInfo,
 }
@@ -45,10 +43,8 @@ impl From<Color> for DrawableColor {
 }
 
 impl DrawableLayer {
-    pub fn from_layer(start_vertex: u32, end_vertex: u32, layer: &Layer, zoom: f32, css_cache: &mut RulesCache) -> Self {
+    pub fn from_layer(layer: &Layer, zoom: f32, css_cache: &mut RulesCache) -> Self {
         let mut drawable_layer = Self {
-            start_vertex,
-            end_vertex,
             layer_data: LayerData {
                 background_color: Color::WHITE.into(),
                 border_color: Color::WHITE.into(),

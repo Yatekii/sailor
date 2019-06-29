@@ -1,3 +1,5 @@
+use crate::vector_tile::tile::Tile;
+use crate::drawing::vertex::Vertex;
 use crate::vector_tile::math::TileId;
 use std::collections::HashMap;
 use crate::vector_tile::math;
@@ -10,10 +12,14 @@ use std::sync::mpsc::{
     Sender,
     Receiver,
 };
+use lyon::tessellation::geometry_builder::{
+    VertexBuffers,
+    BuffersBuilder,
+};
 
 pub struct TileCache {
     cache: HashMap<math::TileId, Tile>,
-    loaders: Vec<(u64, JoinHandle<Option<std::vec::Vec<crate::vector_tile::transform::Layer>>>, TileId)>,
+    loaders: Vec<(u64, JoinHandle<Option<Tile>>, TileId)>,
     channel: (Sender<u64>, Receiver<u64>),
     id: u64,
 }
@@ -43,9 +49,9 @@ impl TileCache {
                 if found {
                     let loader = self.loaders.remove(i);
                     match loader.1.join() {
-                        Ok(layers) => {
-                            if let Some(layers) = layers {
-                                self.cache.insert(loader.2, Tile { layers: layers });
+                        Ok(tile) => {
+                            if let Some(tile) = tile {
+                                self.cache.insert(loader.2, tile);
                             }
                         },
                         Err(e) => {
@@ -71,12 +77,12 @@ impl TileCache {
                 id,
                 spawn(move|| {
                     if let Some(data) = crate::vector_tile::fetch_tile_data(&tile_id_clone) {
-                        let layers = crate::vector_tile::vector_tile_to_mesh(&tile_id_clone, &data);
+                        let tile = Tile::from_mbvt(&tile_id_clone, &data);
                         match tx.send(id) {
                             Err(_) => log::debug!("Could not send the tile load message. This most likely happened because the app was terminated."),
                             _ => (),
                         }
-                        Some(layers)
+                        Some(tile)
                     } else {
                         None
                     }
@@ -89,9 +95,4 @@ impl TileCache {
     pub fn try_get_tile(&mut self, tile_id: &math::TileId) -> Option<&Tile> {
         self.cache.get(&tile_id)
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct Tile {
-    pub layers: Vec<crate::vector_tile::transform::Layer>
 }

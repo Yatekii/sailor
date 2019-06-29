@@ -343,7 +343,7 @@ impl Painter {
       + 12 * 4 * 30
     }
 
-    fn create_bind_group(
+    pub fn create_bind_group(
         device: &Device,
         encoder: &mut CommandEncoder,
         bind_group_layout: &BindGroupLayout,
@@ -469,43 +469,24 @@ impl Painter {
 
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
+                
                 app_state.tile_cache.fetch_tile(&tile_id);
+                
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
-                    let mut vertex_count = 0;
-
-                    let mut layers = vec![];
-                    for l in &tile.layers {
-                        let vc = l.mesh.indices.len() as u32;
-                        vertex_count += vc;
-                        layers.push(DrawableLayer::from_layer(vertex_count - vc, vertex_count, l, app_state.zoom, &mut app_state.css_cache))
-                    }
-
-                    
-                    let bind_group = Self::create_bind_group(&self.device, &mut encoder, &self.bind_group_layout, &app_state.screen, app_state.zoom, &layers);
-
-                    let mut vertices = vec![];
-                    let mut indices = vec![];
-
-                    let mut offset = 0;
-                    for layer in &tile.layers {
-                        vertices.extend(layer.mesh.vertices.clone());
-                        indices.extend(layer.mesh.indices.iter().map(|i| i + offset));
-                        offset += layer.mesh.vertices.len() as u32;
-                    }
-
-                    new_loaded_tiles.insert(tile_id.clone(), DrawableTile {
-                        vertex_buffer: self.device
-                            .create_buffer_mapped(vertices.len(), wgpu::BufferUsage::VERTEX)
-                            .fill_from_slice(&vertices),
-                        index_buffer: self.device
-                            .create_buffer_mapped(indices.len(), wgpu::BufferUsage::INDEX)
-                            .fill_from_slice(&indices),
-                        index_count: indices.len() as u32,
-                        bind_group: bind_group,
-                        layers: layers,
-                        tile_id,
-                    });
+                    new_loaded_tiles.insert(
+                        tile_id.clone(),
+                        DrawableTile::load_from_tile_id(
+                            &self.device,
+                            &mut encoder,
+                            &self.bind_group_layout,
+                            tile_id,
+                            &tile,
+                            app_state.zoom,
+                            &app_state.screen,
+                            &mut app_state.css_cache
+                        )
+                    );
                 } else {
                     log::trace!("Could not read tile {} from cache.", tile_id);
                 }
