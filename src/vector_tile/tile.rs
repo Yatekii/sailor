@@ -36,20 +36,16 @@ impl Tile {
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id));
 
         for (i, layer) in tile.layers.iter().enumerate() {
-            {
-                builder.set_current_layer_id(i as u32);
-            }
+            builder.set_current_layer_id(i as u32);
             for feature in &layer.features {
-                {
-                    geometry_commands_to_drawable(
-                        &mut builder,
-                        tile_id,
-                        i as u32,
-                        feature.type_pb,
-                        &feature.geometry,
-                        tile.layers[0].extent
-                    );
-                }
+                geometry_commands_to_drawable(
+                    &mut builder,
+                    tile_id,
+                    i as u32,
+                    feature.type_pb,
+                    &feature.geometry,
+                    tile.layers[0].extent
+                );
             }
 
             layers.push(crate::vector_tile::transform::Layer {
