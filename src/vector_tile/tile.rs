@@ -30,7 +30,6 @@ impl Tile {
         let tile = crate::vector_tile::Tile::from_reader(&mut reader, &data).expect("Cannot read Tile object.");
         // dbg!(t.elapsed().as_millis());
 
-        let mut layer_id = 0;
         let mut layers = Vec::with_capacity(tile.layers.len());
         let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::with_capacity(4_000_000, 4_000_000);
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id));
@@ -40,8 +39,6 @@ impl Tile {
             for feature in &layer.features {
                 geometry_commands_to_drawable(
                     &mut builder,
-                    tile_id,
-                    i as u32,
                     feature.type_pb,
                     &feature.geometry,
                     tile.layers[0].extent

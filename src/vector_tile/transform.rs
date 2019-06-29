@@ -1,13 +1,7 @@
 use crate::drawing::mesh::MeshBuilder;
-use crate::vector_tile::*;
-use quick_protobuf::{MessageRead, BytesReader};
 
 use lyon::path::Path;
 use lyon::math::*;
-use lyon::tessellation::geometry_builder::{
-    VertexBuffers,
-    BuffersBuilder,
-};
 use lyon::tessellation::{
     FillTessellator,
     FillOptions,
@@ -15,11 +9,6 @@ use lyon::tessellation::{
     StrokeOptions,
 };
 use varint::ZigZag;
-
-use crate::drawing::vertex::{
-    Vertex,
-    LayerVertexCtor,
-};
 
 use crate::vector_tile::mod_Tile::GeomType;
 
@@ -105,8 +94,6 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
 
 pub fn geometry_commands_to_drawable<'a, 'l>(
     builder: &'a mut MeshBuilder<'l>,
-    tile_id: &math::TileId,
-    layer_id: u32,
     geometry_type: GeomType,
     geometry: &Vec<u32>,
     extent: u32

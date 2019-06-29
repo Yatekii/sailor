@@ -26,7 +26,7 @@ use crate::drawing::{
     drawable_layer::DrawableLayer,
 };
 use crate::css::RulesCache;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use wgpu::{
     winit::{
@@ -66,7 +66,7 @@ pub struct Painter {
     swap_chain: SwapChain,
     render_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
-    loaded_tiles: HashMap<TileId, DrawableTile>,
+    loaded_tiles: BTreeMap<TileId, DrawableTile>,
     bind_group_layout: BindGroupLayout,
     vertex_shader: String,
     fragment_shader: String,
@@ -194,7 +194,7 @@ impl Painter {
             swap_chain,
             render_pipeline,
             multisampled_framebuffer,
-            loaded_tiles: HashMap::new(),
+            loaded_tiles: BTreeMap::new(),
             bind_group_layout,
             vertex_shader,
             fragment_shader,
@@ -463,9 +463,10 @@ impl Painter {
     }
 
     pub fn load_tiles(&mut self, app_state: &mut AppState) {
+        println!("--------------------");
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-        let mut new_loaded_tiles = HashMap::new();
+        let mut new_loaded_tiles = BTreeMap::new();
 
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
@@ -474,6 +475,7 @@ impl Painter {
                 
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
+                    println!("T");
                     new_loaded_tiles.insert(
                         tile_id.clone(),
                         DrawableTile::load_from_tile_id(
@@ -491,8 +493,8 @@ impl Painter {
                     log::trace!("Could not read tile {} from cache.", tile_id);
                 }
             } else {
-                if let Some((k, v)) = self.loaded_tiles.remove_entry(&tile_id) {
-                    new_loaded_tiles.insert(k, v);
+                if let Some(v) = self.loaded_tiles.remove(&tile_id) {
+                    new_loaded_tiles.insert(tile_id, v);
                 }
             }
         }

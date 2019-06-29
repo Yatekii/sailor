@@ -1,5 +1,4 @@
 use crate::vector_tile::tile::Tile;
-use crate::drawing::vertex::Vertex;
 use crate::vector_tile::math::TileId;
 use std::collections::HashMap;
 use crate::vector_tile::math;
@@ -11,10 +10,6 @@ use std::sync::mpsc::{
     channel,
     Sender,
     Receiver,
-};
-use lyon::tessellation::geometry_builder::{
-    VertexBuffers,
-    BuffersBuilder,
 };
 
 pub struct TileCache {

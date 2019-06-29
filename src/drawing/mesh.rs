@@ -1,4 +1,3 @@
-use crate::vector_tile::math::TileId;
 use crate::drawing::vertex::{
     Vertex,
     LayerVertexCtor
@@ -47,10 +46,6 @@ impl<'l> MeshBuilder<'l> {
 
     pub fn set_current_vertex_type(&mut self, stroke: bool) {
         self.vertex_constructor.stroke = if stroke { 1 } else { 0 };
-    }
-
-    pub fn set_current_tile_id(&mut self, tile_id: TileId) {
-        self.vertex_constructor.tile_id = tile_id;
     }
 }
 

@@ -36,7 +36,7 @@ impl DrawableTile {
         screen: &Screen,
         css_cache: &mut RulesCache
     ) -> DrawableTile {
-        let mut layers = vec![];
+        let mut layers = Vec::with_capacity(tile.layers.len());
         for l in &tile.layers {
             layers.push(DrawableLayer::from_layer(l, zoom, css_cache))
         }
