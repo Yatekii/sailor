@@ -11,6 +11,7 @@ use crate::vector_tile::transform::Layer;
 pub struct DrawableLayer {
     pub layer_data: LayerData,
     pub layer_info: LayerInfo,
+    pub layer: Layer,
 }
 
 #[derive(Debug, Clone)]
@@ -18,7 +19,7 @@ pub struct LayerInfo {
     pub name: String,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct LayerData {
     background_color: DrawableColor,
     border_color: DrawableColor,
@@ -26,7 +27,7 @@ pub struct LayerData {
     _padding: [u32; 3],
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct DrawableColor {
     pub r: f32,
     pub g: f32,
@@ -43,7 +44,7 @@ impl From<Color> for DrawableColor {
 }
 
 impl DrawableLayer {
-    pub fn from_layer(layer: &Layer, zoom: f32, css_cache: &mut RulesCache) -> Self {
+    pub fn from_layer(layer: Layer, zoom: f32, css_cache: &mut RulesCache) -> Self {
         let mut drawable_layer = Self {
             layer_data: LayerData {
                 background_color: Color::WHITE.into(),
@@ -54,6 +55,7 @@ impl DrawableLayer {
             layer_info: LayerInfo {
                 name: layer.name.clone(),
             },
+            layer,
         };
         drawable_layer.load_style(zoom, css_cache);
         drawable_layer

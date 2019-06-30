@@ -21,7 +21,6 @@ pub struct DrawableTile {
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
     pub index_count: u32,
-    pub bind_group: BindGroup,
     pub layers: Vec<DrawableLayer>
 }
 
@@ -29,7 +28,6 @@ impl DrawableTile {
     pub fn load_from_tile_id(
         device: &Device,
         encoder: &mut CommandEncoder,
-        bind_group_layout: &BindGroupLayout,
         tile_id: TileId,
         tile: &Tile,
         zoom: f32,
@@ -38,17 +36,8 @@ impl DrawableTile {
     ) -> DrawableTile {
         let mut layers = Vec::with_capacity(tile.layers.len());
         for l in &tile.layers {
-            layers.push(DrawableLayer::from_layer(l, zoom, css_cache))
+            layers.push(DrawableLayer::from_layer(l.clone(), zoom, css_cache))
         }
-
-        let bind_group = Painter::create_bind_group(
-            &device,
-            encoder,
-            bind_group_layout,
-            &screen,
-            zoom,
-            &layers
-        );
 
         DrawableTile {
             vertex_buffer: device
@@ -58,16 +47,16 @@ impl DrawableTile {
                 .create_buffer_mapped(tile.mesh.indices.len(), wgpu::BufferUsage::INDEX)
                 .fill_from_slice(&tile.mesh.indices),
             index_count: tile.mesh.indices.len() as u32,
-            bind_group: bind_group,
             layers: layers,
             tile_id,
         }
     }
 
-    pub fn paint(&mut self, render_pass: &mut RenderPass) {
+    pub fn paint(&mut self, render_pass: &mut RenderPass, layer: &DrawableLayer) {
         render_pass.set_index_buffer(&self.index_buffer, 0);
         render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
-        render_pass.set_bind_group(0, &self.bind_group, &[]);
-        render_pass.draw_indexed(0 .. self.index_count, 0, 0 .. 1);
+        if let Some(layer) = self.layers.iter().find(|l| l.layer.id == layer.layer.id) {
+            render_pass.draw_indexed(layer.layer.indices_range.clone(), 0, 0 .. 1);
+        }
     }
 }

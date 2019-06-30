@@ -22,9 +22,9 @@ fn main() {
 
     let mut events_loop = wgpu::winit::EventsLoop::new();
 
-    let mut painter = drawing::Painter::init(&events_loop, size, size);
-
     let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), size, size, z);
+
+    let mut painter = drawing::Painter::init(&events_loop, size, size, &app_state);
 
     let mut status = true;
     let mut mouse_down = false;

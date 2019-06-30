@@ -47,6 +47,10 @@ impl<'l> MeshBuilder<'l> {
     pub fn set_current_vertex_type(&mut self, stroke: bool) {
         self.vertex_constructor.stroke = if stroke { 1 } else { 0 };
     }
+
+    pub fn get_current_index(&mut self) -> u32 {
+        self.buffers.indices.len() as u32
+    }
 }
 
 impl<'l> GeometryBuilder<FillVertex>

@@ -1,3 +1,4 @@
+use core::ops::Range;
 use crate::drawing::mesh::MeshBuilder;
 
 use lyon::path::Path;
@@ -15,6 +16,8 @@ use crate::vector_tile::mod_Tile::GeomType;
 #[derive(Debug, Clone)]
 pub struct Layer {
     pub name: String,
+    pub id: u32,
+    pub indices_range: Range<u32>,
 }
 
 fn area(path: &Path) -> f32 {

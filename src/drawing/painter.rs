@@ -15,9 +15,6 @@ use notify::{
 };
 use wgpu::Surface;
 use wgpu::CommandEncoder;
-use lyon::math::{
-    vector,
-};
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
     drawable_tile::DrawableTile,
@@ -65,7 +62,9 @@ pub struct Painter {
     render_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
+    available_layers: Vec<Option<DrawableLayer>>,
     bind_group_layout: BindGroupLayout,
+    bind_group: BindGroup,
     vertex_shader: String,
     fragment_shader: String,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
@@ -74,7 +73,7 @@ pub struct Painter {
 
 impl Painter {
     /// Initializes the entire draw machinery.
-    pub fn init(events_loop: &EventsLoop, width: u32, height: u32) -> Self {
+    pub fn init(events_loop: &EventsLoop, width: u32, height: u32, app_state: &AppState) -> Self {
         #[cfg(not(feature = "gl"))]
         let (window, instance, size, surface) = {
             let instance = wgpu::Instance::new();
@@ -121,7 +120,7 @@ impl Painter {
             limits: wgpu::Limits::default(),
         });
 
-        let init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        let mut init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
         let (tx, rx) = unbounded();
         
@@ -162,8 +161,25 @@ impl Painter {
                     visibility: wgpu::ShaderStage::VERTEX,
                     ty: wgpu::BindingType::UniformBuffer,
                 },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 1,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::SampledTexture,
+                },
             ]
         });
+
+        let available_layers = vec![None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None];
+
+        let bind_group = Self::create_bind_group(
+            &device,
+            &mut init_encoder,
+            &bind_group_layout,
+            &Self::create_texture(&device, width, height),
+            &app_state.screen,
+            app_state.zoom,
+            &available_layers,
+        );
 
         let render_pipeline = Self::create_render_pipeline(&device, &bind_group_layout, &vs_module, &fs_module);
 
@@ -193,7 +209,9 @@ impl Painter {
             render_pipeline,
             multisampled_framebuffer,
             loaded_tiles: BTreeMap::new(),
+            available_layers,
             bind_group_layout,
+            bind_group,
             vertex_shader,
             fragment_shader,
             _watcher: watcher,
@@ -263,7 +281,7 @@ impl Painter {
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_uniform_buffers(device: &Device, screen: &Screen, z: f32, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
+    fn create_uniform_buffers(device: &Device, screen: &Screen, z: f32, drawable_layers: &Vec<Option<DrawableLayer>>) -> Vec<(Buffer, usize)> {
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device
             .create_buffer_mapped(
@@ -285,7 +303,7 @@ impl Painter {
                 layer_data_len / 12 / 4,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
-            .fill_from_slice(&drawable_layers.iter().map(|dl| dl.layer_data).collect::<Vec<_>>().as_slice());
+            .fill_from_slice(&drawable_layers.iter().map(|dl| if let Some(dl) = dl { dl.layer_data } else { Default::default() }).collect::<Vec<_>>().as_slice());
 
         vec![
             (canvas_size_buffer, canvas_size_len),
@@ -327,9 +345,10 @@ impl Painter {
         device: &Device,
         encoder: &mut CommandEncoder,
         bind_group_layout: &BindGroupLayout,
+        texture_view: &TextureView,
         screen: &Screen,
         z: f32,
-        layers: &Vec<DrawableLayer>
+        layers: &Vec<Option<DrawableLayer>>
     ) -> BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
@@ -350,8 +369,30 @@ impl Painter {
                         range: 0 .. Self::uniform_buffer_size(),
                     },
                 },
+                wgpu::Binding {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(texture_view),
+                },
             ],
         })
+    }
+
+    pub fn create_texture(device: &Device, width: u32, height: u32) -> TextureView {
+        let texture_extent = wgpu::Extent3d {
+            width,
+            height,
+            depth: 1,
+        };
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: texture_extent,
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::TRANSFER_DST,
+        });
+        texture.create_default_view()
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.
@@ -414,10 +455,15 @@ impl Painter {
     }
 
     fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState) {
-        for drawable_tile in self.loaded_tiles.values_mut() {
-            let bind_group = Self::create_bind_group(&self.device, encoder, &self.bind_group_layout, &app_state.screen, app_state.zoom, &drawable_tile.layers);
-            drawable_tile.bind_group = bind_group;
-        }
+        self.bind_group = Self::create_bind_group(
+            &self.device,
+            encoder,
+            &self.bind_group_layout,
+            &Self::create_texture(&self.device, app_state.screen.width, app_state.screen.height),
+            &app_state.screen,
+            app_state.zoom,
+            &self.available_layers
+        );
     }
 
     fn create_multisampled_framebuffer(device: &Device, swap_chain_descriptor: &SwapChainDescriptor, sample_count: u32) -> wgpu::TextureView {
@@ -452,18 +498,21 @@ impl Painter {
                 
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
+                    let drawable_tile = DrawableTile::load_from_tile_id(
+                        &self.device,
+                        encoder,
+                        tile_id,
+                        &tile,
+                        app_state.zoom,
+                        &app_state.screen,
+                        &mut app_state.css_cache
+                    );
+                    for layer in &drawable_tile.layers {
+                        self.available_layers[layer.layer.id as usize] = Some(layer.clone());
+                    }
                     new_loaded_tiles.insert(
                         tile_id.clone(),
-                        DrawableTile::load_from_tile_id(
-                            &self.device,
-                            encoder,
-                            &self.bind_group_layout,
-                            tile_id,
-                            &tile,
-                            app_state.zoom,
-                            &app_state.screen,
-                            &mut app_state.css_cache
-                        )
+                        drawable_tile
                     );
                 } else {
                     log::trace!("Could not read tile {} from cache.", tile_id);
@@ -474,6 +523,8 @@ impl Painter {
                 }
             }
         }
+
+        self.update_uniforms(encoder, &app_state);
 
         self.loaded_tiles = new_loaded_tiles;
     }
@@ -498,40 +549,14 @@ impl Painter {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-
-            let zoom_x = 2.0f32.powf(app_state.zoom) / (app_state.screen.width as f32 / 2.0) * 256.0;
-            let zoom_y = 2.0f32.powf(app_state.zoom) / (app_state.screen.height as f32 / 2.0) * 256.0;
+            render_pass.set_bind_group(0, &self.bind_group, &[]);
 
             for drawable_tile in self.loaded_tiles.values_mut() {
-                // TODO: Fix hideous scissors!
-
-                let top_left = crate::vector_tile::math::num_to_global_space(&drawable_tile.tile_id.into());
-                let bottom_right = top_left + vector(
-                    1.0/2f32.powi(drawable_tile.tile_id.z as i32),
-                    1.0/2f32.powi(drawable_tile.tile_id.z as i32)
-                );
-
-                let mut top_left = top_left - app_state.screen.center;
-                top_left.x *= zoom_x;
-                top_left.y *= zoom_y;
-                top_left += vector(1.0, 1.0);
-                top_left.x = top_left.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0 - 1.0;
-                top_left.y = top_left.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0 - 1.0;
-
-                let mut bottom_right = bottom_right - app_state.screen.center;
-                bottom_right.x *= zoom_x;
-                bottom_right.y *= zoom_y;
-                bottom_right += vector(1.0, 1.0);
-                bottom_right.x = bottom_right.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0 + 1.0;
-                bottom_right.y = bottom_right.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0 + 1.0;
-
-                render_pass.set_scissor_rect(
-                    top_left.x.round() as u32,
-                    top_left.y.round() as u32,
-                    (bottom_right.x - top_left.x).round() as u32,
-                    (bottom_right.y - top_left.y).round() as u32
-                );
-                drawable_tile.paint(&mut render_pass);
+                for layer in &self.available_layers {
+                    if let Some(layer) = layer {
+                        drawable_tile.paint(&mut render_pass, layer);
+                    }
+                }
             }
         }
 
