@@ -16,8 +16,6 @@ use notify::{
 use wgpu::Surface;
 use wgpu::CommandEncoder;
 use lyon::math::{
-    Point,
-    point,
     vector,
 };
 use crate::vector_tile::math::TileId;
@@ -265,21 +263,7 @@ impl Painter {
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_uniform_buffers(device: &Device, screen: &Screen, z: f32, zoom: &Point, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
-        let pan_len = 4 * 4;
-        let pan_buffer = device
-            .create_buffer_mapped(
-                pan_len / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
-            )
-            .fill_from_slice(&[screen.center.x, screen.center.y, 0.0, 0.0]);
-        let zoom_len = 4 * 4;
-        let zoom_buffer = device
-            .create_buffer_mapped(
-                zoom_len / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
-            )
-            .fill_from_slice(&[zoom.x, zoom.y, 0.0, 0.0]);
+    fn create_uniform_buffers(device: &Device, screen: &Screen, z: f32, drawable_layers: &Vec<DrawableLayer>) -> Vec<(Buffer, usize)> {
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device
             .create_buffer_mapped(
@@ -304,8 +288,6 @@ impl Painter {
             .fill_from_slice(&drawable_layers.iter().map(|dl| dl.layer_data).collect::<Vec<_>>().as_slice());
 
         vec![
-            (pan_buffer, pan_len),
-            (zoom_buffer, zoom_len),
             (canvas_size_buffer, canvas_size_len),
             (transform_buffer, transform_len),
             (layer_data_buffer, layer_data_len)
@@ -337,8 +319,6 @@ impl Painter {
 
     const fn uniform_buffer_size() -> u64 {
         4 * 4
-      + 4 * 4
-      + 4 * 4
       + 4 * 4 * 4
       + 12 * 4 * 30
     }
@@ -351,8 +331,6 @@ impl Painter {
         z: f32,
         layers: &Vec<DrawableLayer>
     ) -> BindGroup {
-        let zoom_x = 2.0f32.powf(z) / (screen.width as f32 / 2.0) * 256.0;
-        let zoom_y = 2.0f32.powf(z) / (screen.height as f32 / 2.0) * 256.0;
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
             bindings: &[
@@ -366,7 +344,6 @@ impl Painter {
                                 &device,
                                 &screen,
                                 z,
-                                &point(zoom_x, zoom_y),
                                 layers
                             )
                         ),

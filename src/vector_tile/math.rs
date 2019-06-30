@@ -99,7 +99,7 @@ impl Screen {
         let zoom_y = 2.0f32.powf(z) / (self.height as f32 / 2.0) * 256.0;
         let zoom = glm::scaling(&glm::vec3(zoom_x, zoom_y, 1.0));
         let position = glm::translation(&glm::vec3(-self.center.x, -self.center.y, 0.0));
-        glm::transpose(&(zoom * position))
+        zoom * position
     }
 }
 
