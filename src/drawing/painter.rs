@@ -468,10 +468,12 @@ impl Painter {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         let mut new_loaded_tiles = BTreeMap::new();
 
+        app_state.tile_cache.fetch_tiles();
+
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
                 
-                app_state.tile_cache.fetch_tile(&tile_id);
+                app_state.tile_cache.request_tile(&tile_id);
                 
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {

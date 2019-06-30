@@ -29,37 +29,34 @@ impl TileCache {
         }
     }
 
-    pub fn fetch_tile(&mut self, tile_id: &math::TileId) {
-        match self.channel.1.try_recv() {
-            Ok(id) => {
-                let mut found = false;
-                let mut i = 0;
-                for loader in &self.loaders {
-                    if loader.0 == id {
-                        found = true;
-                        break;
-                    }
-                    i += 1;
+    pub fn fetch_tiles(&mut self) {
+        for id in self.channel.1.try_iter() {
+            let mut found = false;
+            let mut i = 0;
+            for loader in &self.loaders {
+                if loader.0 == id {
+                    found = true;
+                    break;
                 }
-                if found {
-                    let loader = self.loaders.remove(i);
-                    match loader.1.join() {
-                        Ok(tile) => {
-                            if let Some(tile) = tile {
-                                self.cache.insert(loader.2, tile);
-                            }
-                        },
-                        Err(e) => {
-                            log::error!("Failed to join tile loader thread for {}. Reason:\r\n{:?}", loader.2, e);
+                i += 1;
+            }
+            if found {
+                let loader = self.loaders.remove(i);
+                match loader.1.join() {
+                    Ok(tile) => {
+                        if let Some(tile) = tile {
+                            self.cache.insert(loader.2, tile);
                         }
+                    },
+                    Err(e) => {
+                        log::error!("Failed to join tile loader thread for {}. Reason:\r\n{:?}", loader.2, e);
                     }
                 }
-            },
-            Err(_) => ()
+            }
         }
-        
-        // dbg!(self.loaders.len());
+    }
 
+    pub fn request_tile(&mut self, tile_id: &math::TileId) {
         let id = self.id;
         self.id += 1;
 
