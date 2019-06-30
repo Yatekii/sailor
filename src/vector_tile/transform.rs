@@ -109,15 +109,15 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
             let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
             
             // Outline
-            builder.set_current_vertex_type(true);
-            let mut tessellator = StrokeTessellator::new();
-            tessellator
-                .tessellate_path(
-                    &path,
-                    &StrokeOptions::default().with_line_width(0.0),
-                    builder,
-                )
-                .expect("Failed to tesselate path.");
+            // builder.set_current_vertex_type(true);
+            // let mut tessellator = StrokeTessellator::new();
+            // tessellator
+            //     .tessellate_path(
+            //         &path,
+            //         &StrokeOptions::default().with_line_width(0.0),
+            //         builder,
+            //     )
+            //     .expect("Failed to tesselate path.");
 
             // Fill
             builder.set_current_vertex_type(false);
