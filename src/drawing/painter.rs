@@ -462,10 +462,8 @@ impl Painter {
         device.create_texture(multisampled_frame_descriptor).create_default_view()
     }
 
-    pub fn load_tiles(&mut self, app_state: &mut AppState) {
-        println!("--------------------");
+    fn load_tiles(&mut self, app_state: &mut AppState, encoder: &mut CommandEncoder) {
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         let mut new_loaded_tiles = BTreeMap::new();
 
         app_state.tile_cache.fetch_tiles();
@@ -477,12 +475,11 @@ impl Painter {
                 
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
-                    println!("T");
                     new_loaded_tiles.insert(
                         tile_id.clone(),
                         DrawableTile::load_from_tile_id(
                             &self.device,
-                            &mut encoder,
+                            encoder,
                             &self.bind_group_layout,
                             tile_id,
                             &tile,
@@ -502,70 +499,65 @@ impl Painter {
         }
 
         self.loaded_tiles = new_loaded_tiles;
-
-        self.device.get_queue().submit(&[encoder.finish()]);
     }
 
-    pub fn paint(&mut self, app_state: &AppState) {
-        if self.loaded_tiles.len() > 0 {
-            // let t = std::time::Instant::now();
-            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-            // let t = std::time::Instant::now();
-            self.update_uniforms(&mut encoder, &app_state);
-            // dbg!(t.elapsed().as_micros());
-            let frame = self.swap_chain.get_next_texture();
-            {
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: &self.multisampled_framebuffer,
-                        resolve_target: Some(&frame.view),
-                        load_op: wgpu::LoadOp::Clear,
-                        store_op: wgpu::StoreOp::Store,
-                        clear_color: wgpu::Color::GREEN,
-                    }],
-                    depth_stencil_attachment: None,
-                });
+    pub fn paint(&mut self, app_state: &mut AppState) {
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        self.load_tiles(app_state, &mut encoder);
+        // let t = std::time::Instant::now();
+        self.update_uniforms(&mut encoder, &app_state);
+        // dbg!(t.elapsed().as_micros());
+        let frame = self.swap_chain.get_next_texture();
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &self.multisampled_framebuffer,
+                    resolve_target: Some(&frame.view),
+                    load_op: wgpu::LoadOp::Clear,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color::GREEN,
+                }],
+                depth_stencil_attachment: None,
+            });
 
-                render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_pipeline(&self.render_pipeline);
 
-                let zoom_x = 2.0f32.powf(app_state.zoom) / (app_state.screen.width as f32 / 2.0) * 256.0;
-                let zoom_y = 2.0f32.powf(app_state.zoom) / (app_state.screen.height as f32 / 2.0) * 256.0;
+            let zoom_x = 2.0f32.powf(app_state.zoom) / (app_state.screen.width as f32 / 2.0) * 256.0;
+            let zoom_y = 2.0f32.powf(app_state.zoom) / (app_state.screen.height as f32 / 2.0) * 256.0;
 
-                for drawable_tile in self.loaded_tiles.values_mut() {
-                    // TODO: Fix hideous scissors!
+            for drawable_tile in self.loaded_tiles.values_mut() {
+                // TODO: Fix hideous scissors!
 
-                    let top_left = crate::vector_tile::math::num_to_global_space(&drawable_tile.tile_id.into());
-                    let bottom_right = top_left + vector(
-                        1.0/2f32.powi(drawable_tile.tile_id.z as i32),
-                        1.0/2f32.powi(drawable_tile.tile_id.z as i32)
-                    );
+                let top_left = crate::vector_tile::math::num_to_global_space(&drawable_tile.tile_id.into());
+                let bottom_right = top_left + vector(
+                    1.0/2f32.powi(drawable_tile.tile_id.z as i32),
+                    1.0/2f32.powi(drawable_tile.tile_id.z as i32)
+                );
 
-                    let mut top_left = top_left - app_state.screen.center;
-                    top_left.x *= zoom_x;
-                    top_left.y *= zoom_y;
-                    top_left += vector(1.0, 1.0);
-                    top_left.x = top_left.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0 - 1.0;
-                    top_left.y = top_left.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0 - 1.0;
+                let mut top_left = top_left - app_state.screen.center;
+                top_left.x *= zoom_x;
+                top_left.y *= zoom_y;
+                top_left += vector(1.0, 1.0);
+                top_left.x = top_left.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0 - 1.0;
+                top_left.y = top_left.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0 - 1.0;
 
-                    let mut bottom_right = bottom_right - app_state.screen.center;
-                    bottom_right.x *= zoom_x;
-                    bottom_right.y *= zoom_y;
-                    bottom_right += vector(1.0, 1.0);
-                    bottom_right.x = bottom_right.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0 + 1.0;
-                    bottom_right.y = bottom_right.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0 + 1.0;
+                let mut bottom_right = bottom_right - app_state.screen.center;
+                bottom_right.x *= zoom_x;
+                bottom_right.y *= zoom_y;
+                bottom_right += vector(1.0, 1.0);
+                bottom_right.x = bottom_right.x.min(2.0).max(0.0) * app_state.screen.width as f32 / 2.0 + 1.0;
+                bottom_right.y = bottom_right.y.min(2.0).max(0.0) * app_state.screen.height as f32 / 2.0 + 1.0;
 
-                    render_pass.set_scissor_rect(
-                        top_left.x.round() as u32,
-                        top_left.y.round() as u32,
-                        (bottom_right.x - top_left.x).round() as u32,
-                        (bottom_right.y - top_left.y).round() as u32
-                    );
-                    drawable_tile.paint(&mut render_pass);
-                }
+                render_pass.set_scissor_rect(
+                    top_left.x.round() as u32,
+                    top_left.y.round() as u32,
+                    (bottom_right.x - top_left.x).round() as u32,
+                    (bottom_right.y - top_left.y).round() as u32
+                );
+                drawable_tile.paint(&mut render_pass);
             }
-
-            self.device.get_queue().submit(&[encoder.finish()]);
-            // dbg!(t.elapsed().as_millis());
         }
+
+        self.device.get_queue().submit(&[encoder.finish()]);
     }
 }
