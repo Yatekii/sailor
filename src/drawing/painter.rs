@@ -554,7 +554,15 @@ impl Painter {
             for drawable_tile in self.loaded_tiles.values_mut() {
                 for layer in &self.available_layers {
                     if let Some(layer) = layer {
-                        drawable_tile.paint(&mut render_pass, layer);
+                        drawable_tile.paint(&mut render_pass, layer, true);
+                    }
+                }
+            }
+
+            for drawable_tile in self.loaded_tiles.values_mut() {
+                for layer in &self.available_layers {
+                    if let Some(layer) = layer {
+                        drawable_tile.paint(&mut render_pass, layer, false);
                     }
                 }
             }

@@ -29,7 +29,5 @@ void main() {
     } else {
         outColor = layer_data.background_color;
     }
-
-    
     // outColor = vec4(normal, 0.0, 1.0);
 }

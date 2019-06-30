@@ -52,11 +52,15 @@ impl DrawableTile {
         }
     }
 
-    pub fn paint(&mut self, render_pass: &mut RenderPass, layer: &DrawableLayer) {
+    pub fn paint(&mut self, render_pass: &mut RenderPass, layer: &DrawableLayer, outline: bool) {
         render_pass.set_index_buffer(&self.index_buffer, 0);
         render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
         if let Some(layer) = self.layers.iter().find(|l| l.layer.id == layer.layer.id) {
-            render_pass.draw_indexed(layer.layer.indices_range.clone(), 0, 0 .. 2);
+            if outline {
+                render_pass.draw_indexed(layer.layer.indices_range.clone(), 0, 0 .. 1);
+            } else {
+                render_pass.draw_indexed(layer.layer.indices_range.clone(), 0, 1 .. 2);
+            }
         }
     }
 }
