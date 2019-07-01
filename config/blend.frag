@@ -1,0 +1,11 @@
+#version 450
+
+layout(set = 0, binding = 1) uniform texture2D t_Color;
+layout(set = 0, binding = 2) uniform sampler s_Color;
+
+layout(location = 0) out vec4 outColor;
+
+void main() {
+    vec4 tex = texture(sampler2D(t_Color, s_Color), gl_FragCoord.xy);
+    outColor = tex;
+}

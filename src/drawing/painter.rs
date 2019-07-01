@@ -39,6 +39,7 @@ use wgpu::{
     BindGroupLayout,
     BindGroup,
     RenderPipeline,
+    Sampler,
 };
 
 use super::{
@@ -59,12 +60,16 @@ pub struct Painter {
     surface: Surface,
     swap_chain_descriptor: SwapChainDescriptor,
     swap_chain: SwapChain,
-    render_pipeline: RenderPipeline,
+    layer_render_pipeline: RenderPipeline,
+    blend_render_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
     available_layers: Vec<Option<DrawableLayer>>,
-    bind_group_layout: BindGroupLayout,
-    bind_group: BindGroup,
+    layer_bind_group_layout: BindGroupLayout,
+    layer_bind_group: BindGroup,
+    blend_bind_group_layout: BindGroupLayout,
+    blend_bind_group: BindGroup,
+    sampler: Sampler,
     vertex_shader: String,
     fragment_shader: String,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
@@ -133,28 +138,41 @@ impl Painter {
             },
         };
 
-        let vertex_shader = "config/shader.vert".to_string();
-        let fragment_shader = "config/shader.frag".to_string();
+        let layer_vertex_shader = "config/shader.vert".to_string();
+        let layer_fragment_shader = "config/shader.frag".to_string();
+        let blend_vertex_shader = "config/blend.vert".to_string();
+        let blend_fragment_shader = "config/blend.frag".to_string();
 
-        match watcher.watch(&vertex_shader, RecursiveMode::Recursive) {
+        match watcher.watch(&layer_vertex_shader, RecursiveMode::Recursive) {
             Ok(_) => {},
             Err(err) => {
-                log::info!("Failed to start watching {}:", &vertex_shader);
+                log::info!("Failed to start watching {}:", &layer_vertex_shader);
                 log::info!("{}", err);
             },
         };
 
-        match watcher.watch(&fragment_shader, RecursiveMode::Recursive) {
+        match watcher.watch(&layer_fragment_shader, RecursiveMode::Recursive) {
             Ok(_) => {},
             Err(err) => {
-                log::info!("Failed to start watching {}:", &fragment_shader);
+                log::info!("Failed to start watching {}:", &layer_fragment_shader);
                 log::info!("{}", err);
             },
         };
 
-        let (vs_module, fs_module) = Self::load_shader(&device, &vertex_shader, &fragment_shader).expect("Fatal Error. Unable to load shaders.");
+        let (layer_vs_module, layer_fs_module) = Self::load_shader(&device, &layer_vertex_shader, &layer_fragment_shader).expect("Fatal Error. Unable to load shaders.");
+        let (blend_vs_module, blend_fs_module) = Self::load_shader(&device, &blend_vertex_shader, &blend_fragment_shader).expect("Fatal Error. Unable to load shaders.");
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        let layer_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            bindings: &[
+                wgpu::BindGroupLayoutBinding {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::UniformBuffer,
+                },
+            ]
+        });
+
+        let blend_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
                 wgpu::BindGroupLayoutBinding {
                     binding: 0,
@@ -166,22 +184,27 @@ impl Painter {
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::SampledTexture,
                 },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 2,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler,
+                }
             ]
         });
 
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            lod_min_clamp: -100.0,
+            lod_max_clamp: 100.0,
+            compare_function: wgpu::CompareFunction::Always,
+        });
+
         let available_layers = vec![None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None];
-
-        let bind_group = Self::create_bind_group(
-            &device,
-            &mut init_encoder,
-            &bind_group_layout,
-            &Self::create_texture(&device, width, height),
-            &app_state.screen,
-            app_state.zoom,
-            &available_layers,
-        );
-
-        let render_pipeline = Self::create_render_pipeline(&device, &bind_group_layout, &vs_module, &fs_module);
 
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -191,6 +214,29 @@ impl Painter {
         };
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, 8);
+
+        let layer_bind_group = Self::create_layer_bind_group(
+            &device,
+            &mut init_encoder,
+            &layer_bind_group_layout,
+            &app_state.screen,
+            app_state.zoom,
+            &available_layers,
+        );
+
+        let blend_bind_group = Self::create_blend_bind_group(
+            &device,
+            &mut init_encoder,
+            &blend_bind_group_layout,
+            &multisampled_framebuffer,
+            &sampler,
+            &app_state.screen,
+            app_state.zoom,
+            &available_layers,
+        );
+
+        let layer_render_pipeline = Self::create_layer_render_pipeline(&device, &layer_bind_group_layout, &layer_vs_module, &layer_fs_module);
+        let blend_render_pipeline = Self::create_blend_render_pipeline(&device, &blend_bind_group_layout, &blend_vs_module, &blend_fs_module);
 
         let swap_chain = device.create_swap_chain(
             &surface,
@@ -206,20 +252,24 @@ impl Painter {
             surface,
             swap_chain_descriptor,
             swap_chain,
-            render_pipeline,
+            layer_render_pipeline,
+            blend_render_pipeline,
             multisampled_framebuffer,
             loaded_tiles: BTreeMap::new(),
             available_layers,
-            bind_group_layout,
-            bind_group,
-            vertex_shader,
-            fragment_shader,
+            layer_bind_group_layout,
+            layer_bind_group,
+            blend_bind_group_layout,
+            blend_bind_group,
+            sampler,
+            vertex_shader: layer_vertex_shader,
+            fragment_shader: layer_fragment_shader,
             _watcher: watcher,
             rx,
         }
     }
 
-    fn create_render_pipeline(
+    fn create_layer_render_pipeline(
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         vs_module: &ShaderModule,
@@ -277,6 +327,55 @@ impl Painter {
                 ],
             }],
             sample_count: 8,
+        })
+    }
+
+    fn create_blend_render_pipeline(
+        device: &Device,
+        bind_group_layout: &BindGroupLayout,
+        vs_module: &ShaderModule,
+        fs_module: &ShaderModule
+    ) -> RenderPipeline {
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            bind_group_layouts: &[&bind_group_layout],
+        });
+
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            layout: &pipeline_layout,
+            vertex_stage: wgpu::PipelineStageDescriptor {
+                module: &vs_module,
+                entry_point: "main",
+            },
+            fragment_stage: Some(wgpu::PipelineStageDescriptor {
+                module: &fs_module,
+                entry_point: "main",
+            }),
+            rasterization_state: wgpu::RasterizationStateDescriptor {
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: wgpu::CullMode::None,
+                depth_bias: 0,
+                depth_bias_slope_scale: 0.0,
+                depth_bias_clamp: 0.0,
+            },
+            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+            color_states: &[wgpu::ColorStateDescriptor {
+                format: wgpu::TextureFormat::Bgra8Unorm,
+                color_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    operation: wgpu::BlendOperation::Add,
+                },
+                alpha_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::One,
+                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    operation: wgpu::BlendOperation::Add,
+                },
+                write_mask: wgpu::ColorWrite::ALL,
+            }],
+            depth_stencil_state: None,
+            index_format: wgpu::IndexFormat::Uint16,
+            vertex_buffers: &[],
+            sample_count: 1,
         })
     }
 
@@ -341,11 +440,43 @@ impl Painter {
       + 12 * 4 * 30
     }
 
-    pub fn create_bind_group(
+    pub fn create_layer_bind_group(
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        bind_group_layout: &BindGroupLayout,
+        screen: &Screen,
+        z: f32,
+        layers: &Vec<Option<DrawableLayer>>
+    ) -> BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: bind_group_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &Self::copy_uniform_buffers(
+                            &device,
+                            encoder,
+                            &Self::create_uniform_buffers(
+                                &device,
+                                &screen,
+                                z,
+                                layers
+                            )
+                        ),
+                        range: 0 .. Self::uniform_buffer_size(),
+                    },
+                },
+            ],
+        })
+    }
+
+    pub fn create_blend_bind_group(
         device: &Device,
         encoder: &mut CommandEncoder,
         bind_group_layout: &BindGroupLayout,
         texture_view: &TextureView,
+        sampler: &Sampler,
         screen: &Screen,
         z: f32,
         layers: &Vec<Option<DrawableLayer>>
@@ -373,26 +504,12 @@ impl Painter {
                     binding: 1,
                     resource: wgpu::BindingResource::TextureView(texture_view),
                 },
+                wgpu::Binding {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&sampler)
+                }
             ],
         })
-    }
-
-    pub fn create_texture(device: &Device, width: u32, height: u32) -> TextureView {
-        let texture_extent = wgpu::Extent3d {
-            width,
-            height,
-            depth: 1,
-        };
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: texture_extent,
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::TRANSFER_DST,
-        });
-        texture.create_default_view()
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.
@@ -412,7 +529,7 @@ impl Painter {
                 ..
             })) => {
                 if let Ok((vs_module, fs_module)) = Self::load_shader(&self.device, &self.vertex_shader, &self.fragment_shader) {
-                    self.render_pipeline = Self::create_render_pipeline(&self.device, &self.bind_group_layout, &vs_module, &fs_module);
+                    self.layer_render_pipeline = Self::create_layer_render_pipeline(&self.device, &self.layer_bind_group_layout, &vs_module, &fs_module);
                     true
                 } else {
                     false
@@ -455,11 +572,21 @@ impl Painter {
     }
 
     fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState) {
-        self.bind_group = Self::create_bind_group(
+        self.layer_bind_group = Self::create_layer_bind_group(
             &self.device,
             encoder,
-            &self.bind_group_layout,
-            &Self::create_texture(&self.device, app_state.screen.width, app_state.screen.height),
+            &self.layer_bind_group_layout,
+            &app_state.screen,
+            app_state.zoom,
+            &self.available_layers
+        );
+
+        self.blend_bind_group = Self::create_blend_bind_group(
+            &self.device,
+            encoder,
+            &self.blend_bind_group_layout,
+            &self.multisampled_framebuffer,
+            &self.sampler,
             &app_state.screen,
             app_state.zoom,
             &self.available_layers
@@ -536,38 +663,48 @@ impl Painter {
         self.update_uniforms(&mut encoder, &app_state);
         // dbg!(t.elapsed().as_micros());
         let frame = self.swap_chain.get_next_texture();
-        {
+
+        for layer in &self.available_layers {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &self.multisampled_framebuffer,
-                    resolve_target: Some(&frame.view),
+                    resolve_target: None,
                     load_op: wgpu::LoadOp::Clear,
                     store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color::GREEN,
+                    clear_color: wgpu::Color::TRANSPARENT,
                 }],
                 depth_stencil_attachment: None,
             });
 
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.bind_group, &[]);
+            render_pass.set_pipeline(&self.layer_render_pipeline);
+            render_pass.set_bind_group(0, &self.layer_bind_group, &[]);
 
             for drawable_tile in self.loaded_tiles.values_mut() {
-                for layer in &self.available_layers {
-                    if let Some(layer) = layer {
-                        drawable_tile.paint(&mut render_pass, layer, true);
-                    }
-                }
-            }
-
-            for drawable_tile in self.loaded_tiles.values_mut() {
-                for layer in &self.available_layers {
-                    if let Some(layer) = layer {
-                        drawable_tile.paint(&mut render_pass, layer, false);
-                    }
+                if let Some(layer) = layer {
+                    drawable_tile.paint(&mut render_pass, layer, false);
                 }
             }
         }
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Clear,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color::TRANSPARENT,
+                }],
+                depth_stencil_attachment: None,
+            });
 
+            render_pass.set_pipeline(&self.blend_render_pipeline);
+            render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
+            render_pass.draw(0 .. 6, 0 .. 1);
+        }
         self.device.get_queue().submit(&[encoder.finish()]);
     }
 }
+
+// WebGPURenderPipelineColorAttachmentDescriptor
+// blendingEnabled
+// rgbBlendOperation
