@@ -687,6 +687,8 @@ impl Painter {
         // dbg!(t.elapsed().as_micros());
         let frame = self.swap_chain.get_next_texture();
 
+        let mut first = true;
+
         for layer in &self.available_layers {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -715,7 +717,7 @@ impl Painter {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
                     resolve_target: None,
-                    load_op: wgpu::LoadOp::Clear,
+                    load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
                     store_op: wgpu::StoreOp::Store,
                     clear_color: wgpu::Color::TRANSPARENT,
                 }],
@@ -726,6 +728,7 @@ impl Painter {
             render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
             render_pass.draw(0 .. 6, 0 .. 1);
         }
+        first = false;
         }
         self.device.get_queue().submit(&[encoder.finish()]);
     }

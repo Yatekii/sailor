@@ -1,5 +1,5 @@
 layer[name=water] {
-    background-color: rgba(0, 0, 255, 0.274);
+    background-color: rgba(0, 0, 255, 1.0);
     border-color: red;
     border-width: 3px;
 }

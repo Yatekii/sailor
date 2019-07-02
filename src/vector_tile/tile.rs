@@ -21,7 +21,7 @@ pub struct Tile {
 }
 
 pub fn layer_num(name: &str) -> u32 {
-    match name {	
+    19 - match name {	
         "water" => 0,
         "waterway" => 1,
         "landcover" => 2,
@@ -38,7 +38,7 @@ pub fn layer_num(name: &str) -> u32 {
         "housenumber" => 13,
         "poi" => 14,
         "aerodrome_label" => 15,
-        _ => 999,
+        _ => 19,
     }
 }
 

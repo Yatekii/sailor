@@ -6,8 +6,6 @@ use lyon::math::*;
 use lyon::tessellation::{
     FillTessellator,
     FillOptions,
-    StrokeTessellator,
-    StrokeOptions,
 };
 use varint::ZigZag;
 

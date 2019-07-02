@@ -3,13 +3,10 @@ use crate::vector_tile::math::Screen;
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
     drawable_layer::DrawableLayer,
-    painter::Painter,
 };
 use wgpu::{
     RenderPass,
     Buffer,
-    BindGroup,
-    BindGroupLayout,
     Device,
     CommandEncoder,
 };
