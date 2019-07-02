@@ -381,6 +381,7 @@ fn css_name<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a 
 fn css_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
     alt((
         whitespace(hex_color),
+        whitespace(rgba_color),
         whitespace(px_value),
         whitespace(string),
     ))(input)
@@ -422,38 +423,63 @@ pub struct Color {
   pub r: u8,
   pub g: u8,
   pub b: u8,
+  pub a: f32,
 }
 
 impl Color {
-    pub const WHITE: Color = Color { r: 255, g: 255, b: 255, };
-    pub const _BLACK: Color = Color { r:   0, g:   0, b:   0, };
-    pub const RED:   Color = Color { r: 255, g:   0, b:   0, };
-    pub const GREEN: Color = Color { r:   0, g: 255, b:   0, };
-    pub const BLUE:  Color = Color { r:   0, g:   0, b: 255, };
+    pub const WHITE: Color = Color { r: 255, g: 255, b: 255, a: 1.0, };
+    pub const _BLACK: Color = Color { r:   0, g:   0, b:   0, a: 1.0, };
+    pub const RED:   Color = Color { r: 255, g:   0, b:   0, a: 1.0, };
+    pub const GREEN: Color = Color { r:   0, g: 255, b:   0, a: 1.0, };
+    pub const BLUE:  Color = Color { r:   0, g:   0, b: 255, a: 1.0, };
 }
 
 /// Converts a hex string into an `u8`.
 fn from_hex(input: &str) -> Result<u8, std::num::ParseIntError> {
-  u8::from_str_radix(input, 16)
+    u8::from_str_radix(input, 16)
 }
 
 /// `true` if `c` is a hexadecimal valid digit.
 fn is_hex_digit(c: char) -> bool {
-  c.is_digit(16)
+    c.is_digit(16)
 }
 
 /// Parse an actual hex code.
 fn hex_primary<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E> {
-  map_res(
-    take_while_m_n(2, 2, is_hex_digit),
-    from_hex
-  )(input)
+    map_res(
+        take_while_m_n(2, 2, is_hex_digit),
+        from_hex
+    )(input)
 }
 
 /// Parse a single hex color code including the `#`.
 fn hex_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
-  let (input, _) = tag("#")(input)?;
-  let (input, (r, g, b)) = tuple((hex_primary, hex_primary, hex_primary))(input)?;
+    let (input, _) = tag("#")(input)?;
+    let (input, (r, g, b)) = tuple((hex_primary, hex_primary, hex_primary))(input)?;
 
-  Ok((input, CSSValue::Color(Color { r, g, b })))
+    Ok((input, CSSValue::Color(Color { r, g, b, a: 1.0 })))
+}
+
+fn u8<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E> {
+    use std::str::FromStr;
+    map_res(
+        take_while(|c: char| c.is_digit(10)),
+        u8::from_str
+    )(input)
+}
+
+/// Parse a single hex color code including the `#`.
+fn rgba_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+    let (input, _) = whitespace(tag("rgba("))(input)?;
+    let (input, (r, _, g, _, b, _, a)) = tuple((
+        u8,
+        whitespace(char(',')),
+        u8,
+        whitespace(char(',')),
+        u8,
+        whitespace(char(',')),
+        float,
+    ))(input)?;
+    let (input, _) = tag(")")(input)?;
+    Ok((input, CSSValue::Color(Color { r, g, b, a })))
 }

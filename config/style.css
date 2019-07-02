@@ -1,5 +1,5 @@
 layer[name=water] {
-    background-color: #0000FF;
+    background-color: rgba(0, 0, 255, 0.274);
     border-color: red;
     border-width: 3px;
 }
@@ -13,6 +13,6 @@ layer[name=landcover] {
 }
 
 layer[name=landuse] {
-    background-color: #A11414;
+    background-color: rgba(161, 20, 20, 0.295);
     border-color: red;
 }

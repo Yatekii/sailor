@@ -63,6 +63,7 @@ pub struct Painter {
     layer_render_pipeline: RenderPipeline,
     blend_render_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
+    framebuffer: TextureView,
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
     available_layers: Vec<Option<DrawableLayer>>,
     layer_bind_group_layout: BindGroupLayout,
@@ -214,6 +215,7 @@ impl Painter {
         };
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, 8);
+        let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
 
         let layer_bind_group = Self::create_layer_bind_group(
             &device,
@@ -255,6 +257,7 @@ impl Painter {
             layer_render_pipeline,
             blend_render_pipeline,
             multisampled_framebuffer,
+            framebuffer,
             loaded_tiles: BTreeMap::new(),
             available_layers,
             layer_bind_group_layout,
@@ -569,6 +572,7 @@ impl Painter {
         self.swap_chain_descriptor.height = height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
         self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, 8);
+        self.framebuffer = Self::create_framebuffer(&self.device, &self.swap_chain_descriptor);
     }
 
     fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState) {
@@ -606,10 +610,29 @@ impl Painter {
             sample_count: sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: swap_chain_descriptor.format,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         };
 
         device.create_texture(multisampled_frame_descriptor).create_default_view()
+    }
+
+    fn create_framebuffer(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> wgpu::TextureView {
+        let texture_extent = wgpu::Extent3d {
+            width: swap_chain_descriptor.width,
+            height: swap_chain_descriptor.height,
+            depth: 1,
+        };
+        let frame_descriptor = &wgpu::TextureDescriptor {
+            size: texture_extent,
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: swap_chain_descriptor.format,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        };
+
+        device.create_texture(frame_descriptor).create_default_view()
     }
 
     fn load_tiles(&mut self, app_state: &mut AppState, encoder: &mut CommandEncoder) {
@@ -665,6 +688,7 @@ impl Painter {
         let frame = self.swap_chain.get_next_texture();
 
         for layer in &self.available_layers {
+        {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &self.multisampled_framebuffer,
@@ -685,6 +709,7 @@ impl Painter {
                 }
             }
         }
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -700,6 +725,7 @@ impl Painter {
             render_pass.set_pipeline(&self.blend_render_pipeline);
             render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
             render_pass.draw(0 .. 6, 0 .. 1);
+        }
         }
         self.device.get_queue().submit(&[encoder.finish()]);
     }
