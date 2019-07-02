@@ -1,18 +1,22 @@
 layer[name=water] {
-    background-color: rgba(0, 0, 255, 1.0);
+    background-color: rgba(14, 181, 223, 1.0);
     border-color: red;
     border-width: 3px;
 }
 
 layer[name=park] {
-    background-color: #0F6E7A;
+    background-color: rgba(14, 124, 82, 1.0);
+}
+
+layer[name=building] {
+    background-color: rgba(151, 46, 28, 1.0);
 }
 
 layer[name=landcover] {
-    background-color: #CCC91F;
+    background-color: rgba(11, 85, 11, 0.815);
 }
 
 layer[name=landuse] {
-    background-color: rgba(161, 20, 20, 0.295);
+    background-color: rgba(209, 196, 14, 0.438);
     border-color: red;
 }

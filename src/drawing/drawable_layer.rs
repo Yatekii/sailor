@@ -81,8 +81,8 @@ impl DrawableLayer {
                 CSSValue::String(string) => {
                     match &string[..] {
                         "red" => self.layer_data.background_color = Color::RED.into(),
-                        "blue" => self.layer_data.background_color = Color::GREEN.into(),
-                        "green" => self.layer_data.background_color = Color::BLUE.into(),
+                        "green" => self.layer_data.background_color = Color::GREEN.into(),
+                        "blue" => self.layer_data.background_color = Color::BLUE.into(),
                         // Other CSS colors to come later.
                         color => {
                             log::info!("The color '{}' is currently not supported.", color)

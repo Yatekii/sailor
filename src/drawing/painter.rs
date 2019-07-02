@@ -230,7 +230,7 @@ impl Painter {
             &device,
             &mut init_encoder,
             &blend_bind_group_layout,
-            &multisampled_framebuffer,
+            &framebuffer,
             &sampler,
             &app_state.screen,
             app_state.zoom,
@@ -555,10 +555,8 @@ impl Painter {
 
     pub fn update_styles(&mut self, zoom: f32, css_cache: &mut RulesCache) {
         if css_cache.update() {
-            for tile in self.loaded_tiles.values_mut() {
-                for drawable_layer in tile.layers.iter_mut() {
-                    drawable_layer.load_style(zoom, css_cache);
-                }
+            for drawable_layer in self.available_layers.iter_mut() {
+                drawable_layer.as_mut().map(|dl| dl.load_style(zoom, css_cache));
             }
         }
     }
@@ -589,7 +587,7 @@ impl Painter {
             &self.device,
             encoder,
             &self.blend_bind_group_layout,
-            &self.multisampled_framebuffer,
+            &self.framebuffer,
             &self.sampler,
             &app_state.screen,
             app_state.zoom,
@@ -694,7 +692,7 @@ impl Painter {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &self.multisampled_framebuffer,
-                    resolve_target: None,
+                    resolve_target: Some(&self.framebuffer),
                     load_op: wgpu::LoadOp::Clear,
                     store_op: wgpu::StoreOp::Store,
                     clear_color: wgpu::Color::TRANSPARENT,
@@ -704,6 +702,12 @@ impl Painter {
 
             render_pass.set_pipeline(&self.layer_render_pipeline);
             render_pass.set_bind_group(0, &self.layer_bind_group, &[]);
+
+            for drawable_tile in self.loaded_tiles.values_mut() {
+                if let Some(layer) = layer {
+                    drawable_tile.paint(&mut render_pass, layer, true);
+                }
+            }
 
             for drawable_tile in self.loaded_tiles.values_mut() {
                 if let Some(layer) = layer {
@@ -719,7 +723,7 @@ impl Painter {
                     resolve_target: None,
                     load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
                     store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color::TRANSPARENT,
+                    clear_color: wgpu::Color::WHITE,
                 }],
                 depth_stencil_attachment: None,
             });

@@ -53,7 +53,7 @@ impl Tile {
         // dbg!(t.elapsed().as_millis());
 
         let mut layers = Vec::with_capacity(tile.layers.len());
-        let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::with_capacity(4_000_000, 4_000_000);
+        let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::with_capacity(100_000, 100_000);
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id));
 
         for layer in &tile.layers {
