@@ -21,8 +21,8 @@ nom = "5.0.0-beta2"
 notify = "5.0.0-pre.0"
 crossbeam-channel = "*"
 take_mut = "*"
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"] }
-# wgpu = { path = "../wgpu-rs", features = ["vulkan"] }
+# wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"] }
+wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs", rev = "bc783e09cb444ee72bbb5ddc0ffeab9cf8e92543" }
 pretty_env_logger = "0.3.0"
 log = "0.4.6"
 glsl-to-spirv = "0.1"

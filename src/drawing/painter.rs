@@ -214,7 +214,7 @@ impl Painter {
             height: size.height.round() as u32,
         };
 
-        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, 8);
+        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, 2);
         let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
 
         let layer_bind_group = Self::create_layer_bind_group(
@@ -329,7 +329,7 @@ impl Painter {
                     },
                 ],
             }],
-            sample_count: 8,
+            sample_count: 2,
         })
     }
 
@@ -569,7 +569,7 @@ impl Painter {
         self.swap_chain_descriptor.width = width;
         self.swap_chain_descriptor.height = height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
-        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, 8);
+        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, 2);
         self.framebuffer = Self::create_framebuffer(&self.device, &self.swap_chain_descriptor);
     }
 
@@ -678,6 +678,7 @@ impl Painter {
     }
 
     pub fn paint(&mut self, app_state: &mut AppState) {
+        let frame_start = std::time::Instant::now();
         let mut t = timestamp(std::time::Instant::now(), "===========================");
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         t = timestamp(t, "Create encoder");
@@ -749,6 +750,7 @@ impl Painter {
         }
         self.device.get_queue().submit(&[encoder.finish()]);
         timestamp(t, &format!("\tFrame with {} drawcalls submitted", num_drawcalls));
+        log::warn!("Frametime {}", frame_start.elapsed().as_micros());
     }
 }
 
