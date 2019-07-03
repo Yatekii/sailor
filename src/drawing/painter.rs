@@ -627,7 +627,7 @@ impl Painter {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: swap_chain_descriptor.format,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         };
 
         device.create_texture(frame_descriptor).create_default_view()
