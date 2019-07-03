@@ -678,7 +678,6 @@ impl Painter {
     }
 
     pub fn paint(&mut self, app_state: &mut AppState) {
-        let frame_start = std::time::Instant::now();
         let mut t = timestamp(std::time::Instant::now(), "===========================");
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         t = timestamp(t, "Create encoder");
@@ -750,7 +749,7 @@ impl Painter {
         }
         self.device.get_queue().submit(&[encoder.finish()]);
         timestamp(t, &format!("\tFrame with {} drawcalls submitted", num_drawcalls));
-        log::warn!("Frametime {}", frame_start.elapsed().as_micros());
+        
     }
 }
 

@@ -2,6 +2,7 @@ mod vector_tile;
 mod drawing;
 mod app_state;
 mod css;
+mod stats;
 
 extern crate lyon;
 extern crate nalgebra_glm as glm;
@@ -29,6 +30,9 @@ fn main() {
     let mut status = true;
     let mut mouse_down = false;
     let mut last_pos = wgpu::winit::dpi::LogicalPosition::new(0.0, 0.0);
+
+
+    let mut stats = stats::Stats::new();
 
     loop {
         use wgpu::winit::{Event, WindowEvent, ElementState, MouseButton, MouseScrollDelta, KeyboardInput, VirtualKeyCode};
@@ -83,6 +87,9 @@ fn main() {
         painter.update_styles(app_state.zoom, &mut app_state.css_cache);
         // let t = std::time::Instant::now();
         painter.paint(&mut app_state);
+
+        stats.capture_frame();
+        log::warn!("Frametime {:.2}", stats.get_average());
 
         // Frame by frame stepping.
         // match std::io::stdin().read_line(&mut String::new()) {
