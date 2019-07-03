@@ -76,9 +76,9 @@ impl Screen {
 
     pub fn get_tile_boundaries_for_zoom_level(&self, z: f32) -> TileField {
         let z = z.min(14.0);
-        let px_to_world = self.width as f32 / 256.0 / 2.0 / 2f32.powi(z as i32);
-        let py_to_world = self.height as f32 / 256.0 / 2.0 / 2f32.powi(z as i32);
-        
+        let px_to_world = self.width as f32 / crate::PIXEL_SIZE / 2.0 / 2f32.powi(z as i32);
+        let py_to_world = self.height as f32 / crate::PIXEL_SIZE / 2.0 / 2f32.powi(z as i32);
+
         let top_left: TileId = global_to_num_space(&(self.center - vector(px_to_world, py_to_world)), z as u32).into();
         let bottom_right: TileId = global_to_num_space(&(self.center + vector(px_to_world, py_to_world)), z as u32).into();
         TileField::new(
@@ -88,8 +88,8 @@ impl Screen {
     }
 
     pub fn global_to_screen(&self, z: f32) -> glm::TMat4<f32> {
-        let zoom_x = 2.0f32.powf(z) / (self.width as f32 / 2.0) * 256.0;
-        let zoom_y = 2.0f32.powf(z) / (self.height as f32 / 2.0) * 256.0;
+        let zoom_x = 2.0f32.powf(z) / (self.width as f32 / 2.0) * crate::PIXEL_SIZE;
+        let zoom_y = 2.0f32.powf(z) / (self.height as f32 / 2.0) * crate::PIXEL_SIZE;
         let zoom = glm::scaling(&glm::vec3(zoom_x, zoom_y, 1.0));
         let position = glm::translation(&glm::vec3(-self.center.x, -self.center.y, 0.0));
         zoom * position

@@ -13,7 +13,7 @@ layer[name=building] {
 }
 
 layer[name=landcover] {
-    background-color: rgba(11, 85, 11, 0.815);
+    background-color: rgba(11, 85, 11, 0.527);
 }
 
 layer[name=landuse] {

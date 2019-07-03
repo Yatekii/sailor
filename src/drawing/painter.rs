@@ -202,7 +202,7 @@ impl Painter {
             height: size.height.round() as u32,
         };
 
-        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, 2);
+        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, 8);
         let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
 
         let blend_bind_group = Self::create_blend_bind_group(
@@ -306,7 +306,7 @@ impl Painter {
                     },
                 ],
             }],
-            sample_count: 2,
+            sample_count: 8,
         })
     }
 
@@ -515,7 +515,7 @@ impl Painter {
         self.swap_chain_descriptor.width = width;
         self.swap_chain_descriptor.height = height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
-        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, 2);
+        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, 8);
         self.framebuffer = Self::create_framebuffer(&self.device, &self.swap_chain_descriptor);
     }
 

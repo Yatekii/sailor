@@ -12,6 +12,8 @@ use lyon::math::{
     vector,
 };
 
+pub const PIXEL_SIZE: f32 = 256.0;
+
 fn main() {
     pretty_env_logger::init();
 
@@ -67,8 +69,8 @@ fn main() {
                     },
                     WindowEvent::CursorMoved { position, .. } => {
                         let mut delta = vector((position.x - last_pos.x) as f32, (position.y - last_pos.y) as f32);
-                        let zoom_x = (app_state.screen.width as f32) / 256.0 / 2f32.powf(app_state.zoom) / 256.0 / 2.0 / 1.3;
-                        let zoom_y = (app_state.screen.height as f32) / 256.0 / 2f32.powf(app_state.zoom) / 256.0 / 2.0 / 1.3;
+                        let zoom_x = (app_state.screen.width as f32) / PIXEL_SIZE / 2f32.powf(app_state.zoom) / PIXEL_SIZE / 2.0 / 1.3;
+                        let zoom_y = (app_state.screen.height as f32) / PIXEL_SIZE / 2f32.powf(app_state.zoom) / PIXEL_SIZE / 2.0 / 1.3;
                         delta.x *= zoom_x;
                         delta.y *= zoom_y;
 
