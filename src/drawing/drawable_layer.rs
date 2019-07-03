@@ -21,9 +21,9 @@ pub struct LayerInfo {
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct LayerData {
-    background_color: DrawableColor,
-    border_color: DrawableColor,
-    border_width: f32,
+    pub background_color: DrawableColor,
+    pub border_color: DrawableColor,
+    pub border_width: f32,
     _padding: [u32; 3],
 }
 

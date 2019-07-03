@@ -78,8 +78,7 @@ impl Screen {
         let z = z.min(14.0);
         let px_to_world = self.width as f32 / 256.0 / 2.0 / 2f32.powi(z as i32);
         let py_to_world = self.height as f32 / 256.0 / 2.0 / 2f32.powi(z as i32);
-
-        let middle_tile: TileId = global_to_num_space(&self.center, z as u32).into();
+        
         let top_left: TileId = global_to_num_space(&(self.center - vector(px_to_world, py_to_world)), z as u32).into();
         let bottom_right: TileId = global_to_num_space(&(self.center + vector(px_to_world, py_to_world)), z as u32).into();
         TileField::new(

@@ -1,5 +1,4 @@
 use crate::css::RulesCache;
-use crate::vector_tile::math::Screen;
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
     drawable_layer::DrawableLayer,
@@ -8,7 +7,6 @@ use wgpu::{
     RenderPass,
     Buffer,
     Device,
-    CommandEncoder,
 };
 
 use crate::vector_tile::tile::Tile;
@@ -24,11 +22,9 @@ pub struct DrawableTile {
 impl DrawableTile {
     pub fn load_from_tile_id(
         device: &Device,
-        encoder: &mut CommandEncoder,
         tile_id: TileId,
         tile: &Tile,
         zoom: f32,
-        screen: &Screen,
         css_cache: &mut RulesCache
     ) -> DrawableTile {
         let mut layers = Vec::with_capacity(tile.layers.len());
@@ -50,11 +46,13 @@ impl DrawableTile {
     }
 
     pub fn paint(&mut self, render_pass: &mut RenderPass, layer: &DrawableLayer, outline: bool) {
-        render_pass.set_index_buffer(&self.index_buffer, 0);
-        render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
         if let Some(layer) = self.layers.iter().find(|l| l.layer.id == layer.layer.id) {
+            render_pass.set_index_buffer(&self.index_buffer, 0);
+            render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
             if outline {
-                render_pass.draw_indexed(layer.layer.indices_range.clone(), 0, 0 .. 1);
+                if layer.layer_data.border_width > 0.0 && layer.layer_data.border_color.a > 0.0 {
+                    render_pass.draw_indexed(layer.layer.indices_range.clone(), 0, 0 .. 1);
+                }
             } else {
                 render_pass.draw_indexed(layer.layer.indices_range.clone(), 0, 1 .. 2);
             }

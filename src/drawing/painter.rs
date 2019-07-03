@@ -585,11 +585,9 @@ impl Painter {
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
                     let drawable_tile = DrawableTile::load_from_tile_id(
                         &self.device,
-                        encoder,
                         tile_id,
                         &tile,
                         app_state.zoom,
-                        &app_state.screen,
                         &mut app_state.css_cache
                     );
                     for layer in &drawable_tile.layers {
@@ -609,8 +607,6 @@ impl Painter {
             }
         }
 
-        self.update_uniforms(encoder, &app_state);
-
         self.loaded_tiles = new_loaded_tiles;
     }
 
@@ -627,14 +623,13 @@ impl Painter {
         let mut first = true;
         t = timestamp(t, "======== Start Layer Loop ========");
         let mut num_drawcalls = 0;
-        println!("{}", self.loaded_tiles.len());
         'outer: for (i, layer) in self.available_layers.iter().enumerate() {
             {
                 // Check if we have anything to draw on a specific layer. If not, continue with the next layer.
                 let mut hit = false;
                 for _drawable_tile in self.loaded_tiles.values_mut() {
                     if let Some(layer) = layer {
-                        if layer.layer.indices_range.end > 1 {
+                        if layer.layer.indices_range.end - layer.layer.indices_range.start > 1 {
                             hit = true;
                         }
                     }
