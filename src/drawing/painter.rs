@@ -66,8 +66,6 @@ pub struct Painter {
     framebuffer: TextureView,
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
     available_layers: Vec<Option<DrawableLayer>>,
-    layer_bind_group_layout: BindGroupLayout,
-    layer_bind_group: BindGroup,
     blend_bind_group_layout: BindGroupLayout,
     blend_bind_group: BindGroup,
     sampler: Sampler,
@@ -163,16 +161,6 @@ impl Painter {
         let (layer_vs_module, layer_fs_module) = Self::load_shader(&device, &layer_vertex_shader, &layer_fragment_shader).expect("Fatal Error. Unable to load shaders.");
         let (blend_vs_module, blend_fs_module) = Self::load_shader(&device, &blend_vertex_shader, &blend_fragment_shader).expect("Fatal Error. Unable to load shaders.");
 
-        let layer_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            bindings: &[
-                wgpu::BindGroupLayoutBinding {
-                    binding: 0,
-                    visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer,
-                },
-            ]
-        });
-
         let blend_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
                 wgpu::BindGroupLayoutBinding {
@@ -217,15 +205,6 @@ impl Painter {
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, 2);
         let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
 
-        let layer_bind_group = Self::create_layer_bind_group(
-            &device,
-            &mut init_encoder,
-            &layer_bind_group_layout,
-            &app_state.screen,
-            app_state.zoom,
-            &available_layers,
-        );
-
         let blend_bind_group = Self::create_blend_bind_group(
             &device,
             &mut init_encoder,
@@ -237,7 +216,7 @@ impl Painter {
             &available_layers,
         );
 
-        let layer_render_pipeline = Self::create_layer_render_pipeline(&device, &layer_bind_group_layout, &layer_vs_module, &layer_fs_module);
+        let layer_render_pipeline = Self::create_layer_render_pipeline(&device, &blend_bind_group_layout, &layer_vs_module, &layer_fs_module);
         let blend_render_pipeline = Self::create_blend_render_pipeline(&device, &blend_bind_group_layout, &blend_vs_module, &blend_fs_module);
 
         let swap_chain = device.create_swap_chain(
@@ -260,8 +239,6 @@ impl Painter {
             framebuffer,
             loaded_tiles: BTreeMap::new(),
             available_layers,
-            layer_bind_group_layout,
-            layer_bind_group,
             blend_bind_group_layout,
             blend_bind_group,
             sampler,
@@ -443,37 +420,6 @@ impl Painter {
       + 12 * 4 * 30
     }
 
-    pub fn create_layer_bind_group(
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        bind_group_layout: &BindGroupLayout,
-        screen: &Screen,
-        z: f32,
-        layers: &Vec<Option<DrawableLayer>>
-    ) -> BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: bind_group_layout,
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer {
-                        buffer: &Self::copy_uniform_buffers(
-                            &device,
-                            encoder,
-                            &Self::create_uniform_buffers(
-                                &device,
-                                &screen,
-                                z,
-                                layers
-                            )
-                        ),
-                        range: 0 .. Self::uniform_buffer_size(),
-                    },
-                },
-            ],
-        })
-    }
-
     pub fn create_blend_bind_group(
         device: &Device,
         encoder: &mut CommandEncoder,
@@ -532,7 +478,7 @@ impl Painter {
                 ..
             })) => {
                 if let Ok((vs_module, fs_module)) = Self::load_shader(&self.device, &self.vertex_shader, &self.fragment_shader) {
-                    self.layer_render_pipeline = Self::create_layer_render_pipeline(&self.device, &self.layer_bind_group_layout, &vs_module, &fs_module);
+                    self.layer_render_pipeline = Self::create_layer_render_pipeline(&self.device, &self.blend_bind_group_layout, &vs_module, &fs_module);
                     true
                 } else {
                     false
@@ -574,15 +520,6 @@ impl Painter {
     }
 
     fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState) {
-        self.layer_bind_group = Self::create_layer_bind_group(
-            &self.device,
-            encoder,
-            &self.layer_bind_group_layout,
-            &app_state.screen,
-            app_state.zoom,
-            &self.available_layers
-        );
-
         self.blend_bind_group = Self::create_blend_bind_group(
             &self.device,
             encoder,
@@ -690,43 +627,81 @@ impl Painter {
         let mut first = true;
         t = timestamp(t, "======== Start Layer Loop ========");
         let mut num_drawcalls = 0;
+        println!("{}", self.loaded_tiles.len());
         'outer: for (i, layer) in self.available_layers.iter().enumerate() {
-        {
-            t = timestamp(t, &format!("\tBegin Layer {}", i));
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &self.multisampled_framebuffer,
-                    resolve_target: Some(&self.framebuffer),
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color::TRANSPARENT,
-                }],
-                depth_stencil_attachment: None,
-            });
-            t = timestamp(t, "\tRender Pass 1 created");
-
-            render_pass.set_pipeline(&self.layer_render_pipeline);
-            t = timestamp(t, "\tPipeline 1 set");
-            render_pass.set_bind_group(0, &self.layer_bind_group, &[]);
-            t = timestamp(t, "\t Bind Group set");
-
-            for drawable_tile in self.loaded_tiles.values_mut() {
-                if let Some(layer) = layer {
-                    drawable_tile.paint(&mut render_pass, layer, true);
-                    num_drawcalls += 1;
+            {
+                // Check if we have anything to draw on a specific layer. If not, continue with the next layer.
+                let mut hit = false;
+                for _drawable_tile in self.loaded_tiles.values_mut() {
+                    if let Some(layer) = layer {
+                        if layer.layer.indices_range.end > 1 {
+                            hit = true;
+                        }
+                    }
                 }
-            }
-            t = timestamp(t, "\tOutline drawn");
-
-            for drawable_tile in self.loaded_tiles.values_mut() {
-                if let Some(layer) = layer {
-                    drawable_tile.paint(&mut render_pass, layer, false);
+                if !hit {
+                    continue 'outer;
                 }
+
+                t = timestamp(t, &format!("\tBegin Layer {}", i));
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: &self.multisampled_framebuffer,
+                        resolve_target: Some(&self.framebuffer),
+                        load_op: wgpu::LoadOp::Clear,
+                        store_op: wgpu::StoreOp::Store,
+                        clear_color: wgpu::Color::TRANSPARENT,
+                    }],
+                    depth_stencil_attachment: None,
+                });
+                t = timestamp(t, "\tRender Pass 1 created");
+
+                render_pass.set_pipeline(&self.layer_render_pipeline);
+                t = timestamp(t, "\tPipeline 1 set");
+                render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
+                t = timestamp(t, "\t Bind Group set");
+
+                for drawable_tile in self.loaded_tiles.values_mut() {
+                    if let Some(layer) = layer {
+                        drawable_tile.paint(&mut render_pass, layer, true);
+                        num_drawcalls += 1;
+                    }
+                }
+                t = timestamp(t, "\tOutline drawn");
+
+                for drawable_tile in self.loaded_tiles.values_mut() {
+                    if let Some(layer) = layer {
+                        drawable_tile.paint(&mut render_pass, layer, false);
+                        num_drawcalls += 1;
+                    }
+                }
+                t = timestamp(t, "\tPolygons drawn");
             }
-            t = timestamp(t, "\tPolygons drawn");
+
+            {
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: &frame.view,
+                        resolve_target: None,
+                        load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
+                        store_op: wgpu::StoreOp::Store,
+                        clear_color: wgpu::Color::WHITE,
+                    }],
+                    depth_stencil_attachment: None,
+                });
+                t = timestamp(t, "\tRender Pass 2 Created");
+                render_pass.set_pipeline(&self.blend_render_pipeline);
+                t = timestamp(t, "\tPipeline 2 set");
+                render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
+                t = timestamp(t, "\tBindgroup 2 set");
+                render_pass.draw(0 .. 6, 0 .. 1);
+                t = timestamp(t, "\tResolve target drawn on");
+            }
+        first = false;
         }
 
-        {
+        if num_drawcalls == 0 {
+            // Do a futile render pass if no other work was submitted.
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
@@ -737,19 +712,13 @@ impl Painter {
                 }],
                 depth_stencil_attachment: None,
             });
-            t = timestamp(t, "\tRender Pass 2 Created");
             render_pass.set_pipeline(&self.blend_render_pipeline);
-            t = timestamp(t, "\tPipeline 2 set");
             render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
-            t = timestamp(t, "\tBindgroup 2 set");
             render_pass.draw(0 .. 6, 0 .. 1);
-            t = timestamp(t, "\tResolve target drawn on");
-        }
-        first = false;
         }
         self.device.get_queue().submit(&[encoder.finish()]);
-        timestamp(t, &format!("\tFrame with {} drawcalls submitted", num_drawcalls));
         
+        timestamp(t, &format!("\tFrame with {} drawcalls submitted", num_drawcalls));
     }
 }
 
@@ -757,7 +726,3 @@ fn timestamp(old: std::time::Instant, string: &str) -> std::time::Instant {
     log::debug!("{}: {}", string, old.elapsed().as_micros());
     std::time::Instant::now()
 }
-
-// WebGPURenderPipelineColorAttachmentDescriptor
-// blendingEnabled
-// rgbBlendOperation

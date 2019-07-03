@@ -10,7 +10,7 @@ impl Stats {
             stamp: std::time::Instant::now(),
             last_frametimes: {
                 let mut dq = std::collections::VecDeque::new();
-                for i in 0..30 {
+                for _ in 0..30 {
                     dq.push_back(0);
                 }
                 dq
