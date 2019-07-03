@@ -678,17 +678,21 @@ impl Painter {
     }
 
     pub fn paint(&mut self, app_state: &mut AppState) {
+        let mut t = timestamp(std::time::Instant::now(), "===========================");
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        t = timestamp(t, "Create encoder");
         self.load_tiles(app_state, &mut encoder);
-        // let t = std::time::Instant::now();
+        t = timestamp(t, "Load tiles");
         self.update_uniforms(&mut encoder, &app_state);
-        // dbg!(t.elapsed().as_micros());
+        t = timestamp(t, "Update uniforms");
         let frame = self.swap_chain.get_next_texture();
-
+        t = timestamp(t, "Create rendertarget");
         let mut first = true;
-
-        for layer in &self.available_layers {
+        t = timestamp(t, "======== Start Layer Loop ========");
+        let mut num_drawcalls = 0;
+        'outer: for (i, layer) in self.available_layers.iter().enumerate() {
         {
+            t = timestamp(t, &format!("\tBegin Layer {}", i));
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &self.multisampled_framebuffer,
@@ -699,21 +703,27 @@ impl Painter {
                 }],
                 depth_stencil_attachment: None,
             });
+            t = timestamp(t, "\tRender Pass 1 created");
 
             render_pass.set_pipeline(&self.layer_render_pipeline);
+            t = timestamp(t, "\tPipeline 1 set");
             render_pass.set_bind_group(0, &self.layer_bind_group, &[]);
+            t = timestamp(t, "\t Bind Group set");
 
             for drawable_tile in self.loaded_tiles.values_mut() {
                 if let Some(layer) = layer {
                     drawable_tile.paint(&mut render_pass, layer, true);
+                    num_drawcalls += 1;
                 }
             }
+            t = timestamp(t, "\tOutline drawn");
 
             for drawable_tile in self.loaded_tiles.values_mut() {
                 if let Some(layer) = layer {
                     drawable_tile.paint(&mut render_pass, layer, false);
                 }
             }
+            t = timestamp(t, "\tPolygons drawn");
         }
 
         {
@@ -727,15 +737,24 @@ impl Painter {
                 }],
                 depth_stencil_attachment: None,
             });
-
+            t = timestamp(t, "\tRender Pass 2 Created");
             render_pass.set_pipeline(&self.blend_render_pipeline);
+            t = timestamp(t, "\tPipeline 2 set");
             render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
+            t = timestamp(t, "\tBindgroup 2 set");
             render_pass.draw(0 .. 6, 0 .. 1);
+            t = timestamp(t, "\tResolve target drawn on");
         }
         first = false;
         }
         self.device.get_queue().submit(&[encoder.finish()]);
+        timestamp(t, &format!("\tFrame with {} drawcalls submitted", num_drawcalls));
     }
+}
+
+fn timestamp(old: std::time::Instant, string: &str) -> std::time::Instant {
+    log::debug!("{}: {}", string, old.elapsed().as_micros());
+    std::time::Instant::now()
 }
 
 // WebGPURenderPipelineColorAttachmentDescriptor
