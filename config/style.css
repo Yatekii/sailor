@@ -12,7 +12,7 @@ layer[name=building] {
     background-color: rgba(151, 46, 28, 1.0);
 }
 
-layer[name=landcover] {
+layer[name=landcover][class=wood][subclass=forest] {
     background-color: rgba(11, 85, 11, 0.527);
 }
 

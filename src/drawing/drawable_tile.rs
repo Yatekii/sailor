@@ -70,7 +70,7 @@ impl DrawableTile {
                 }
             } else {
                 if ld.has_fill() {
-                render_pass.draw_indexed(layer.indices_range.clone(), 0, 1 .. 2);
+                    render_pass.draw_indexed(layer.indices_range.clone(), 0, 1 .. 2);
                 }
             });
         }

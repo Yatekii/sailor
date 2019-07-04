@@ -45,7 +45,7 @@ impl LayerData {
 
     pub fn has_fill(&self) -> bool {
         for feature in &self.features {
-            if feature.style.border_color.a > 0.0 {
+            if feature.style.background_color.a > 0.0 {
                 return true;
             }
         }
