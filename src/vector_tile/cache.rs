@@ -1,3 +1,8 @@
+use crate::drawing::layer_data::LayerCollection;
+use std::sync::{
+    Arc,
+    RwLock,
+};
 use crate::vector_tile::tile::Tile;
 use crate::vector_tile::math::TileId;
 use std::collections::HashMap;
@@ -56,7 +61,7 @@ impl TileCache {
         }
     }
 
-    pub fn request_tile(&mut self, tile_id: &math::TileId) {
+    pub fn request_tile(&mut self, tile_id: &math::TileId, layer_collection: Arc<RwLock<LayerCollection>>) {
         let id = self.id;
         self.id += 1;
 
@@ -69,7 +74,7 @@ impl TileCache {
                 id,
                 spawn(move|| {
                     if let Some(data) = crate::vector_tile::fetch_tile_data(&tile_id_clone) {
-                        let tile = Tile::from_mbvt(&tile_id_clone, &data);
+                        let tile = Tile::from_mbvt(&tile_id_clone, &data, layer_collection);
                         match tx.send(id) {
                             Err(_) => log::debug!("Could not send the tile load message. This most likely happened because the app was terminated."),
                             _ => (),

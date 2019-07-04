@@ -1,3 +1,5 @@
+use crate::drawing::layer_data::LayerData;
+use crate::drawing::layer_data::LayerCollection;
 use crate::css::RulesCache;
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
@@ -24,12 +26,10 @@ impl DrawableTile {
         device: &Device,
         tile_id: TileId,
         tile: &Tile,
-        zoom: f32,
-        css_cache: &mut RulesCache
     ) -> DrawableTile {
         let mut layers = Vec::with_capacity(tile.layers.len());
         for l in &tile.layers {
-            layers.push(DrawableLayer::from_layer(l.clone(), zoom, css_cache))
+            layers.push(DrawableLayer::from_layer(&l))
         }
 
         DrawableTile {
@@ -45,17 +45,34 @@ impl DrawableTile {
         }
     }
 
-    pub fn paint(&mut self, render_pass: &mut RenderPass, layer: &DrawableLayer, outline: bool) {
-        if let Some(layer) = self.layers.iter().find(|l| l.layer.id == layer.layer.id) {
+    pub fn layer_has_data(&self, layer_data: &LayerData) -> bool {
+        self.layers
+            .iter()
+            .find(|dl| dl.id == layer_data.id)
+            .map(|dl| dl.indices_range.end - dl.indices_range.start > 1)
+            .unwrap_or(false)
+    }
+
+    pub fn paint(
+        &mut self,
+        render_pass: &mut RenderPass,
+        drawable_layer: &LayerData,
+        layer_collection: &LayerCollection,
+        outline: bool
+    ) {
+        if let Some(layer) = self.layers.iter().find(|l| l.id == drawable_layer.id) {
+            let layer_data = layer_collection.get_layer(layer.id);
             render_pass.set_index_buffer(&self.index_buffer, 0);
             render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
-            if outline {
-                if layer.layer_data.border_width > 0.0 && layer.layer_data.border_color.a > 0.0 {
-                    render_pass.draw_indexed(layer.layer.indices_range.clone(), 0, 0 .. 1);
+            layer_data.map(|ld| if outline {
+                if ld.has_outline() {
+                    render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 .. 1);
                 }
             } else {
-                render_pass.draw_indexed(layer.layer.indices_range.clone(), 0, 1 .. 2);
-            }
+                if ld.has_fill() {
+                render_pass.draw_indexed(layer.indices_range.clone(), 0, 1 .. 2);
+                }
+            });
         }
     }
 }

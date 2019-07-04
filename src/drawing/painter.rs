@@ -1,3 +1,4 @@
+use crate::drawing::layer_data::LayerCollection;
 use crate::vector_tile::math::Screen;
 use wgpu::TextureView;
 use crossbeam_channel::{
@@ -52,6 +53,11 @@ use super::{
     },
 };
 
+use std::sync::{
+    Arc,
+    RwLock,
+};
+
 use crate::app_state::AppState;
 
 pub struct Painter {
@@ -65,7 +71,6 @@ pub struct Painter {
     multisampled_framebuffer: TextureView,
     framebuffer: TextureView,
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
-    available_layers: Vec<Option<DrawableLayer>>,
     blend_bind_group_layout: BindGroupLayout,
     blend_bind_group: BindGroup,
     sampler: Sampler,
@@ -73,6 +78,7 @@ pub struct Painter {
     fragment_shader: String,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
+    layer_collection: Arc<RwLock<LayerCollection>>,
 }
 
 impl Painter {
@@ -193,7 +199,7 @@ impl Painter {
             compare_function: wgpu::CompareFunction::Always,
         });
 
-        let available_layers = vec![None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None];
+        let layer_collection = Arc::new(RwLock::new(LayerCollection::new(20, 50)));
 
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -213,7 +219,7 @@ impl Painter {
             &sampler,
             &app_state.screen,
             app_state.zoom,
-            &available_layers,
+            &layer_collection.read().unwrap(),
         );
 
         let layer_render_pipeline = Self::create_layer_render_pipeline(&device, &blend_bind_group_layout, &layer_vs_module, &layer_fs_module);
@@ -238,7 +244,6 @@ impl Painter {
             multisampled_framebuffer,
             framebuffer,
             loaded_tiles: BTreeMap::new(),
-            available_layers,
             blend_bind_group_layout,
             blend_bind_group,
             sampler,
@@ -246,6 +251,7 @@ impl Painter {
             fragment_shader: layer_fragment_shader,
             _watcher: watcher,
             rx,
+            layer_collection,
         }
     }
 
@@ -360,7 +366,7 @@ impl Painter {
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_uniform_buffers(device: &Device, screen: &Screen, z: f32, drawable_layers: &Vec<Option<DrawableLayer>>) -> Vec<(Buffer, usize)> {
+    fn create_uniform_buffers(device: &Device, screen: &Screen, z: f32, layer_collection: &LayerCollection) -> Vec<(Buffer, usize)> {
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device
             .create_buffer_mapped(
@@ -376,13 +382,15 @@ impl Painter {
             )
             .fill_from_slice(screen.global_to_screen(z).as_slice());
 
-        let layer_data_len = drawable_layers.len() * 12 * 4;
+        let buffer = layer_collection.assemble_style_buffer();
+        let layer_data_len = buffer.len() * 12 * 4;
+        
         let layer_data_buffer = device
             .create_buffer_mapped(
                 layer_data_len / 12 / 4,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
-            .fill_from_slice(&drawable_layers.iter().map(|dl| if let Some(dl) = dl { dl.layer_data } else { Default::default() }).collect::<Vec<_>>().as_slice());
+            .fill_from_slice(&buffer.as_slice());
 
         vec![
             (canvas_size_buffer, canvas_size_len),
@@ -417,7 +425,7 @@ impl Painter {
     const fn uniform_buffer_size() -> u64 {
         4 * 4
       + 4 * 4 * 4
-      + 12 * 4 * 30
+      + 12 * 4 * 20 * 50
     }
 
     pub fn create_blend_bind_group(
@@ -428,7 +436,7 @@ impl Painter {
         sampler: &Sampler,
         screen: &Screen,
         z: f32,
-        layers: &Vec<Option<DrawableLayer>>
+        layers: &LayerCollection
     ) -> BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
@@ -501,9 +509,8 @@ impl Painter {
 
     pub fn update_styles(&mut self, zoom: f32, css_cache: &mut RulesCache) {
         if css_cache.update() {
-            for drawable_layer in self.available_layers.iter_mut() {
-                drawable_layer.as_mut().map(|dl| dl.load_style(zoom, css_cache));
-            }
+            let mut layer_collection = self.layer_collection.write().unwrap();
+            layer_collection.load_styles(zoom, css_cache);
         }
     }
 
@@ -520,6 +527,7 @@ impl Painter {
     }
 
     fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState) {
+        let layer_collection = self.layer_collection.read().unwrap();
         self.blend_bind_group = Self::create_blend_bind_group(
             &self.device,
             encoder,
@@ -528,7 +536,7 @@ impl Painter {
             &self.sampler,
             &app_state.screen,
             app_state.zoom,
-            &self.available_layers
+            &layer_collection
         );
     }
 
@@ -578,21 +586,15 @@ impl Painter {
 
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
-                
-                app_state.tile_cache.request_tile(&tile_id);
+                app_state.tile_cache.request_tile(&tile_id, self.layer_collection.clone());
                 
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
                     let drawable_tile = DrawableTile::load_from_tile_id(
                         &self.device,
                         tile_id,
-                        &tile,
-                        app_state.zoom,
-                        &mut app_state.css_cache
+                        &tile
                     );
-                    for layer in &drawable_tile.layers {
-                        self.available_layers[layer.layer.id as usize] = Some(layer.clone());
-                    }
                     new_loaded_tiles.insert(
                         tile_id.clone(),
                         drawable_tile
@@ -607,6 +609,9 @@ impl Painter {
             }
         }
 
+        let mut layer_collection = self.layer_collection.write().unwrap();
+        layer_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
+
         self.loaded_tiles = new_loaded_tiles;
     }
 
@@ -617,19 +622,21 @@ impl Painter {
         self.load_tiles(app_state, &mut encoder);
         t = timestamp(t, "Load tiles");
         self.update_uniforms(&mut encoder, &app_state);
+        let layer_collection = self.layer_collection.read().unwrap();
         t = timestamp(t, "Update uniforms");
         let frame = self.swap_chain.get_next_texture();
         t = timestamp(t, "Create rendertarget");
         let mut first = true;
         t = timestamp(t, "======== Start Layer Loop ========");
         let mut num_drawcalls = 0;
-        'outer: for (i, layer) in self.available_layers.iter().enumerate() {
+        'outer: for (i, layer) in layer_collection.iter().enumerate() {
             {
+                // dbg!(&layer);
                 // Check if we have anything to draw on a specific layer. If not, continue with the next layer.
                 let mut hit = false;
-                for _drawable_tile in self.loaded_tiles.values_mut() {
+                for drawable_tile in self.loaded_tiles.values_mut() {
                     if let Some(layer) = layer {
-                        if layer.layer.indices_range.end - layer.layer.indices_range.start > 1 {
+                        if drawable_tile.layer_has_data(layer) {
                             hit = true;
                         }
                     }
@@ -658,7 +665,7 @@ impl Painter {
 
                 for drawable_tile in self.loaded_tiles.values_mut() {
                     if let Some(layer) = layer {
-                        drawable_tile.paint(&mut render_pass, layer, true);
+                        drawable_tile.paint(&mut render_pass, layer, &layer_collection, true);
                         num_drawcalls += 1;
                     }
                 }
@@ -666,7 +673,7 @@ impl Painter {
 
                 for drawable_tile in self.loaded_tiles.values_mut() {
                     if let Some(layer) = layer {
-                        drawable_tile.paint(&mut render_pass, layer, false);
+                        drawable_tile.paint(&mut render_pass, layer, &layer_collection, false);
                         num_drawcalls += 1;
                     }
                 }

@@ -1,3 +1,9 @@
+use crate::drawing::layer_data::LayerCollection;
+use crate::drawing::feature::Feature;
+use std::sync::{
+    Arc,
+    RwLock,
+};
 use crate::vector_tile::transform::geometry_commands_to_drawable;
 use crate::vector_tile::math::TileId;
 use crate::drawing::mesh::MeshBuilder;
@@ -43,7 +49,7 @@ pub fn layer_num(name: &str) -> u32 {
 }
 
 impl Tile {
-    pub fn from_mbvt(tile_id: &math::TileId, data: &Vec<u8>) -> Self {
+    pub fn from_mbvt(tile_id: &math::TileId, data: &Vec<u8>, layer_collection: Arc<RwLock<LayerCollection>>) -> Self {
         // let t = std::time::Instant::now();
 
         // we can build a bytes reader directly out of the bytes
@@ -59,8 +65,39 @@ impl Tile {
         for layer in &tile.layers {
             let index_start_before = builder.get_current_index();
             let layer_id = layer_num(&layer.name);
-            builder.set_current_layer_id(layer_id);
+            let mut layer_collection = layer_collection.write().unwrap();
+            let n_features_max = layer_collection.get_sizes().1;
+            let layer_data = if let Some(layer_data) = layer_collection.get_layer_mut(layer_id) {
+                layer_data
+            } else {
+                layer_collection.create_new_layer(layer_id, &layer.name.to_string())
+            };
             for feature in &layer.features {
+
+                let mut selector = crate::css::Selector::new()
+                    .with_type("layer".to_string())
+                    .with_any("name".to_string(), layer.name.to_string());
+                
+                for tag in feature.tags.chunks(2) {
+                    let key = layer.keys[tag[0] as usize].to_string();
+                    
+                    match &key[..] {
+                        "class" | "subclass" => {
+                            let value = layer.values[tag[1] as usize].clone();
+                            selector = selector.with_any(key, value.string_value.unwrap().to_string())
+                        },
+                        _ => (),
+                    }
+                    
+                }
+
+                let layer_offset = layer_id * n_features_max;
+                if let Some(feature_id) = layer_data.get_feature_id(&selector) {
+                    builder.set_current_feature_id(layer_offset + feature_id);
+                } else {
+                    builder.set_current_feature_id(layer_offset + layer_data.add_feature(Feature::new(selector)));
+                }
+
                 geometry_commands_to_drawable(
                     &mut builder,
                     feature.type_pb,

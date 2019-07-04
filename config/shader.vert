@@ -16,7 +16,7 @@ layout(set = 0, binding = 0) uniform Locals {
     vec2 canvas_size;
     vec2 _unused;
     mat4 transform;
-    LayerData layer_datas[30];
+    LayerData layer_datas[20 * 50];
 };
 
 void main() {

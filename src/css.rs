@@ -166,7 +166,7 @@ pub struct Rule {
 }
 
 /// A single CSS selector.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Selector {
     /// The type a selector matches.
     /// E.g. `"layer"`.
