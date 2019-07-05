@@ -60,6 +60,8 @@ use std::sync::{
 
 use crate::app_state::AppState;
 
+const MSAA_SAMPLES: u32 = 1;
+
 pub struct Painter {
     window: Window,
     device: Device,
@@ -208,7 +210,7 @@ impl Painter {
             height: size.height.round() as u32,
         };
 
-        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, 8);
+        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, MSAA_SAMPLES);
         let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
 
         let blend_bind_group = Self::create_blend_bind_group(
@@ -312,7 +314,7 @@ impl Painter {
                     },
                 ],
             }],
-            sample_count: 8,
+            sample_count: MSAA_SAMPLES,
         })
     }
 
@@ -522,7 +524,7 @@ impl Painter {
         self.swap_chain_descriptor.width = width;
         self.swap_chain_descriptor.height = height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
-        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, 8);
+        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, MSAA_SAMPLES);
         self.framebuffer = Self::create_framebuffer(&self.device, &self.swap_chain_descriptor);
     }
 
@@ -579,17 +581,25 @@ impl Painter {
     }
 
     fn load_tiles(&mut self, app_state: &mut AppState, encoder: &mut CommandEncoder) {
+        let mut t = timestampe(std::time::Instant::now(), "Load Tiles");
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
+        t = timestampe(t, "Load Tilefield");
         let mut new_loaded_tiles = BTreeMap::new();
 
         app_state.tile_cache.fetch_tiles();
+        t = timestampe(t, "Fetch Tiles");
 
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
+
+                t = timestampe(t, "Start Request Tiles");
                 app_state.tile_cache.request_tile(&tile_id, self.layer_collection.clone());
                 
+        t = timestampe(t, "Request Tiles");
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
+
+        t = timestampe(t, "Create Tiles");
                     let drawable_tile = DrawableTile::load_from_tile_id(
                         &self.device,
                         tile_id,
@@ -599,6 +609,8 @@ impl Painter {
                         tile_id.clone(),
                         drawable_tile
                     );
+
+        t = timestampe(t, "Created Tile");
                 } else {
                     log::trace!("Could not read tile {} from cache.", tile_id);
                 }
@@ -609,8 +621,12 @@ impl Painter {
             }
         }
 
+        t = timestampe(t, "Load Styles");
         let mut layer_collection = self.layer_collection.write().unwrap();
+        t = timestampe(t, "LOCK Styles");
         layer_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
+
+        t = timestampe(t, "Styles loaded");
 
         self.loaded_tiles = new_loaded_tiles;
     }
@@ -648,8 +664,8 @@ impl Painter {
                 t = timestamp(t, &format!("\tBegin Layer {}", i));
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: &self.multisampled_framebuffer,
-                        resolve_target: Some(&self.framebuffer),
+                        attachment: if MSAA_SAMPLES > 1 { &self.multisampled_framebuffer } else { &self.framebuffer },
+                        resolve_target: if MSAA_SAMPLES > 1 { Some(&self.framebuffer) } else { None },
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
                         clear_color: wgpu::Color::TRANSPARENT,
@@ -726,5 +742,10 @@ impl Painter {
 
 fn timestamp(old: std::time::Instant, string: &str) -> std::time::Instant {
     log::debug!("{}: {}", string, old.elapsed().as_micros());
+    std::time::Instant::now()
+}
+
+fn timestampe(old: std::time::Instant, string: &str) -> std::time::Instant {
+    log::error!("{}: {}", string, old.elapsed().as_micros());
     std::time::Instant::now()
 }
