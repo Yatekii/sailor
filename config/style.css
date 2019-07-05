@@ -12,12 +12,15 @@ layer[name=building] {
     background-color: rgba(151, 46, 28, 1.0);
 }
 
-layer[name=landcover][class=wood][subclass=forest] {
+layer[name=landcover] {
     background-color: rgba(11, 85, 11, 0.527);
 }
 
 layer[name=landuse] {
     background-color: rgba(209, 196, 14, 0.438);
+}
+
+layer[name=landuse][zoom=12] {
     border-color: red;
     border-width: 3px;
 }

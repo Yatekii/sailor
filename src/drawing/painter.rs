@@ -41,6 +41,7 @@ use wgpu::{
     BindGroup,
     RenderPipeline,
     Sampler,
+    PresentMode,
 };
 
 use super::{
@@ -63,7 +64,9 @@ use crate::app_state::AppState;
 const MSAA_SAMPLES: u32 = 1;
 
 pub struct Painter {
+    #[cfg(feature = "vulkan")]
     window: Window,
+    hidpi_factor: f64,
     device: Device,
     surface: Surface,
     swap_chain_descriptor: SwapChainDescriptor,
@@ -86,39 +89,41 @@ pub struct Painter {
 impl Painter {
     /// Initializes the entire draw machinery.
     pub fn init(events_loop: &EventsLoop, width: u32, height: u32, app_state: &AppState) -> Self {
-        #[cfg(not(feature = "gl"))]
-        let (window, instance, size, surface) = {
+        #[cfg(feature = "vulkan")]
+        let (window, instance, size, surface, factor) = {
             let instance = wgpu::Instance::new();
 
             let window = Window::new(&events_loop).unwrap();
             window.set_inner_size(LogicalSize { width: width as f64, height: height as f64 });
+            let factor = window.get_hidpi_factor();
             let size = window
                 .get_inner_size()
                 .unwrap()
-                .to_physical(window.get_hidpi_factor());
+                .to_physical(factor);
 
             let surface = instance.create_surface(&window);
 
-            (window, instance, size, surface)
+            (window, instance, size, surface, factor)
         };
 
         #[cfg(feature = "gl")]
-        let (instance, size, surface) = {
+        let (instance, size, surface, factor) = {
             let wb = wgpu::winit::WindowBuilder::new()
-                .with_dimensions(LogicalSize { width, height });
+                .with_dimensions(LogicalSize { width: width as f64, height: height as f64 });
             let cb = wgpu::glutin::ContextBuilder::new().with_vsync(true);
             let context = wgpu::glutin::WindowedContext::new_windowed(wb, cb, &events_loop).unwrap();
 
+            let factor = context.window().get_hidpi_factor();
             let size = context
                 .window()
                 .get_inner_size()
                 .unwrap()
-                .to_physical(context.window().get_hidpi_factor());
+                .to_physical(factor);
 
             let instance = wgpu::Instance::new(context);
             let surface = instance.get_surface();
 
-            (instance, size, surface)
+            (instance, size, surface, factor)
         };
 
         let adapter = instance.get_adapter(&wgpu::AdapterDescriptor {
@@ -208,6 +213,7 @@ impl Painter {
             format: wgpu::TextureFormat::Bgra8Unorm,
             width: size.width.round() as u32,
             height: size.height.round() as u32,
+            present_mode: PresentMode::NoVsync,
         };
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, MSAA_SAMPLES);
@@ -236,7 +242,9 @@ impl Painter {
         device.get_queue().submit(&[init_command_buf]);
 
         Self {
+            #[cfg(feature = "vulkan")]
             window,
+            hidpi_factor: factor,
             device,
             surface,
             swap_chain_descriptor,
@@ -517,7 +525,7 @@ impl Painter {
     }
 
     pub fn get_hidpi_factor(&self) -> f64 {
-        self.window.get_hidpi_factor()
+        self.hidpi_factor
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
