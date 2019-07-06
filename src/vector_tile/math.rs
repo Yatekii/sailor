@@ -227,7 +227,11 @@ impl<'a> Iterator for TileIterator<'a> {
             return Some(c)
         }
         if self.current_tile.y < self.tile_field.bottomright.y {
-            self.current_tile = TileId::new(self.current_tile.z, self.tile_field.topleft.x + 1, self.current_tile.y + 1);
+            self.current_tile = TileId::new(
+                self.current_tile.z,
+                self.tile_field.topleft.x + 1,
+                self.current_tile.y + 1
+            );
             let c = self.current_tile - TileId::new(self.current_tile.z, 1, 0);
             Some(c)
         } else {

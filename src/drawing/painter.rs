@@ -598,6 +598,9 @@ impl Painter {
         t = timestampe(t, "Fetch Tiles");
 
         for tile_id in tile_field.iter() {
+            if tile_id.z > 14 {
+                panic!();
+            }
             if !self.loaded_tiles.contains_key(&tile_id) {
 
                 t = timestampe(t, "Start Request Tiles");
