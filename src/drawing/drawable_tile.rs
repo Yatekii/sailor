@@ -45,10 +45,10 @@ impl DrawableTile {
         }
     }
 
-    pub fn layer_has_data(&self, layer_data: &LayerData) -> bool {
+    pub fn layer_has_data(&self, layer_id: u32) -> bool {
         self.layers
             .iter()
-            .find(|dl| dl.id == layer_data.id)
+            .find(|dl| dl.id == layer_id)
             .map(|dl| dl.indices_range.end - dl.indices_range.start > 1)
             .unwrap_or(false)
     }
@@ -56,23 +56,18 @@ impl DrawableTile {
     pub fn paint(
         &mut self,
         render_pass: &mut RenderPass,
-        drawable_layer: &LayerData,
+        layer_id: u32,
         layer_collection: &LayerCollection,
         outline: bool
     ) {
-        if let Some(layer) = self.layers.iter().find(|l| l.id == drawable_layer.id) {
-            let layer_data = layer_collection.get_layer(layer.id);
+        if let Some(layer) = self.layers.iter().find(|l| l.id == layer_id) {
             render_pass.set_index_buffer(&self.index_buffer, 0);
             render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
-            layer_data.map(|ld| if outline {
-                if ld.has_outline() {
-                    render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 .. 1);
-                }
+            if outline {
+                // render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 .. 1);
             } else {
-                if ld.has_fill() {
-                    render_pass.draw_indexed(layer.indices_range.clone(), 0, 1 .. 2);
-                }
-            });
+                render_pass.draw_indexed(layer.indices_range.clone(), 0, 1 .. 2);
+            }
         }
     }
 }

@@ -65,15 +65,7 @@ impl Tile {
         for layer in &tile.layers {
             let index_start_before = builder.get_current_index();
             let layer_id = layer_num(&layer.name);
-            let mut layer_collection = layer_collection.write().unwrap();
-            let n_features_max = layer_collection.get_sizes().1;
-            let layer_data = if let Some(layer_data) = layer_collection.get_layer_mut(layer_id) {
-                layer_data
-            } else {
-                layer_collection.create_new_layer(layer_id, &layer.name.to_string())
-            };
             for feature in &layer.features {
-
                 let mut selector = crate::css::Selector::new()
                     .with_type("layer".to_string())
                     .with_any("name".to_string(), layer.name.to_string());
@@ -88,14 +80,18 @@ impl Tile {
                         },
                         _ => (),
                     }
-                    
                 }
 
-                let layer_offset = layer_id * n_features_max;
-                if let Some(feature_id) = layer_data.get_feature_id(&selector) {
-                    builder.set_current_feature_id(layer_offset + feature_id);
-                } else {
-                    builder.set_current_feature_id(layer_offset + layer_data.add_feature(Feature::new(selector)));
+                {
+                    let mut layer_collection = layer_collection.write().unwrap();
+                    if !layer_collection.is_layer_set(layer_id) {
+                        layer_collection.set_layer(layer_id);
+                    }
+                    if let Some(feature_id) = layer_collection.get_feature_id(&selector) {
+                        builder.set_current_feature_id(feature_id);
+                    } else {
+                        builder.set_current_feature_id(layer_collection.add_feature(Feature::new(selector)));
+                    }
                 }
 
                 geometry_commands_to_drawable(

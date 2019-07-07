@@ -16,18 +16,21 @@ layout(set = 0, binding = 0) uniform Locals {
     vec2 canvas_size;
     vec2 _unused;
     mat4 transform;
-    LayerData layer_datas[20 * 50];
+    LayerData layer_datas[500];
 };
 
 void main() {
-    LayerData layer_data = layer_datas[layer_id >> 1];
+    LayerData layer_data = layer_datas[layer_id];
     bool is_outline = gl_InstanceIndex == 0;
     gl_Position = transform * vec4(position, 0.0, 1.0);
-    if(is_outline){
-        gl_Position.xy += normal / canvas_size * layer_data.border_width / 2;
-        outColor = layer_data.outline_color;
-    } else {
+    // if(is_outline){
+    //     gl_Position.xy += normal / canvas_size * layer_data.border_width / 2;
+    //     outColor = layer_data.outline_color;
+    // } else {
         outColor = layer_data.background_color;
-    }
+        if(layer_id == 3500) {
+            outColor = vec4(1.0, 0.0, 0.0, 1.0);
+        }
+    // }
     // outColor = vec4(normal, 0.0, 1.0);
 }

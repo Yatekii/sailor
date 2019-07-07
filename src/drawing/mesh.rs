@@ -41,6 +41,7 @@ impl<'l> MeshBuilder<'l> {
     }
 
     pub fn set_current_feature_id(&mut self, layer_id: u32) {
+        // dbg!(&layer_id);
         self.vertex_constructor.layer_id = layer_id;
     }
 

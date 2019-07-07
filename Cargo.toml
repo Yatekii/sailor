@@ -28,6 +28,7 @@ crossbeam-channel = "*"
 take_mut = "*"
 # wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"] }
 wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs" }
+# wgpu = { package = "wgpu", features = ["vulkan"], path = "../wgpu-rs" }
 pretty_env_logger = "0.3.0"
 log = "0.4.6"
 glsl-to-spirv = "0.1"

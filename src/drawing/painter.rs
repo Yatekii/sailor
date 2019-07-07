@@ -206,7 +206,7 @@ impl Painter {
             compare_function: wgpu::CompareFunction::Always,
         });
 
-        let layer_collection = Arc::new(RwLock::new(LayerCollection::new(20, 50)));
+        let layer_collection = Arc::new(RwLock::new(LayerCollection::new(20, 500)));
 
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -394,7 +394,6 @@ impl Painter {
 
         let buffer = layer_collection.assemble_style_buffer();
         let layer_data_len = buffer.len() * 12 * 4;
-        
         let layer_data_buffer = device
             .create_buffer_mapped(
                 layer_data_len / 12 / 4,
@@ -435,7 +434,7 @@ impl Painter {
     const fn uniform_buffer_size() -> u64 {
         4 * 4
       + 4 * 4 * 4
-      + 12 * 4 * 20 * 50
+      + 12 * 4 * 500
     }
 
     pub fn create_blend_bind_group(
@@ -536,8 +535,7 @@ impl Painter {
         self.framebuffer = Self::create_framebuffer(&self.device, &self.swap_chain_descriptor);
     }
 
-    fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState) {
-        let layer_collection = self.layer_collection.read().unwrap();
+    fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState, layer_collection: &LayerCollection) {
         self.blend_bind_group = Self::create_blend_bind_group(
             &self.device,
             encoder,
@@ -546,7 +544,7 @@ impl Painter {
             &self.sampler,
             &app_state.screen,
             app_state.zoom,
-            &layer_collection
+            layer_collection
         );
     }
 
@@ -589,28 +587,22 @@ impl Painter {
     }
 
     fn load_tiles(&mut self, app_state: &mut AppState, encoder: &mut CommandEncoder) {
-        let mut t = timestampe(std::time::Instant::now(), "Load Tiles");
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
-        t = timestampe(t, "Load Tilefield");
+    
         let mut new_loaded_tiles = BTreeMap::new();
 
         app_state.tile_cache.fetch_tiles();
-        t = timestampe(t, "Fetch Tiles");
-
         for tile_id in tile_field.iter() {
             if tile_id.z > 14 {
                 panic!();
             }
             if !self.loaded_tiles.contains_key(&tile_id) {
 
-                t = timestampe(t, "Start Request Tiles");
                 app_state.tile_cache.request_tile(&tile_id, self.layer_collection.clone());
                 
-        t = timestampe(t, "Request Tiles");
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
 
-        t = timestampe(t, "Create Tiles");
                     let drawable_tile = DrawableTile::load_from_tile_id(
                         &self.device,
                         tile_id,
@@ -621,7 +613,6 @@ impl Painter {
                         drawable_tile
                     );
 
-        t = timestampe(t, "Created Tile");
                 } else {
                     log::trace!("Could not read tile {} from cache.", tile_id);
                 }
@@ -632,12 +623,10 @@ impl Painter {
             }
         }
 
-        t = timestampe(t, "Load Styles");
         let mut layer_collection = self.layer_collection.write().unwrap();
-        t = timestampe(t, "LOCK Styles");
-        layer_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
-
-        t = timestampe(t, "Styles loaded");
+        if app_state.zoom < 13.0 {
+            layer_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
+        }
 
         self.loaded_tiles = new_loaded_tiles;
     }
@@ -648,22 +637,23 @@ impl Painter {
         t = timestamp(t, "Create encoder");
         self.load_tiles(app_state, &mut encoder);
         t = timestamp(t, "Load tiles");
-        self.update_uniforms(&mut encoder, &app_state);
-        let layer_collection = self.layer_collection.read().unwrap();
+        let lock = self.layer_collection.clone();
+        let layer_collection = lock.read().unwrap();
+        self.update_uniforms(&mut encoder, &app_state, &layer_collection);
         t = timestamp(t, "Update uniforms");
         let frame = self.swap_chain.get_next_texture();
         t = timestamp(t, "Create rendertarget");
         let mut first = true;
         t = timestamp(t, "======== Start Layer Loop ========");
         let mut num_drawcalls = 0;
-        'outer: for (i, layer) in layer_collection.iter().enumerate() {
+        'outer: for (id, layer) in layer_collection.iter_layers().enumerate() {
             {
                 // dbg!(&layer);
                 // Check if we have anything to draw on a specific layer. If not, continue with the next layer.
                 let mut hit = false;
                 for drawable_tile in self.loaded_tiles.values_mut() {
-                    if let Some(layer) = layer {
-                        if drawable_tile.layer_has_data(layer) {
+                    if *layer {
+                        if drawable_tile.layer_has_data(id as u32) {
                             hit = true;
                         }
                     }
@@ -672,7 +662,7 @@ impl Painter {
                     continue 'outer;
                 }
 
-                t = timestamp(t, &format!("\tBegin Layer {}", i));
+                t = timestamp(t, &format!("\tBegin Layer {}", id));
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                         attachment: if MSAA_SAMPLES > 1 { &self.multisampled_framebuffer } else { &self.framebuffer },
@@ -691,16 +681,16 @@ impl Painter {
                 t = timestamp(t, "\t Bind Group set");
 
                 for drawable_tile in self.loaded_tiles.values_mut() {
-                    if let Some(layer) = layer {
-                        drawable_tile.paint(&mut render_pass, layer, &layer_collection, true);
+                    if *layer {
+                        drawable_tile.paint(&mut render_pass, id as u32, &layer_collection, true);
                         num_drawcalls += 1;
                     }
                 }
                 t = timestamp(t, "\tOutline drawn");
 
                 for drawable_tile in self.loaded_tiles.values_mut() {
-                    if let Some(layer) = layer {
-                        drawable_tile.paint(&mut render_pass, layer, &layer_collection, false);
+                    if *layer {
+                        drawable_tile.paint(&mut render_pass, id as u32, &layer_collection, false);
                         num_drawcalls += 1;
                     }
                 }

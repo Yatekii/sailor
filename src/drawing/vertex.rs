@@ -35,7 +35,7 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         Vertex {
             position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
             normal: vertex.normal.to_array(),
-            layer_id: self.layer_id << 1 | self.stroke,
+            layer_id: self.layer_id,
         }
     }
 }
@@ -48,7 +48,7 @@ impl VertexConstructor<tessellation::StrokeVertex, Vertex> for LayerVertexCtor {
         Vertex {
             position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
             normal: vertex.normal.to_array(),
-            layer_id: self.layer_id << 1 | self.stroke,
+            layer_id: self.layer_id,
         }
     }
 }
