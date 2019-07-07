@@ -624,9 +624,7 @@ impl Painter {
         }
 
         let mut layer_collection = self.layer_collection.write().unwrap();
-        if app_state.zoom < 13.0 {
-            layer_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
-        }
+        layer_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
 
         self.loaded_tiles = new_loaded_tiles;
     }
