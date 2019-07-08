@@ -6,6 +6,7 @@ use lyon::math::*;
 use lyon::tessellation::{
     FillTessellator,
     FillOptions,
+    FillVertex,
 };
 use varint::ZigZag;
 
@@ -127,6 +128,79 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
                     builder,
                 )
                 .expect("Failed to tesselate path.");
+        }
+    }
+
+    if geometry_type == GeomType::LINESTRING {
+        use crate::lyon::lyon_tessellation::GeometryBuilder;
+        while cursor < geometry.len() {
+            let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
+
+            GeometryBuilder::<FillVertex>::begin_geometry(builder);
+
+            // Fill
+            builder.set_current_vertex_type(false);
+            let points = path.points();
+
+            let line = points[1] - points[0].to_vector();
+            let mut last_normal: Vector = vector(line.y, -line.x).normalize() / 2f32.powi(10);
+
+            let mut last_vertex_1 = builder.add_vertex(FillVertex {
+                position: points[0] + last_normal,
+                normal: last_normal,
+            }).unwrap();
+
+            let mut last_vertex_2 = builder.add_vertex(FillVertex {
+                position: points[0] - last_normal,
+                normal: -last_normal,
+            }).unwrap();
+
+            for i in 1..points.len() - 1{
+                let next_line = points[i + 1] - points[i].to_vector();
+                let next_normal: Vector = vector(next_line.y, -next_line.x);
+
+                let mut normal = (last_normal + next_normal).normalize() / 2f32.powi(10);
+
+                if normal.dot(next_line.to_vector()) >= 0.0 {
+                    let b = normal.dot(next_line.to_vector());
+                    normal = -normal;
+                }
+
+                let vertex_1 = builder.add_vertex(FillVertex {
+                    position: points[i] + normal,
+                    normal: normal,
+                }).unwrap();
+
+                let vertex_2 = builder.add_vertex(FillVertex {
+                    position: points[i] - normal,
+                    normal: - normal,
+                }).unwrap();
+
+                GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_1, last_vertex_2, vertex_1);
+                GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_2, vertex_2, vertex_1);
+
+                last_vertex_1 = vertex_1;
+                last_vertex_2 = vertex_2;
+                last_normal = normal;
+            }
+
+            let line = points[points.len() - 1] - points[points.len() - 2].to_vector();
+            let normal: Vector = vector(line.y, -line.x).normalize() / 2f32.powi(10);
+
+            let vertex_1 = builder.add_vertex(FillVertex {
+                position: points[points.len() - 1] + normal,
+                normal: normal,
+            }).unwrap();
+
+            let vertex_2 = builder.add_vertex(FillVertex {
+                position: points[points.len() - 1] - normal,
+                normal: -normal,
+            }).unwrap();
+
+            GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_1, last_vertex_2, vertex_1);
+            GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_2, vertex_2, vertex_1);
+
+            GeometryBuilder::<FillVertex>::end_geometry(builder);
         }
     }
 }

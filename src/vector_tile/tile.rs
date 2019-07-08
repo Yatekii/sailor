@@ -27,23 +27,23 @@ pub struct Tile {
 }
 
 pub fn layer_num(name: &str) -> u32 {
-    19 - match name {	
-        "water" => 0,
-        "waterway" => 1,
-        "landcover" => 2,
+    match name {
+        "landcover" => 0,
+        "water" => 1,
+        "waterway" => 2,
         "landuse" => 3,
-        "mountain_peak" => 4,
+        // "mountain_peak" => 4,
         "park" => 5,
-        "boundary" => 6,
-        "aeroway" => 7,
+        // "boundary" => 6,
+        // "aeroway" => 7,
         "transportation" => 8,
         "building" => 9,
-        "water_name" => 10,
-        "transportation_name" => 11,
-        "place" => 12,
-        "housenumber" => 13,
-        "poi" => 14,
-        "aerodrome_label" => 15,
+        // "water_name" => 10,
+        // "transportation_name" => 11,
+        // "place" => 12,
+        // "housenumber" => 13,
+        // "poi" => 14,
+        // "aerodrome_label" => 15,
         _ => 19,
     }
 }

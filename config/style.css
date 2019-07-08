@@ -24,3 +24,7 @@ layer[name=landuse][zoom=12] {
     border-color: red;
     border-width: 3px;
 }
+
+layer[name=transportation] {
+    background-color: rgba(21, 124, 102, 0.959);
+}

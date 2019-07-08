@@ -22,7 +22,7 @@ use lyon::{
 };
 
 pub struct MeshBuilder<'l> {
-    buffers: &'l mut VertexBuffers<Vertex, u32>,
+    pub buffers: &'l mut VertexBuffers<Vertex, u32>,
     vertex_offset: Index,
     index_offset: Index,
     vertex_constructor: LayerVertexCtor,
