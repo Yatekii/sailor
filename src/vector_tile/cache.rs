@@ -1,4 +1,4 @@
-use crate::drawing::layer_data::LayerCollection;
+use crate::drawing::layer_collection::LayerCollection;
 use std::sync::{
     Arc,
     RwLock,

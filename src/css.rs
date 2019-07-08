@@ -427,7 +427,7 @@ pub struct Color {
 }
 
 impl Color {
-    pub const WHITE: Color = Color { r: 255, g: 255, b: 255, a: 1.0, };
+    pub const _WHITE: Color = Color { r: 255, g: 255, b: 255, a: 1.0, };
     pub const _BLACK: Color = Color { r:   0, g:   0, b:   0, a: 1.0, };
     pub const RED:   Color = Color { r: 255, g:   0, b:   0, a: 1.0, };
     pub const GREEN: Color = Color { r:   0, g: 255, b:   0, a: 1.0, };

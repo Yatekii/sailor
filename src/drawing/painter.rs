@@ -1,4 +1,4 @@
-use crate::drawing::layer_data::LayerCollection;
+use crate::drawing::layer_collection::LayerCollection;
 use crate::vector_tile::math::Screen;
 use wgpu::TextureView;
 use crossbeam_channel::{
@@ -19,7 +19,6 @@ use wgpu::CommandEncoder;
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
     drawable_tile::DrawableTile,
-    drawable_layer::DrawableLayer,
 };
 use crate::css::RulesCache;
 use std::collections::BTreeMap;
@@ -65,7 +64,7 @@ const MSAA_SAMPLES: u32 = 1;
 
 pub struct Painter {
     #[cfg(feature = "vulkan")]
-    window: Window,
+    _window: Window,
     hidpi_factor: f64,
     device: Device,
     surface: Surface,
@@ -243,7 +242,7 @@ impl Painter {
 
         Self {
             #[cfg(feature = "vulkan")]
-            window,
+            _window: window,
             hidpi_factor: factor,
             device,
             surface,
@@ -586,18 +585,27 @@ impl Painter {
         device.create_texture(frame_descriptor).create_default_view()
     }
 
-    fn load_tiles(&mut self, app_state: &mut AppState, encoder: &mut CommandEncoder) {
-        let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom);
-    
-        let mut new_loaded_tiles = BTreeMap::new();
+    fn load_tiles(&mut self, app_state: &mut AppState) {
+        let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom, 1);
+
+        // Remove old bigger tiles which are not in the FOV anymore.
+        let old_tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom - 1.0, 2);
+        let key_iter: Vec<_> = self.loaded_tiles.keys().copied().collect();
+        for key in key_iter {
+            if key.z == (app_state.zoom - 1.0) as u32 {
+                if !old_tile_field.contains(&key) {
+                    self.loaded_tiles.remove(&key);
+                }
+            } else {
+                if !tile_field.contains(&key) {
+                    self.loaded_tiles.remove(&key);
+                }
+            }
+        }
 
         app_state.tile_cache.fetch_tiles();
         for tile_id in tile_field.iter() {
-            if tile_id.z > 14 {
-                panic!();
-            }
             if !self.loaded_tiles.contains_key(&tile_id) {
-
                 app_state.tile_cache.request_tile(&tile_id, self.layer_collection.clone());
                 
                 let tile_cache = &mut app_state.tile_cache;
@@ -608,32 +616,58 @@ impl Painter {
                         tile_id,
                         &tile
                     );
-                    new_loaded_tiles.insert(
+
+                    self.loaded_tiles.insert(
                         tile_id.clone(),
                         drawable_tile
                     );
 
+                    // Remove old bigger tile when all 4 smaller tiles are loaded.
+                    let mut count = 0;
+                    let num_x = (tile_id.x / 2) * 2;
+                    let num_y = (tile_id.y / 2) * 2;
+                    for tile_id in &[
+                        TileId::new(tile_id.z, num_x, num_y),
+                        TileId::new(tile_id.z, num_x + 1, num_y),
+                        TileId::new(tile_id.z, num_x + 1, num_y + 1),
+                        TileId::new(tile_id.z, num_x, num_y + 1),
+                    ] {
+                        if !tile_field.contains(tile_id) {
+                            count += 1;
+                            continue;
+                        }
+                        if self.loaded_tiles.contains_key(tile_id) {
+                            count += 1;
+                        }
+                    }
+                    if count == 4 {
+                        self.loaded_tiles.remove(&TileId::new(tile_id.z - 1, num_x / 2, num_y / 2));
+                    }
+
+                    // Remove old smaller tiles when all 4 smaller tiles are loaded.
+                    for tile_id in &[
+                        TileId::new(tile_id.z + 1, tile_id.x * 2, tile_id.y * 2),
+                        TileId::new(tile_id.z + 1, tile_id.x * 2 + 1, tile_id.y * 2),
+                        TileId::new(tile_id.z + 1, tile_id.x * 2 + 1, tile_id.y * 2 + 1),
+                        TileId::new(tile_id.z + 1, tile_id.x * 2, tile_id.y * 2 + 1),
+                    ] {
+                        self.loaded_tiles.remove(tile_id);
+                    }
                 } else {
                     log::trace!("Could not read tile {} from cache.", tile_id);
-                }
-            } else {
-                if let Some(v) = self.loaded_tiles.remove(&tile_id) {
-                    new_loaded_tiles.insert(tile_id, v);
                 }
             }
         }
 
         let mut layer_collection = self.layer_collection.write().unwrap();
         layer_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
-
-        self.loaded_tiles = new_loaded_tiles;
     }
 
     pub fn paint(&mut self, app_state: &mut AppState) {
         let mut t = timestamp(std::time::Instant::now(), "===========================");
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         t = timestamp(t, "Create encoder");
-        self.load_tiles(app_state, &mut encoder);
+        self.load_tiles(app_state);
         t = timestamp(t, "Load tiles");
         let lock = self.layer_collection.clone();
         let layer_collection = lock.read().unwrap();
@@ -680,7 +714,7 @@ impl Painter {
 
                 for drawable_tile in self.loaded_tiles.values_mut() {
                     if *layer {
-                        drawable_tile.paint(&mut render_pass, id as u32, &layer_collection, true);
+                        drawable_tile.paint(&mut render_pass, id as u32, true);
                         num_drawcalls += 1;
                     }
                 }
@@ -688,7 +722,7 @@ impl Painter {
 
                 for drawable_tile in self.loaded_tiles.values_mut() {
                     if *layer {
-                        drawable_tile.paint(&mut render_pass, id as u32, &layer_collection, false);
+                        drawable_tile.paint(&mut render_pass, id as u32, false);
                         num_drawcalls += 1;
                     }
                 }
@@ -741,10 +775,5 @@ impl Painter {
 
 fn timestamp(old: std::time::Instant, string: &str) -> std::time::Instant {
     log::debug!("{}: {}", string, old.elapsed().as_micros());
-    std::time::Instant::now()
-}
-
-fn timestampe(old: std::time::Instant, string: &str) -> std::time::Instant {
-    log::error!("{}: {}", string, old.elapsed().as_micros());
     std::time::Instant::now()
 }

@@ -1,6 +1,3 @@
-use crate::drawing::layer_data::LayerData;
-use crate::drawing::layer_data::LayerCollection;
-use crate::css::RulesCache;
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
     drawable_layer::DrawableLayer,
@@ -57,7 +54,6 @@ impl DrawableTile {
         &mut self,
         render_pass: &mut RenderPass,
         layer_id: u32,
-        layer_collection: &LayerCollection,
         outline: bool
     ) {
         if let Some(layer) = self.layers.iter().find(|l| l.id == layer_id) {

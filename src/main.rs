@@ -87,17 +87,10 @@ fn main() {
 
         painter.update_shader();
         painter.update_styles(app_state.zoom, &mut app_state.css_cache);
-        // let t = std::time::Instant::now();
         painter.paint(&mut app_state);
 
         stats.capture_frame();
         log::warn!("Frametime {:.2}", stats.get_average());
-
-        // Frame by frame stepping.
-        // match std::io::stdin().read_line(&mut String::new()) {
-        //     Ok(_goes_into_input_above) => {},
-        //     Err(_no_updates_is_fine) => {},
-        // }
 
         if !status {
             break;

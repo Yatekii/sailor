@@ -74,10 +74,10 @@ impl Screen {
         }
     }
 
-    pub fn get_tile_boundaries_for_zoom_level(&self, z: f32) -> TileField {
+    pub fn get_tile_boundaries_for_zoom_level(&self, z: f32, scale: u32) -> TileField {
         let z = z.min(14.0);
-        let px_to_world = self.width as f32 / crate::PIXEL_SIZE / 2.0 / 2f32.powi(z as i32);
-        let py_to_world = self.height as f32 / crate::PIXEL_SIZE / 2.0 / 2f32.powi(z as i32);
+        let px_to_world = self.width as f32 / crate::PIXEL_SIZE / 2.0 / 2f32.powi(z as i32) / scale as f32;
+        let py_to_world = self.height as f32 / crate::PIXEL_SIZE / 2.0 / 2f32.powi(z as i32) / scale as f32;
 
         let top_left: TileId = global_to_num_space(&(self.center - vector(px_to_world, py_to_world)), z as u32).into();
         let bottom_right: TileId = global_to_num_space(&(self.center + vector(px_to_world, py_to_world)), z as u32).into();
@@ -210,6 +210,15 @@ impl TileField {
             current_tile: self.topleft,
         }
     }
+
+    pub fn contains(&self, tile_id: &TileId) -> bool {
+        for tile in self.iter() {
+            if &tile == tile_id {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 pub struct TileIterator<'a> {
@@ -243,7 +252,7 @@ impl<'a> Iterator for TileIterator<'a> {
 #[test]
 fn get_tile_boundaries_for_8_zoom() {
     let bb = Screen::new(point(47.607371, 6.114297), 800, 800);
-    let tile_field = bb.get_tile_boundaries_for_zoom_level(8.0);
+    let tile_field = bb.get_tile_boundaries_for_zoom_level(8.0, 1);
     let tiles = tile_field.iter().collect::<Vec<_>>();
 
     assert_eq!(tiles.len(), 25);

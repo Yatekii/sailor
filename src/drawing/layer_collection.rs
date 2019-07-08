@@ -6,25 +6,6 @@ use crate::drawing::feature::{
 };
 
 #[derive(Debug, Clone)]
-pub struct LayerData {
-    pub name: String,
-    pub id: u32,
-    pub features: Vec<Feature>,
-}
-
-impl LayerData {
-    pub fn new(name: impl Into<String>, id: u32, n: u32) -> Self {
-        Self {
-            name: name.into(),
-            id,
-            features: vec![],
-        }
-    }
-
-    
-}
-
-#[derive(Debug, Clone)]
 pub struct LayerCollection {
     layers: Vec<bool>,
     features: Vec<Feature>,
@@ -52,12 +33,8 @@ impl LayerCollection {
         self.layers.iter()
     }
 
-    pub fn get_feature_mut(&mut self, selector: &crate::css::Selector) -> Option<&mut Feature> {
-        self.features.iter_mut().find(|feature| &feature.selector == selector)
-    }
-
     pub fn get_feature_id(&mut self, selector: &crate::css::Selector) -> Option<u32> {
-        self.features.iter_mut().enumerate().find(|(i, feature)| &feature.selector == selector).map(|(i, _)| i as u32)
+        self.features.iter_mut().enumerate().find(|(_, feature)| &feature.selector == selector).map(|(i, _)| i as u32)
     }
 
     pub fn add_feature(&mut self, feature: Feature) -> u32 {
@@ -66,7 +43,7 @@ impl LayerCollection {
         self.features.len() as u32 - 1
     }
 
-    pub fn has_outline(&self) -> bool {
+    pub fn _has_outline(&self) -> bool {
         for feature in &self.features {
             if feature.style.border_width > 0.0 && feature.style.border_color.a > 0.0 {
                 return true;
@@ -75,7 +52,7 @@ impl LayerCollection {
         false
     }
 
-    pub fn has_fill(&self) -> bool {
+    pub fn _has_fill(&self) -> bool {
         for feature in &self.features {
             if feature.style.background_color.a > 0.0 {
                 return true;
