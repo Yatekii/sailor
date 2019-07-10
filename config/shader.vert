@@ -15,8 +15,11 @@ struct LayerData {
 layout(set = 0, binding = 0) uniform Locals {
     vec2 canvas_size;
     vec2 _unused;
-    mat4 transform;
     LayerData layer_datas[500];
+};
+
+layout(set = 0, binding = 1) uniform Transform {
+    mat4 transform;
 };
 
 void main() {
