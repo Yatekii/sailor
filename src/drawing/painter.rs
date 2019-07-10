@@ -74,6 +74,7 @@ pub struct Painter {
     blend_render_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
     framebuffer: TextureView,
+    uniform_buffer: Buffer,
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
     blend_bind_group_layout: BindGroupLayout,
     blend_bind_group: BindGroup,
@@ -218,10 +219,13 @@ impl Painter {
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, MSAA_SAMPLES);
         let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
 
+        let uniform_buffer = Self::create_uniform_buffer(&device);
+
         let blend_bind_group = Self::create_blend_bind_group(
             &device,
             &mut init_encoder,
             &blend_bind_group_layout,
+            &uniform_buffer,
             &framebuffer,
             &sampler,
             &app_state.screen,
@@ -252,6 +256,7 @@ impl Painter {
             blend_render_pipeline,
             multisampled_framebuffer,
             framebuffer,
+            uniform_buffer,
             loaded_tiles: BTreeMap::new(),
             blend_bind_group_layout,
             blend_bind_group,
@@ -407,27 +412,37 @@ impl Painter {
         ]
     }
 
-    fn copy_uniform_buffers(device: &Device, encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>) -> Buffer {
-        let final_buffer = device
+    fn create_uniform_buffer(device: &Device) -> Buffer {
+        device
             .create_buffer_mapped::<u8>(
                 Self::uniform_buffer_size() as usize,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
-            .fill_from_slice(&[0; Self::uniform_buffer_size() as usize]);
+            .fill_from_slice(&[0; Self::uniform_buffer_size() as usize])
+    }
 
+    fn copy_uniform_buffers(encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>, destination: &Buffer) {
         let mut total_bytes = 0;
         for (buffer, len) in source {
             encoder.copy_buffer_to_buffer(
                 &buffer,
                 0,
-                &final_buffer,
+                &destination,
                 total_bytes,
                 *len as u64
             );
             total_bytes += *len as u64;
         }
+    }
 
-        final_buffer
+    fn update_transform(device: &Device, encoder: &mut CommandEncoder, source: Buffer, destination: Buffer) {
+        encoder.copy_buffer_to_buffer(
+            &source,
+            0,
+            &destination,
+            4 * 4,
+            4 * 4 * 4
+        );
     }
 
     const fn uniform_buffer_size() -> u64 {
@@ -440,6 +455,7 @@ impl Painter {
         device: &Device,
         encoder: &mut CommandEncoder,
         bind_group_layout: &BindGroupLayout,
+        uniform_buffer: &Buffer,
         texture_view: &TextureView,
         sampler: &Sampler,
         screen: &Screen,
@@ -452,16 +468,7 @@ impl Painter {
                 wgpu::Binding {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
-                        buffer: &Self::copy_uniform_buffers(
-                            &device,
-                            encoder,
-                            &Self::create_uniform_buffers(
-                                &device,
-                                &screen,
-                                z,
-                                layers
-                            )
-                        ),
+                        buffer: uniform_buffer,
                         range: 0 .. Self::uniform_buffer_size(),
                     },
                 },
@@ -535,15 +542,15 @@ impl Painter {
     }
 
     fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState, layer_collection: &LayerCollection) {
-        self.blend_bind_group = Self::create_blend_bind_group(
-            &self.device,
+        Self::copy_uniform_buffers(
             encoder,
-            &self.blend_bind_group_layout,
-            &self.framebuffer,
-            &self.sampler,
-            &app_state.screen,
-            app_state.zoom,
-            layer_collection
+            &Self::create_uniform_buffers(
+                &self.device,
+                &app_state.screen,
+                app_state.zoom,
+                layer_collection
+            ),
+            &self.uniform_buffer
         );
     }
 
@@ -722,6 +729,16 @@ impl Painter {
 
                 for drawable_tile in self.loaded_tiles.values_mut() {
                     if *layer {
+                        // Self::update_transform(
+                        //     &self.device,
+                        //     &mut encoder,
+                        //     self.device.create_buffer_mapped(
+                        //         4 * 4,
+                        //         wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
+                        //     )
+                        //     .fill_from_slice(app_state.screen.global_to_screen(app_state.zoom).as_slice()),
+                        //     &self.uniform_buffer
+                        // );
                         drawable_tile.paint(&mut render_pass, id as u32, false);
                         num_drawcalls += 1;
                     }
