@@ -414,10 +414,10 @@ impl Painter {
         z: f32,
         drawable_tiles: impl Iterator<Item=&'a DrawableTile>
     ) -> (Buffer, u64) {
-        let mut vec = Vec::with_capacity(256);
+        let mut vec = Vec::with_capacity(64);
         let mat = screen.global_to_screen(z);
         vec.extend(mat.as_slice());
-        vec.extend(&vec![0f32; 192]);
+        vec.extend(&vec![0f32; 48]);
         let tiles = drawable_tiles
             .flat_map(|dt|
                 vec.iter().map(|f| *f)
@@ -472,7 +472,8 @@ impl Painter {
         screen: &Screen,
         z: f32,
         layers: &LayerCollection,
-        tile_id: u32,
+        tile_id: &TileId,
+        offset: u32,
     ) -> BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
@@ -488,7 +489,7 @@ impl Painter {
                     binding: 1,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &tile_transform_buffer.0,
-                        range: 0 .. tile_transform_buffer.1,
+                        range: offset as u64 * 256 .. tile_transform_buffer.1,
                     },
                 },
                 wgpu::Binding {
@@ -663,7 +664,8 @@ impl Painter {
                             &app_state.screen,
                             app_state.zoom,
                             &self.layer_collection.read().unwrap(),
-                            self.loaded_tiles.len() as u32
+                            &tile_id,
+                            self.loaded_tiles.len() as u32,
                         )
                     );
 
@@ -795,6 +797,7 @@ impl Painter {
                                     &app_state.screen,
                                     app_state.zoom,
                                     &self.layer_collection.read().unwrap(),
+                                    &drawable_tile.tile_id,
                                     i as u32
                                 )
                             );
