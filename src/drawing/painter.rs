@@ -414,14 +414,16 @@ impl Painter {
         z: f32,
         drawable_tiles: impl Iterator<Item=&'a DrawableTile>
     ) -> (Buffer, u64) {
-        let mut vec = Vec::with_capacity(64);
-        let mat = screen.global_to_screen(z);
-        vec.extend(mat.as_slice());
-        vec.extend(&vec![0f32; 48]);
+        let empty = vec![0f32; 48];
+        
         let tiles = drawable_tiles
-            .flat_map(|dt|
-                vec.iter().map(|f| *f)
-            ).collect::<Vec<f32>>();
+            .flat_map(|dt| {
+                let mut vec = Vec::with_capacity(64);
+                let mat = screen.tile_to_global_space(z, &dt.tile_id);
+                vec.extend(mat.as_slice());
+                vec.extend(&empty);
+                vec.iter().map(|f| *f).collect::<Vec<_>>()
+            }).collect::<Vec<f32>>();
         (
             device
             .create_buffer_mapped::<f32>(

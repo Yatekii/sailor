@@ -87,6 +87,13 @@ impl Screen {
         )
     }
 
+    pub fn tile_to_global_space(&self, z: f32, coordinate: &TileId) -> glm::TMat4<f32> {
+        let zoom = 1.0/2f32.powi(coordinate.z as i32);
+        let zoom = glm::scaling(&glm::vec3(zoom, zoom, 1.0));
+        let pos = glm::translation(&glm::vec3(coordinate.x as f32, coordinate.y as f32, 0.0));
+        self.global_to_screen(z) * zoom * pos
+    }
+
     pub fn global_to_screen(&self, z: f32) -> glm::TMat4<f32> {
         let zoom_x = 2.0f32.powf(z) / (self.width as f32 / 2.0) * crate::PIXEL_SIZE;
         let zoom_y = 2.0f32.powf(z) / (self.height as f32 / 2.0) * crate::PIXEL_SIZE;
