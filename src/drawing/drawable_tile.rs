@@ -6,6 +6,7 @@ use wgpu::{
     RenderPass,
     Buffer,
     Device,
+    BindGroup,
 };
 
 use crate::vector_tile::tile::Tile;
@@ -15,7 +16,8 @@ pub struct DrawableTile {
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
     pub index_count: u32,
-    pub layers: Vec<DrawableLayer>
+    pub layers: Vec<DrawableLayer>,
+    pub bind_group: BindGroup,
 }
 
 impl DrawableTile {
@@ -23,6 +25,7 @@ impl DrawableTile {
         device: &Device,
         tile_id: TileId,
         tile: &Tile,
+        bind_group: BindGroup,
     ) -> DrawableTile {
         let mut layers = Vec::with_capacity(tile.layers.len());
         for l in &tile.layers {
@@ -39,6 +42,7 @@ impl DrawableTile {
             index_count: tile.mesh.indices.len() as u32,
             layers: layers,
             tile_id,
+            bind_group,
         }
     }
 
@@ -48,6 +52,10 @@ impl DrawableTile {
             .find(|dl| dl.id == layer_id)
             .map(|dl| dl.indices_range.end - dl.indices_range.start > 1)
             .unwrap_or(false)
+    }
+
+    pub fn update_bind_group(&mut self, bind_group: BindGroup) {
+        self.bind_group = bind_group;
     }
 
     pub fn paint(

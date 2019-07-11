@@ -1,3 +1,4 @@
+use nalgebra_glm::TMat4;
 use crate::drawing::layer_collection::LayerCollection;
 use crate::vector_tile::math::Screen;
 use wgpu::TextureView;
@@ -41,6 +42,10 @@ use wgpu::{
     RenderPipeline,
     Sampler,
     // PresentMode,
+    LoadOp,
+    StoreOp,
+    RenderPassDepthStencilAttachmentDescriptor,
+    DepthStencilStateDescriptor,
 };
 
 use super::{
@@ -74,10 +79,11 @@ pub struct Painter {
     blend_render_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
     framebuffer: TextureView,
+    stencil: TextureView,
     uniform_buffer: Buffer,
+    tile_transform_buffer: (Buffer, u64),
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
     blend_bind_group_layout: BindGroupLayout,
-    blend_bind_group: BindGroup,
     sampler: Sampler,
     vertex_shader: String,
     fragment_shader: String,
@@ -183,11 +189,16 @@ impl Painter {
                 },
                 wgpu::BindGroupLayoutBinding {
                     binding: 1,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::UniformBuffer,
+                },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 2,
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::SampledTexture,
                 },
                 wgpu::BindGroupLayoutBinding {
-                    binding: 2,
+                    binding: 3,
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::Sampler,
                 }
@@ -218,20 +229,10 @@ impl Painter {
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, MSAA_SAMPLES);
         let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
+        let stencil = Self::create_stencil(&device, &swap_chain_descriptor);
 
         let uniform_buffer = Self::create_uniform_buffer(&device);
-
-        let blend_bind_group = Self::create_blend_bind_group(
-            &device,
-            &mut init_encoder,
-            &blend_bind_group_layout,
-            &uniform_buffer,
-            &framebuffer,
-            &sampler,
-            &app_state.screen,
-            app_state.zoom,
-            &layer_collection.read().unwrap(),
-        );
+        let tile_transform_buffer = Self::create_tile_transform_buffer(&device, &app_state.screen, app_state.zoom, std::iter::empty::<&DrawableTile>());
 
         let layer_render_pipeline = Self::create_layer_render_pipeline(&device, &blend_bind_group_layout, &layer_vs_module, &layer_fs_module);
         let blend_render_pipeline = Self::create_blend_render_pipeline(&device, &blend_bind_group_layout, &blend_vs_module, &blend_fs_module);
@@ -257,9 +258,10 @@ impl Painter {
             multisampled_framebuffer,
             framebuffer,
             uniform_buffer,
+            stencil,
+            tile_transform_buffer,
             loaded_tiles: BTreeMap::new(),
             blend_bind_group_layout,
-            blend_bind_group,
             sampler,
             vertex_shader: layer_vertex_shader,
             fragment_shader: layer_fragment_shader,
@@ -303,7 +305,25 @@ impl Painter {
                 alpha_blend: wgpu::BlendDescriptor::REPLACE,
                 write_mask: wgpu::ColorWrite::ALL,
             }],
-            depth_stencil_state: None,
+            depth_stencil_state: Some(DepthStencilStateDescriptor {
+                format: wgpu::TextureFormat::Bgra8Unorm,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Never,
+                stencil_front: wgpu::StencilStateFaceDescriptor {
+                    compare: wgpu::CompareFunction::Equal,
+                    fail_op: wgpu::StencilOperation::Zero,
+                    depth_fail_op: wgpu::StencilOperation::Zero,
+                    pass_op: wgpu::StencilOperation::IncrementClamp,
+                },
+                stencil_back: wgpu::StencilStateFaceDescriptor {
+                    compare: wgpu::CompareFunction::Never,
+                    fail_op: wgpu::StencilOperation::Zero,
+                    depth_fail_op: wgpu::StencilOperation::Zero,
+                    pass_op: wgpu::StencilOperation::IncrementClamp,
+                },
+                stencil_read_mask: std::u32::MAX,
+                stencil_write_mask: std::u32::MAX,
+            }),
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -388,13 +408,6 @@ impl Painter {
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
             )
             .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
-        let transform_len = 4 * 4 * 4;
-        let transform_buffer = device
-            .create_buffer_mapped(
-                transform_len / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
-            )
-            .fill_from_slice(screen.global_to_screen(z).as_slice());
 
         let buffer = layer_collection.assemble_style_buffer();
         let layer_data_len = buffer.len() * 12 * 4;
@@ -407,7 +420,6 @@ impl Painter {
 
         vec![
             (canvas_size_buffer, canvas_size_len),
-            (transform_buffer, transform_len),
             (layer_data_buffer, layer_data_len)
         ]
     }
@@ -419,6 +431,33 @@ impl Painter {
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
             .fill_from_slice(&[0; Self::uniform_buffer_size() as usize])
+    }
+
+    fn create_tile_transform_buffer<'a>(
+        device: &Device,
+        screen: &Screen,
+        z: f32,
+        drawable_tiles: impl Iterator<Item=&'a DrawableTile>
+    ) -> (Buffer, u64) {
+        let empty = vec![0f32; 48];
+        
+        let tiles = drawable_tiles
+            .flat_map(|dt| {
+                let mut vec = Vec::with_capacity(64);
+                let mat = screen.tile_to_global_space(z, &dt.tile_id);
+                vec.extend(mat.as_slice());
+                vec.extend(&empty);
+                vec.iter().map(|f| *f).collect::<Vec<_>>()
+            }).collect::<Vec<f32>>();
+        (
+            device
+            .create_buffer_mapped::<f32>(
+                tiles.len(),
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+            )
+            .fill_from_slice(tiles.as_slice()),
+            tiles.len() as u64
+        )
     }
 
     fn copy_uniform_buffers(encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>, destination: &Buffer) {
@@ -447,20 +486,21 @@ impl Painter {
 
     const fn uniform_buffer_size() -> u64 {
         4 * 4
-      + 4 * 4 * 4
       + 12 * 4 * 500
     }
 
     pub fn create_blend_bind_group(
         device: &Device,
-        encoder: &mut CommandEncoder,
         bind_group_layout: &BindGroupLayout,
         uniform_buffer: &Buffer,
+        tile_transform_buffer: &(Buffer, u64),
         texture_view: &TextureView,
         sampler: &Sampler,
         screen: &Screen,
         z: f32,
-        layers: &LayerCollection
+        layers: &LayerCollection,
+        tile_id: &TileId,
+        offset: u32,
     ) -> BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
@@ -474,10 +514,17 @@ impl Painter {
                 },
                 wgpu::Binding {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(texture_view),
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &tile_transform_buffer.0,
+                        range: offset as u64 * 256 .. tile_transform_buffer.1,
+                    },
                 },
                 wgpu::Binding {
                     binding: 2,
+                    resource: wgpu::BindingResource::TextureView(texture_view),
+                },
+                wgpu::Binding {
+                    binding: 3,
                     resource: wgpu::BindingResource::Sampler(&sampler)
                 }
             ],
@@ -539,9 +586,15 @@ impl Painter {
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
         self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, MSAA_SAMPLES);
         self.framebuffer = Self::create_framebuffer(&self.device, &self.swap_chain_descriptor);
+        self.stencil = Self::create_stencil(&self.device, &self.swap_chain_descriptor);
     }
 
-    fn update_uniforms(&mut self, encoder: &mut CommandEncoder, app_state: &AppState, layer_collection: &LayerCollection) {
+    fn update_uniforms<'a>(
+        &mut self,
+        encoder: &mut CommandEncoder,
+        app_state: &AppState,
+        layer_collection: &LayerCollection
+    ) {
         Self::copy_uniform_buffers(
             encoder,
             &Self::create_uniform_buffers(
@@ -551,6 +604,13 @@ impl Painter {
                 layer_collection
             ),
             &self.uniform_buffer
+        );
+
+        self.tile_transform_buffer = Self::create_tile_transform_buffer(
+            &self.device,
+            &app_state.screen,
+            app_state.zoom,
+            self.loaded_tiles.values()
         );
     }
 
@@ -574,6 +634,25 @@ impl Painter {
     }
 
     fn create_framebuffer(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> wgpu::TextureView {
+        let texture_extent = wgpu::Extent3d {
+            width: swap_chain_descriptor.width,
+            height: swap_chain_descriptor.height,
+            depth: 1,
+        };
+        let frame_descriptor = &wgpu::TextureDescriptor {
+            size: texture_extent,
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: swap_chain_descriptor.format,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        };
+
+        device.create_texture(frame_descriptor).create_default_view()
+    }
+
+    fn create_stencil(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> wgpu::TextureView {
         let texture_extent = wgpu::Extent3d {
             width: swap_chain_descriptor.width,
             height: swap_chain_descriptor.height,
@@ -621,7 +700,20 @@ impl Painter {
                     let drawable_tile = DrawableTile::load_from_tile_id(
                         &self.device,
                         tile_id,
-                        &tile
+                        &tile,
+                        Self::create_blend_bind_group(
+                            &self.device,
+                            &self.blend_bind_group_layout,
+                            &self.uniform_buffer,
+                            &self.tile_transform_buffer,
+                            &self.framebuffer,
+                            &self.sampler,
+                            &app_state.screen,
+                            app_state.zoom,
+                            &self.layer_collection.read().unwrap(),
+                            &tile_id,
+                            self.loaded_tiles.len() as u32,
+                        )
                     );
 
                     self.loaded_tiles.insert(
@@ -680,113 +772,124 @@ impl Painter {
         let layer_collection = lock.read().unwrap();
         self.update_uniforms(&mut encoder, &app_state, &layer_collection);
         t = timestamp(t, "Update uniforms");
-        let frame = self.swap_chain.get_next_texture();
-        t = timestamp(t, "Create rendertarget");
-        let mut first = true;
-        t = timestamp(t, "======== Start Layer Loop ========");
-        let mut num_drawcalls = 0;
-        'outer: for (id, layer) in layer_collection.iter_layers().enumerate() {
-            {
-                // dbg!(&layer);
-                // Check if we have anything to draw on a specific layer. If not, continue with the next layer.
-                let mut hit = false;
-                for drawable_tile in self.loaded_tiles.values_mut() {
-                    if *layer {
-                        if drawable_tile.layer_has_data(id as u32) {
-                            hit = true;
+        let num_tiles = self.loaded_tiles.len();
+        if layer_collection.iter_layers().count() > 0 && num_tiles > 0 {
+            let frame = self.swap_chain.get_next_texture();
+            t = timestamp(t, "Create rendertarget");
+            let mut first = true;
+            t = timestamp(t, "======== Start Layer Loop ========");
+            let mut num_drawcalls = 0;
+            'outer: for (id, layer) in layer_collection.iter_layers().enumerate() {
+                {
+                    // dbg!(&layer);
+                    // Check if we have anything to draw on a specific layer. If not, continue with the next layer.
+                    let mut hit = false;
+                    for drawable_tile in self.loaded_tiles.values_mut() {
+                        if *layer {
+                            if drawable_tile.layer_has_data(id as u32) {
+                                hit = true;
+                            }
                         }
                     }
-                }
-                if !hit {
-                    continue 'outer;
-                }
-
-                t = timestamp(t, &format!("\tBegin Layer {}", id));
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: if MSAA_SAMPLES > 1 { &self.multisampled_framebuffer } else { &self.framebuffer },
-                        resolve_target: if MSAA_SAMPLES > 1 { Some(&self.framebuffer) } else { None },
-                        load_op: wgpu::LoadOp::Clear,
-                        store_op: wgpu::StoreOp::Store,
-                        clear_color: wgpu::Color::TRANSPARENT,
-                    }],
-                    depth_stencil_attachment: None,
-                });
-                t = timestamp(t, "\tRender Pass 1 created");
-
-                render_pass.set_pipeline(&self.layer_render_pipeline);
-                t = timestamp(t, "\tPipeline 1 set");
-                render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
-                t = timestamp(t, "\t Bind Group set");
-
-                for drawable_tile in self.loaded_tiles.values_mut() {
-                    if *layer {
-                        drawable_tile.paint(&mut render_pass, id as u32, true);
-                        num_drawcalls += 1;
+                    if !hit {
+                        continue 'outer;
                     }
-                }
-                t = timestamp(t, "\tOutline drawn");
 
-                for drawable_tile in self.loaded_tiles.values_mut() {
-                    if *layer {
-                        // Self::update_transform(
-                        //     &self.device,
-                        //     &mut encoder,
-                        //     self.device.create_buffer_mapped(
-                        //         4 * 4,
-                        //         wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
-                        //     )
-                        //     .fill_from_slice(app_state.screen.global_to_screen(app_state.zoom).as_slice()),
-                        //     &self.uniform_buffer
-                        // );
-                        drawable_tile.paint(&mut render_pass, id as u32, false);
-                        num_drawcalls += 1;
+                    t = timestamp(t, &format!("\tBegin Layer {}", id));
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: if MSAA_SAMPLES > 1 { &self.multisampled_framebuffer } else { &self.framebuffer },
+                            resolve_target: if MSAA_SAMPLES > 1 { Some(&self.framebuffer) } else { None },
+                            load_op: wgpu::LoadOp::Clear,
+                            store_op: wgpu::StoreOp::Store,
+                            clear_color: wgpu::Color::TRANSPARENT,
+                        }],
+                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
+                            attachment: &self.stencil,
+                            depth_load_op: LoadOp::Clear,
+                            depth_store_op: StoreOp::Store,
+                            clear_depth: 0.0,
+                            stencil_load_op: LoadOp::Load,
+                            stencil_store_op: StoreOp::Store,
+                            clear_stencil: 0,
+                        }),
+                    });
+                    t = timestamp(t, "\tRender Pass 1 created");
+
+                    render_pass.set_pipeline(&self.layer_render_pipeline);
+                    render_pass.set_stencil_reference(1);
+                    t = timestamp(t, "\tPipeline 1 set");
+                    t = timestamp(t, "\t Bind Group set");
+
+                    for drawable_tile in self.loaded_tiles.values_mut() {
+                        if *layer {
+                            drawable_tile.paint(&mut render_pass, id as u32, true);
+                            num_drawcalls += 1;
+                        }
                     }
+                    t = timestamp(t, "\tOutline drawn");
+
+                    for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
+                        if *layer {
+                            // Self::update_transform(
+                            //     &self.device,
+                            //     &mut encoder,
+                            //     self.device.create_buffer_mapped(
+                            //         4 * 4,
+                            //         wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
+                            //     )
+                            //     .fill_from_slice(app_state.screen.global_to_screen(app_state.zoom).as_slice()),
+                            //     &self.uniform_buffer
+                            // );
+                            
+                            drawable_tile.update_bind_group(
+                                Self::create_blend_bind_group(
+                                    &self.device,
+                                    &self.blend_bind_group_layout,
+                                    &self.uniform_buffer,
+                                    &self.tile_transform_buffer,
+                                    &self.framebuffer,
+                                    &self.sampler,
+                                    &app_state.screen,
+                                    app_state.zoom,
+                                    &self.layer_collection.read().unwrap(),
+                                    &drawable_tile.tile_id,
+                                    i as u32
+                                )
+                            );
+                            render_pass.set_bind_group(0, &drawable_tile.bind_group, &[]);
+                            drawable_tile.paint(&mut render_pass, id as u32, false);
+                            num_drawcalls += 1;
+                        }
+                    }
+                    t = timestamp(t, "\tPolygons drawn");
                 }
-                t = timestamp(t, "\tPolygons drawn");
-            }
 
-            {
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: &frame.view,
-                        resolve_target: None,
-                        load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
-                        store_op: wgpu::StoreOp::Store,
-                        clear_color: wgpu::Color::WHITE,
-                    }],
-                    depth_stencil_attachment: None,
-                });
-                t = timestamp(t, "\tRender Pass 2 Created");
-                render_pass.set_pipeline(&self.blend_render_pipeline);
-                t = timestamp(t, "\tPipeline 2 set");
-                render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
-                t = timestamp(t, "\tBindgroup 2 set");
-                render_pass.draw(0 .. 6, 0 .. 1);
-                t = timestamp(t, "\tResolve target drawn on");
+                {
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: &frame.view,
+                            resolve_target: None,
+                            load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
+                            store_op: wgpu::StoreOp::Store,
+                            clear_color: wgpu::Color::WHITE,
+                        }],
+                        depth_stencil_attachment: None,
+                    });
+                    t = timestamp(t, "\tRender Pass 2 Created");
+                    render_pass.set_pipeline(&self.blend_render_pipeline);
+                    t = timestamp(t, "\tPipeline 2 set");
+                    render_pass.set_bind_group(0, &self.loaded_tiles.values_mut().next().unwrap().bind_group, &[]);
+                    t = timestamp(t, "\tBindgroup 2 set");
+                    render_pass.draw(0 .. 6, 0 .. 1);
+                    t = timestamp(t, "\tResolve target drawn on");
+                }
+                first = false;
             }
-        first = false;
+            self.device.get_queue().submit(&[encoder.finish()]);
+            
+            timestamp(t, &format!("\tFrame with {} drawcalls submitted", num_drawcalls));
         }
-
-        if num_drawcalls == 0 {
-            // Do a futile render pass if no other work was submitted.
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
-                    resolve_target: None,
-                    load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color::WHITE,
-                }],
-                depth_stencil_attachment: None,
-            });
-            render_pass.set_pipeline(&self.blend_render_pipeline);
-            render_pass.set_bind_group(0, &self.blend_bind_group, &[]);
-            render_pass.draw(0 .. 6, 0 .. 1);
-        }
-        self.device.get_queue().submit(&[encoder.finish()]);
-        
-        timestamp(t, &format!("\tFrame with {} drawcalls submitted", num_drawcalls));
     }
 }
 
