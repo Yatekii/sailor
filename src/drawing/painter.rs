@@ -42,6 +42,10 @@ use wgpu::{
     RenderPipeline,
     Sampler,
     PresentMode,
+    LoadOp,
+    StoreOp,
+    RenderPassDepthStencilAttachmentDescriptor,
+    DepthStencilStateDescriptor,
 };
 
 use super::{
@@ -75,6 +79,7 @@ pub struct Painter {
     blend_render_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
     framebuffer: TextureView,
+    stencil: TextureView,
     uniform_buffer: Buffer,
     tile_transform_buffer: (Buffer, u64),
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
@@ -224,6 +229,7 @@ impl Painter {
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, MSAA_SAMPLES);
         let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
+        let stencil = Self::create_stencil(&device, &swap_chain_descriptor);
 
         let uniform_buffer = Self::create_uniform_buffer(&device);
         let tile_transform_buffer = Self::create_tile_transform_buffer(&device, &app_state.screen, app_state.zoom, std::iter::empty::<&DrawableTile>());
@@ -252,6 +258,7 @@ impl Painter {
             multisampled_framebuffer,
             framebuffer,
             uniform_buffer,
+            stencil,
             tile_transform_buffer,
             loaded_tiles: BTreeMap::new(),
             blend_bind_group_layout,
@@ -298,7 +305,25 @@ impl Painter {
                 alpha_blend: wgpu::BlendDescriptor::REPLACE,
                 write_mask: wgpu::ColorWrite::ALL,
             }],
-            depth_stencil_state: None,
+            depth_stencil_state: Some(DepthStencilStateDescriptor {
+                format: wgpu::TextureFormat::Bgra8Unorm,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Never,
+                stencil_front: wgpu::StencilStateFaceDescriptor {
+                    compare: wgpu::CompareFunction::Equal,
+                    fail_op: wgpu::StencilOperation::Zero,
+                    depth_fail_op: wgpu::StencilOperation::Zero,
+                    pass_op: wgpu::StencilOperation::IncrementClamp,
+                },
+                stencil_back: wgpu::StencilStateFaceDescriptor {
+                    compare: wgpu::CompareFunction::Never,
+                    fail_op: wgpu::StencilOperation::Zero,
+                    depth_fail_op: wgpu::StencilOperation::Zero,
+                    pass_op: wgpu::StencilOperation::IncrementClamp,
+                },
+                stencil_read_mask: std::u32::MAX,
+                stencil_write_mask: std::u32::MAX,
+            }),
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -561,6 +586,7 @@ impl Painter {
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
         self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, MSAA_SAMPLES);
         self.framebuffer = Self::create_framebuffer(&self.device, &self.swap_chain_descriptor);
+        self.stencil = Self::create_stencil(&self.device, &self.swap_chain_descriptor);
     }
 
     fn update_uniforms<'a>(
@@ -608,6 +634,25 @@ impl Painter {
     }
 
     fn create_framebuffer(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> wgpu::TextureView {
+        let texture_extent = wgpu::Extent3d {
+            width: swap_chain_descriptor.width,
+            height: swap_chain_descriptor.height,
+            depth: 1,
+        };
+        let frame_descriptor = &wgpu::TextureDescriptor {
+            size: texture_extent,
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: swap_chain_descriptor.format,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        };
+
+        device.create_texture(frame_descriptor).create_default_view()
+    }
+
+    fn create_stencil(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> wgpu::TextureView {
         let texture_extent = wgpu::Extent3d {
             width: swap_chain_descriptor.width,
             height: swap_chain_descriptor.height,
@@ -759,7 +804,15 @@ impl Painter {
                             store_op: wgpu::StoreOp::Store,
                             clear_color: wgpu::Color::TRANSPARENT,
                         }],
-                        depth_stencil_attachment: None,
+                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
+                            attachment: &self.stencil,
+                            depth_load_op: LoadOp::Clear,
+                            depth_store_op: StoreOp::Store,
+                            clear_depth: 0.0,
+                            stencil_load_op: LoadOp::Load,
+                            stencil_store_op: StoreOp::Store,
+                            clear_stencil: 0,
+                        }),
                     });
                     t = timestamp(t, "\tRender Pass 1 created");
 
