@@ -40,7 +40,7 @@ use wgpu::{
     BindGroup,
     RenderPipeline,
     Sampler,
-    PresentMode,
+    // PresentMode,
 };
 
 use super::{
@@ -213,7 +213,7 @@ impl Painter {
             format: wgpu::TextureFormat::Bgra8Unorm,
             width: size.width.round() as u32,
             height: size.height.round() as u32,
-            present_mode: PresentMode::NoVsync,
+            // present_mode: PresentMode::NoVsync,
         };
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, MSAA_SAMPLES);
