@@ -41,7 +41,7 @@ use wgpu::{
     BindGroup,
     RenderPipeline,
     Sampler,
-    // PresentMode,
+    PresentMode,
     LoadOp,
     StoreOp,
     RenderPassDepthStencilAttachmentDescriptor,
@@ -224,7 +224,7 @@ impl Painter {
             format: wgpu::TextureFormat::Bgra8Unorm,
             width: size.width.round() as u32,
             height: size.height.round() as u32,
-            // present_mode: PresentMode::NoVsync,
+            present_mode: PresentMode::NoVsync,
         };
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, MSAA_SAMPLES);
@@ -673,10 +673,13 @@ impl Painter {
     }
 
     fn load_tiles(&mut self, app_state: &mut AppState) {
+        let mut t = timestamp(std::time::Instant::now(), "\t\tStart Renderpass");
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom, 1);
+        t = timestamp(t, "\t\t\tTilefield 1");
 
         // Remove old bigger tiles which are not in the FOV anymore.
         let old_tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom - 1.0, 2);
+        t = timestamp(t, "\t\t\tTileFiled 2");
         let key_iter: Vec<_> = self.loaded_tiles.keys().copied().collect();
         for key in key_iter {
             if key.z == (app_state.zoom - 1.0) as u32 {
@@ -689,14 +692,19 @@ impl Painter {
                 }
             }
         }
+        t = timestamp(t, "\t\t\tAdd/remove keys");
 
         app_state.tile_cache.fetch_tiles();
+        t = timestamp(t, "\t\t\tFetch tiles");
         for tile_id in tile_field.iter() {
+            t = timestamp(t, "\t\t\t\tTile Iter ============");
             if !self.loaded_tiles.contains_key(&tile_id) {
                 app_state.tile_cache.request_tile(&tile_id, self.layer_collection.clone());
+                t = timestamp(t, "\t\t\t\tTile Request");
                 
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
+                    t = timestamp(t, "\t\t\t\tGet Tile");
 
                     let drawable_tile = DrawableTile::load_from_tile_id(
                         &self.device,
@@ -716,6 +724,7 @@ impl Painter {
                             self.loaded_tiles.len() as u32,
                         )
                     );
+                    t = timestamp(t, "\t\t\t\tLoad Tile");
 
                     self.loaded_tiles.insert(
                         tile_id.clone(),
@@ -753,6 +762,8 @@ impl Painter {
                     ] {
                         self.loaded_tiles.remove(tile_id);
                     }
+
+                    t = timestamp(t, "\t\t\t\tCheck and remove tiles");
                 } else {
                     log::trace!("Could not read tile {} from cache.", tile_id);
                 }
