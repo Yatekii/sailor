@@ -68,7 +68,7 @@ impl DrawableTile {
             render_pass.set_index_buffer(&self.index_buffer, 0);
             render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
             if outline {
-                // render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 .. 1);
+                render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 .. 1);
             } else {
                 render_pass.draw_indexed(layer.indices_range.clone(), 0, 1 .. 2);
             }
