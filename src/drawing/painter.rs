@@ -305,25 +305,26 @@ impl Painter {
                 alpha_blend: wgpu::BlendDescriptor::REPLACE,
                 write_mask: wgpu::ColorWrite::ALL,
             }],
-            depth_stencil_state: Some(DepthStencilStateDescriptor {
-                format: wgpu::TextureFormat::Bgra8Unorm,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::Never,
-                stencil_front: wgpu::StencilStateFaceDescriptor {
-                    compare: wgpu::CompareFunction::Equal,
-                    fail_op: wgpu::StencilOperation::Zero,
-                    depth_fail_op: wgpu::StencilOperation::Zero,
-                    pass_op: wgpu::StencilOperation::IncrementClamp,
-                },
-                stencil_back: wgpu::StencilStateFaceDescriptor {
-                    compare: wgpu::CompareFunction::Never,
-                    fail_op: wgpu::StencilOperation::Zero,
-                    depth_fail_op: wgpu::StencilOperation::Zero,
-                    pass_op: wgpu::StencilOperation::IncrementClamp,
-                },
-                stencil_read_mask: std::u32::MAX,
-                stencil_write_mask: std::u32::MAX,
-            }),
+            depth_stencil_state: None,
+            // depth_stencil_state: Some(DepthStencilStateDescriptor {
+            //     format: wgpu::TextureFormat::Bgra8Unorm,
+            //     depth_write_enabled: false,
+            //     depth_compare: wgpu::CompareFunction::Never,
+            //     stencil_front: wgpu::StencilStateFaceDescriptor {
+            //         compare: wgpu::CompareFunction::Equal,
+            //         fail_op: wgpu::StencilOperation::Zero,
+            //         depth_fail_op: wgpu::StencilOperation::Zero,
+            //         pass_op: wgpu::StencilOperation::IncrementClamp,
+            //     },
+            //     stencil_back: wgpu::StencilStateFaceDescriptor {
+            //         compare: wgpu::CompareFunction::Never,
+            //         fail_op: wgpu::StencilOperation::Zero,
+            //         depth_fail_op: wgpu::StencilOperation::Zero,
+            //         pass_op: wgpu::StencilOperation::IncrementClamp,
+            //     },
+            //     stencil_read_mask: std::u32::MAX,
+            //     stencil_write_mask: std::u32::MAX,
+            // }),
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -804,30 +805,31 @@ impl Painter {
                             store_op: wgpu::StoreOp::Store,
                             clear_color: wgpu::Color::TRANSPARENT,
                         }],
-                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
-                            attachment: &self.stencil,
-                            depth_load_op: LoadOp::Clear,
-                            depth_store_op: StoreOp::Store,
-                            clear_depth: 0.0,
-                            stencil_load_op: LoadOp::Load,
-                            stencil_store_op: StoreOp::Store,
-                            clear_stencil: 0,
-                        }),
+                        depth_stencil_attachment: None,
+                        // depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
+                        //     attachment: &self.stencil,
+                        //     depth_load_op: LoadOp::Clear,
+                        //     depth_store_op: StoreOp::Store,
+                        //     clear_depth: 0.0,
+                        //     stencil_load_op: LoadOp::Load,
+                        //     stencil_store_op: StoreOp::Store,
+                        //     clear_stencil: 0,
+                        // }),
                     });
                     t = timestamp(t, "\tRender Pass 1 created");
 
                     render_pass.set_pipeline(&self.layer_render_pipeline);
-                    render_pass.set_stencil_reference(1);
+                    // render_pass.set_stencil_reference(1);
                     t = timestamp(t, "\tPipeline 1 set");
                     t = timestamp(t, "\t Bind Group set");
 
-                    for drawable_tile in self.loaded_tiles.values_mut() {
-                        if *layer {
-                            drawable_tile.paint(&mut render_pass, id as u32, true);
-                            num_drawcalls += 1;
-                        }
-                    }
-                    t = timestamp(t, "\tOutline drawn");
+                    // for drawable_tile in self.loaded_tiles.values_mut() {
+                    //     if *layer {
+                    //         drawable_tile.paint(&mut render_pass, id as u32, true);
+                    //         num_drawcalls += 1;
+                    //     }
+                    // }
+                    // t = timestamp(t, "\tOutline drawn");
 
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
                         if *layer {
