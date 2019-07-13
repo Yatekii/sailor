@@ -126,13 +126,12 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
             // Fill
             builder.set_current_vertex_type(false);
             let mut tessellator = FillTessellator::new();
-            tessellator
+            let _ = tessellator
                 .tessellate_path(
                     &path,
                     &FillOptions::tolerance(0.0001).with_normals(true),
                     builder,
-                )
-                .expect("Failed to tesselate path.");
+                ).map_err(|e| { dbg!(e); dbg!(path); });
         }
     }
 
