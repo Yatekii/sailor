@@ -16,6 +16,7 @@ pub struct DrawableTile {
     pub index_buffer: Buffer,
     pub index_count: u32,
     pub layers: Vec<DrawableLayer>,
+    pub extent: u16,
 }
 
 impl DrawableTile {
@@ -39,6 +40,7 @@ impl DrawableTile {
             index_count: tile.mesh.indices.len() as u32,
             layers: layers,
             tile_id,
+            extent: tile.extent,
         }
     }
 

@@ -34,7 +34,7 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         // println!("{:?}", vertex.position);
         Vertex {
             // position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
-            position: vertex.position.to_array(),
+            position: [vertex.position.x as f32, vertex.position.y as f32],
             normal: vertex.normal.to_array(),
             layer_id: self.layer_id,
         }
@@ -46,8 +46,9 @@ impl VertexConstructor<tessellation::StrokeVertex, Vertex> for LayerVertexCtor {
         assert!(!vertex.position.x.is_nan());
         assert!(!vertex.position.y.is_nan());
         // println!("{:?}", vertex.position);
+        let pos = math::tile_to_global_space(&self.tile_id, vertex.position);
         Vertex {
-            position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
+            position: [pos.x as f32, pos.y as f32],
             normal: vertex.normal.to_array(),
             layer_id: self.layer_id,
         }

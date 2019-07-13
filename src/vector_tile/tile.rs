@@ -24,6 +24,7 @@ pub struct Tile {
     pub tile_id: TileId,
     pub layers: Vec<crate::vector_tile::transform::Layer>,
     pub mesh: VertexBuffers<Vertex, u32>,
+    pub extent: u16,
 }
 
 pub fn layer_num(name: &str) -> u32 {
@@ -97,8 +98,7 @@ impl Tile {
                 geometry_commands_to_drawable(
                     &mut builder,
                     feature.type_pb,
-                    &feature.geometry,
-                    tile.layers[0].extent
+                    &feature.geometry
                 );
             }
 
@@ -113,6 +113,7 @@ impl Tile {
             tile_id: tile_id.clone(),
             layers,
             mesh,
+            extent: tile.layers[0].extent as u16,
         }
     }
 }

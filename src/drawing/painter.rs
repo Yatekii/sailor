@@ -402,22 +402,28 @@ impl Painter {
         z: f32,
         drawable_tiles: impl Iterator<Item=&'a DrawableTile>
     ) -> (Buffer, u64) {
-        let tiles = drawable_tiles
-            .flat_map(|dt| screen
-                .tile_to_global_space(z, &dt.tile_id)
-                .as_slice()
-                .iter()
-                .map(|f| *f)
-                .collect::<Vec<_>>()
-            ).collect::<Vec<f32>>();
+        let tile_data = drawable_tiles
+            .flat_map(|dt| {
+                let mut data = screen
+                    .tile_to_global_space(z, &dt.tile_id)
+                    .as_slice()
+                    .iter()
+                    .map(|f| *f)
+                    .collect::<Vec<_>>();
+                data.push(dt.extent as f32);
+                data.push(dt.extent as f32);
+                data.push(dt.extent as f32);
+                data.push(dt.extent as f32);
+                data
+            }).collect::<Vec<f32>>();
         (
             device
             .create_buffer_mapped::<f32>(
-                tiles.len(),
+                tile_data.len(),
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
-            .fill_from_slice(tiles.as_slice()),
-            tiles.len() as u64
+            .fill_from_slice(tile_data.as_slice()),
+            tile_data.len() as u64
         )
     }
 

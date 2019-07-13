@@ -32,7 +32,7 @@ fn area(path: &Path) -> f32 {
     area + points[points.len() - 1].x * points[1].y - points[points.len() - 1].y * points[1].x
 }
 
-fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, cursor: &mut usize, gcursor: &mut Point) -> Path {
+fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, cursor: &mut usize, gcursor: &mut Point) -> Path {
     let mut builder = Path::builder();
 
     while *cursor < geometry.len() {
@@ -43,9 +43,9 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
         match value & 0x07 {
             1 => {
                 for _ in 0..count {
-                    let dx = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
+                    let dx = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32;
                     *cursor += 1;
-                    let dy = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
+                    let dy = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32;
                     *cursor += 1;
                     *gcursor += vector(dx, dy);
                     builder.move_to(*gcursor);
@@ -57,9 +57,9 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
             },
             2 => {
                 for _ in 0..count {
-                    let dx = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
+                    let dx = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32;
                     *cursor += 1;
-                    let dy = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32 / extent as f32;
+                    let dy = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32;
                     *cursor += 1;
                     *gcursor += vector(dx, dy);
                     builder.line_to(*gcursor);
@@ -102,15 +102,14 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
 pub fn geometry_commands_to_drawable<'a, 'l>(
     builder: &'a mut MeshBuilder<'l>,
     geometry_type: GeomType,
-    geometry: &Vec<u32>,
-    extent: u32
+    geometry: &Vec<u32>
 ) {
     let mut cursor = 0;
     let mut c = point(0f32, 0f32);
 
     if geometry_type == GeomType::POLYGON {
         while cursor < geometry.len() {
-            let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
+            let path = parse_one_to_path(geometry_type, geometry, &mut cursor, &mut c);
             
             // Outline
             // builder.set_current_vertex_type(true);
@@ -131,14 +130,14 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
                     &path,
                     &FillOptions::tolerance(0.0001).with_normals(true),
                     builder,
-                ).map_err(|e| { dbg!(e); dbg!(path); });
+                ).map_err(|_e| { log::error!("Broken path."); });
         }
     }
 
     if geometry_type == GeomType::LINESTRING {
         use crate::lyon::lyon_tessellation::GeometryBuilder;
         while cursor < geometry.len() {
-            let path = parse_one_to_path(geometry_type, geometry, extent, &mut cursor, &mut c);
+            let path = parse_one_to_path(geometry_type, geometry, &mut cursor, &mut c);
 
             GeometryBuilder::<FillVertex>::begin_geometry(builder);
 
