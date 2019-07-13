@@ -19,21 +19,19 @@ layout(set = 0, binding = 0) uniform Locals {
 };
 
 layout(set = 0, binding = 1) uniform Transform {
-    mat4 transform;
+    mat4 transform[200];
 };
 
 void main() {
     LayerData layer_data = layer_datas[layer_id];
-    bool is_outline = gl_InstanceIndex == 0;
-    gl_Position = transform * vec4(position, 0.0, 1.0);
-    // if(is_outline){
-    //     gl_Position.xy += normal / canvas_size * layer_data.border_width / 2;
-    //     outColor = layer_data.outline_color;
-    // } else {
+    bool is_outline = (gl_InstanceIndex & 0x01) == 0;
+    uint tile_id = (gl_InstanceIndex >> 1);
+    gl_Position = transform[tile_id] * vec4(position, 0.0, 1.0);
+    if(is_outline){
+        gl_Position.xy += normal / canvas_size * layer_data.border_width / 2;
+        outColor = layer_data.outline_color;
+    } else {
         outColor = layer_data.background_color;
-        if(layer_id == 3500) {
-            outColor = vec4(1.0, 0.0, 0.0, 1.0);
-        }
-    // }
+    }
     // outColor = vec4(normal, 0.0, 1.0);
 }

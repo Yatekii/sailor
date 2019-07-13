@@ -84,6 +84,7 @@ pub struct Painter {
     tile_transform_buffer: (Buffer, u64),
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
     blend_bind_group_layout: BindGroupLayout,
+    bind_group: BindGroup,
     sampler: Sampler,
     vertex_shader: String,
     fragment_shader: String,
@@ -242,6 +243,19 @@ impl Painter {
             &swap_chain_descriptor,
         );
 
+        let bind_group = Self::create_blend_bind_group(
+            &device,
+            &blend_bind_group_layout,
+            &uniform_buffer,
+            &tile_transform_buffer,
+            &framebuffer,
+            &sampler,
+            &app_state.screen,
+            app_state.zoom,
+            &layer_collection.read().unwrap(),
+            0,
+        );
+
         let init_command_buf = init_encoder.finish();
         device.get_queue().submit(&[init_command_buf]);
 
@@ -262,6 +276,7 @@ impl Painter {
             tile_transform_buffer,
             loaded_tiles: BTreeMap::new(),
             blend_bind_group_layout,
+            bind_group,
             sampler,
             vertex_shader: layer_vertex_shader,
             fragment_shader: layer_fragment_shader,
@@ -448,16 +463,14 @@ impl Painter {
         z: f32,
         drawable_tiles: impl Iterator<Item=&'a DrawableTile>
     ) -> (Buffer, u64) {
-        let empty = vec![0f32; 48];
-        
         let tiles = drawable_tiles
-            .flat_map(|dt| {
-                let mut vec = Vec::with_capacity(64);
-                let mat = screen.tile_to_global_space(z, &dt.tile_id);
-                vec.extend(mat.as_slice());
-                vec.extend(&empty);
-                vec.iter().map(|f| *f).collect::<Vec<_>>()
-            }).collect::<Vec<f32>>();
+            .flat_map(|dt| screen
+                .tile_to_global_space(z, &dt.tile_id)
+                .as_slice()
+                .iter()
+                .map(|f| *f)
+                .collect::<Vec<_>>()
+            ).collect::<Vec<f32>>();
         (
             device
             .create_buffer_mapped::<f32>(
@@ -508,7 +521,6 @@ impl Painter {
         screen: &Screen,
         z: f32,
         layers: &LayerCollection,
-        tile_id: &TileId,
         offset: u32,
     ) -> BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -525,7 +537,7 @@ impl Painter {
                     binding: 1,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &tile_transform_buffer.0,
-                        range: offset as u64 * 256 .. tile_transform_buffer.1,
+                        range: 0 .. tile_transform_buffer.1,
                     },
                 },
                 wgpu::Binding {
@@ -718,19 +730,6 @@ impl Painter {
                         &self.device,
                         tile_id,
                         &tile,
-                        Self::create_blend_bind_group(
-                            &self.device,
-                            &self.blend_bind_group_layout,
-                            &self.uniform_buffer,
-                            &self.tile_transform_buffer,
-                            &self.framebuffer,
-                            &self.sampler,
-                            &app_state.screen,
-                            app_state.zoom,
-                            &self.layer_collection.read().unwrap(),
-                            &tile_id,
-                            self.loaded_tiles.len() as u32,
-                        )
                     );
                     t = timestamp(t, "\t\t\t\tLoad Tile");
 
@@ -791,6 +790,18 @@ impl Painter {
         let lock = self.layer_collection.clone();
         let layer_collection = lock.read().unwrap();
         self.update_uniforms(&mut encoder, &app_state, &layer_collection);
+        self.bind_group = Self::create_blend_bind_group(
+            &self.device,
+            &self.blend_bind_group_layout,
+            &self.uniform_buffer,
+            &self.tile_transform_buffer,
+            &self.framebuffer,
+            &self.sampler,
+            &app_state.screen,
+            app_state.zoom,
+            &self.layer_collection.read().unwrap(),
+            self.loaded_tiles.len() as u32,
+        );
         t = timestamp(t, "Update uniforms");
         let num_tiles = self.loaded_tiles.len();
         if layer_collection.iter_layers().count() > 0 && num_tiles > 0 {
@@ -841,6 +852,7 @@ impl Painter {
                     render_pass.set_pipeline(&self.layer_render_pipeline);
                     render_pass.set_stencil_reference(0);
                     t = timestamp(t, "\tPipeline 1 set");
+                    render_pass.set_bind_group(0, &self.bind_group, &[]);
                     t = timestamp(t, "\t Bind Group set");
 
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
@@ -855,35 +867,17 @@ impl Painter {
                             //     .fill_from_slice(app_state.screen.global_to_screen(app_state.zoom).as_slice()),
                             //     &self.uniform_buffer
                             // );
-                            
-                            drawable_tile.update_bind_group(
-                                Self::create_blend_bind_group(
-                                    &self.device,
-                                    &self.blend_bind_group_layout,
-                                    &self.uniform_buffer,
-                                    &self.tile_transform_buffer,
-                                    &self.framebuffer,
-                                    &self.sampler,
-                                    &app_state.screen,
-                                    app_state.zoom,
-                                    &self.layer_collection.read().unwrap(),
-                                    &drawable_tile.tile_id,
-                                    i as u32
-                                )
-                            );
-                            render_pass.set_bind_group(0, &drawable_tile.bind_group, &[]);
-                            drawable_tile.paint(&mut render_pass, id as u32, false);
+                            drawable_tile.paint(&mut render_pass, i as u32, id as u32, false);
                             num_drawcalls += 1;
                         }
                     }
 
-                    // for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
-                    //     if *layer {
-                    //         render_pass.set_bind_group(0, &drawable_tile.bind_group, &[]);
-                    //         drawable_tile.paint(&mut render_pass, id as u32, true);
-                    //         num_drawcalls += 1;
-                    //     }
-                    // }
+                    for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
+                        if *layer {
+                            drawable_tile.paint(&mut render_pass, i as u32, id as u32, true);
+                            num_drawcalls += 1;
+                        }
+                    }
 
                     t = timestamp(t, "\tPolygons drawn");
                 }

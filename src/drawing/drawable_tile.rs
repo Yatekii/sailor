@@ -17,7 +17,6 @@ pub struct DrawableTile {
     pub index_buffer: Buffer,
     pub index_count: u32,
     pub layers: Vec<DrawableLayer>,
-    pub bind_group: BindGroup,
 }
 
 impl DrawableTile {
@@ -25,7 +24,6 @@ impl DrawableTile {
         device: &Device,
         tile_id: TileId,
         tile: &Tile,
-        bind_group: BindGroup,
     ) -> DrawableTile {
         let mut layers = Vec::with_capacity(tile.layers.len());
         for l in &tile.layers {
@@ -42,7 +40,6 @@ impl DrawableTile {
             index_count: tile.mesh.indices.len() as u32,
             layers: layers,
             tile_id,
-            bind_group,
         }
     }
 
@@ -54,13 +51,10 @@ impl DrawableTile {
             .unwrap_or(false)
     }
 
-    pub fn update_bind_group(&mut self, bind_group: BindGroup) {
-        self.bind_group = bind_group;
-    }
-
     pub fn paint(
         &mut self,
         render_pass: &mut RenderPass,
+        tile_id: u32,
         layer_id: u32,
         outline: bool
     ) {
@@ -68,9 +62,11 @@ impl DrawableTile {
             render_pass.set_index_buffer(&self.index_buffer, 0);
             render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
             if outline {
-                render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 .. 1);
+                let range_start = tile_id << 1;
+                render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 + range_start .. 1 + range_start);
             } else {
-                render_pass.draw_indexed(layer.indices_range.clone(), 0, 1 .. 2);
+                let range_start = (tile_id << 1) | 1;
+                render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 + range_start .. 1 + range_start);
             }
         }
     }
