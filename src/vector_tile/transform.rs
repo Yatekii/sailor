@@ -162,7 +162,6 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
                 let mut normal = (last_normal + next_normal).normalize() / 2f32.powi(10);
 
                 if normal.dot(next_line.to_vector()) >= 0.0 {
-                    let b = normal.dot(next_line.to_vector());
                     normal = -normal;
                 }
 

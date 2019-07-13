@@ -6,7 +6,6 @@ use wgpu::{
     RenderPass,
     Buffer,
     Device,
-    BindGroup,
 };
 
 use crate::vector_tile::tile::Tile;
