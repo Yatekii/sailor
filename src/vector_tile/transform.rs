@@ -75,14 +75,7 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),
                     GeomType::LINESTRING => panic!("This is a bug. Please report it."),
-                    GeomType::POLYGON => {
-                        let path = builder.build();
-                        if area(&path) < 0f32 {
-                            return path;
-                        } else {
-                            return path;
-                        }
-                    },
+                    GeomType::POLYGON => {},
                     _ => panic!("This is a bug. Please report it."),
                 }
             },
@@ -91,7 +84,19 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, extent: u32, 
             },
         }
     }
-    panic!("This is a bug. Please report it.");
+    match geometry_type {
+        GeomType::POINT => panic!("This is a bug. Please report it."),
+        GeomType::LINESTRING => panic!("This is a bug. Please report it."),
+        GeomType::POLYGON => {
+            let path = builder.build();
+            if area(&path) < 0f32 {
+                return path;
+            } else {
+                return path;
+            }
+        },
+        _ => panic!("This is a bug. Please report it."),
+    }
 }
 
 pub fn geometry_commands_to_drawable<'a, 'l>(
