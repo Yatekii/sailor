@@ -22,19 +22,17 @@ vulkan = []
 debug = true
 
 [dependencies]
-structopt = "*"
-quick-protobuf = "*"
-lyon = "*"
-euclid = "*"
-varint = "*"
-reqwest = "*"
-nalgebra = "*"
-nalgebra-glm = "0.4"
-rayon = "*"
+quick-protobuf = "0.6.3"
+lyon = "0.13.2"
+varint = "0.9.0"
+reqwest = "0.9.18"
+nalgebra = "0.18.0"
+nalgebra-glm = "0.4.0"
+rayon = "1.1.0"
 nom = "5.0.0-beta2"
 notify = "5.0.0-pre.0"
-crossbeam-channel = "*"
-take_mut = "*"
+crossbeam-channel = "0.3.8"
+take_mut = "0.2.2"
 wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"], rev="4233fee6e21f22362a019691d7c9643b0d6068d2" }
 # wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs" }
 # wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs", branch = "stencil" }
@@ -42,4 +40,4 @@ wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"], r
 pretty_env_logger = "0.3.0"
 log = "0.4.6"
 glsl-to-spirv = "0.1"
-phf = { version = "*", features = ["macros"] }
+phf = { version = "0.7.24", features = ["macros"] }
