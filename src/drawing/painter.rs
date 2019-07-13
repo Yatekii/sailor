@@ -753,7 +753,7 @@ impl Painter {
                             resolve_target: if MSAA_SAMPLES > 1 { Some(&frame.view) } else { None },
                             load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
                             store_op: wgpu::StoreOp::Store,
-                            clear_color: wgpu::Color::TRANSPARENT,
+                            clear_color: wgpu::Color::WHITE,
                         }],
                         depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
                             attachment: &self.stencil,
