@@ -4,6 +4,15 @@ version = "0.1.0"
 authors = ["Noah Hüsser <yatekii@yatekii.ch>"]
 edition = "2018"
 
+description = "A sailing navigation application."
+documentation = "https://docs.rs/sailor/"
+homepage = "https://github.com/Yatekii/sailor"
+repository = "https://github.com/Yatekii/sailor"
+readme = "README.md"
+categories = []
+keywords = ["sailing", "gfx", "gps"]
+license = "MIT OR Apache-2.0"
+
 [features]
 default = ["vulkan"]
 gl = []
