@@ -91,8 +91,10 @@ impl RulesCache {
             },
         };
 
+        let rules = try_parse_styles(&contents)?;
+
         Some(Self {
-            rules: try_parse_styles(&contents)?,
+            rules: rules,
             rx,
             _watcher: watcher,
         })
@@ -103,6 +105,7 @@ impl RulesCache {
     /// E.g. `layer` does not match the `layer[zoom=5]` rule selector.
     /// On the contrary, `layer[zoom=5]` matches the `layer` rule selector.
     pub fn get_matching_rules(&self, selector: &Selector) -> Vec<&Rule> {
+
         self.rules.iter().filter(|rule| selector.matches(&rule.selector)).collect()
     }
 
@@ -382,6 +385,7 @@ fn css_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSS
     alt((
         whitespace(hex_color),
         whitespace(rgba_color),
+        whitespace(rgb_color),
         whitespace(px_value),
         whitespace(string),
     ))(input)
@@ -482,4 +486,18 @@ fn rgba_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CS
     ))(input)?;
     let (input, _) = tag(")")(input)?;
     Ok((input, CSSValue::Color(Color { r, g, b, a })))
+}
+
+/// Parse a single hex color code including the `#`.
+fn rgb_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+    let (input, _) = whitespace(tag("rgb("))(input)?;
+    let (input, (r, _, g, _, b)) = tuple((
+        u8,
+        whitespace(char(',')),
+        u8,
+        whitespace(char(',')),
+        u8,
+    ))(input)?;
+    let (input, _) = tag(")")(input)?;
+    Ok((input, CSSValue::Color(Color { r, g, b, a: 1.0 })))
 }

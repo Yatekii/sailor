@@ -16,7 +16,7 @@ struct LayerData {
 layout(set = 0, binding = 0) uniform Locals {
     vec2 canvas_size;
     vec2 _unused;
-    LayerData layer_datas[500];
+    LayerData layer_datas[1000];
 };
 
 // std140

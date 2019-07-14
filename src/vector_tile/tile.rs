@@ -35,7 +35,7 @@ pub fn layer_num(name: &str) -> u32 {
         "landuse" => 3,
         // "mountain_peak" => 4,
         "park" => 5,
-        // "boundary" => 6,
+        "boundary" => 6,
         // "aeroway" => 7,
         "transportation" => 8,
         "building" => 9,

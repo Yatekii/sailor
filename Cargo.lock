@@ -1718,6 +1718,7 @@ dependencies = [
  "nalgebra-glm 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom 5.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "notify 5.0.0-pre.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "phf 0.7.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "pretty_env_logger 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-protobuf 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",

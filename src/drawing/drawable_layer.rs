@@ -1,4 +1,3 @@
-use crate::css::Selector;
 use crate::vector_tile::transform::Layer;
 use core::ops::Range;
 

@@ -49,6 +49,7 @@ impl Feature {
         let rules = css_cache.get_matching_rules(
             &self.selector.clone().with_any("zoom".to_string(), (zoom.floor() as u32).to_string())
         );
+
         let background_color = rules
             .iter()
             .filter_map(|r| r.kvs.get("background-color"))

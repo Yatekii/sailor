@@ -41,3 +41,4 @@ pretty_env_logger = "0.3.0"
 log = "0.4.6"
 glsl-to-spirv = "0.1"
 phf = { version = "0.7.24", features = ["macros"] }
+num-traits = "*"
