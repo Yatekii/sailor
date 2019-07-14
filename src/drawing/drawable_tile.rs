@@ -62,12 +62,14 @@ impl DrawableTile {
         if let Some(layer) = self.layers.iter().find(|l| l.id == layer_id) {
             render_pass.set_index_buffer(&self.index_buffer, 0);
             render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
-            if outline {
-                let range_start = tile_id << 1;
-                render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 + range_start .. 1 + range_start);
-            } else {
-                let range_start = (tile_id << 1) | 1;
-                render_pass.draw_indexed(layer.indices_range.clone(), 0, 0 + range_start .. 1 + range_start);
+            for feature in &layer.features {
+                if outline {
+                    let range_start = tile_id << 1;
+                    render_pass.draw_indexed(feature.1.clone(), 0, 0 + range_start .. 1 + range_start);
+                } else {
+                    let range_start = (tile_id << 1) | 1;
+                    render_pass.draw_indexed(feature.1.clone(), 0, 0 + range_start .. 1 + range_start);
+                }
             }
         }
     }

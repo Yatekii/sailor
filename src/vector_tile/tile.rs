@@ -64,8 +64,10 @@ impl Tile {
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id));
 
         for layer in &tile.layers {
-            let index_start_before = builder.get_current_index();
+            let mut index_start_before = builder.get_current_index();
             let layer_id = layer_num(&layer.name);
+            let mut last_selector = crate::css::Selector::new();
+            let mut features = vec![];
             for feature in &layer.features {
                 let mut selector = crate::css::Selector::new()
                     .with_type("layer".to_string())
@@ -83,6 +85,12 @@ impl Tile {
                     }
                 }
 
+                if last_selector != selector {
+                    features.push((last_selector.clone(), index_start_before..builder.get_current_index()));
+                    last_selector = selector.clone();
+                    index_start_before = builder.get_current_index();
+                }
+
                 {
                     let mut layer_collection = layer_collection.write().unwrap();
                     if !layer_collection.is_layer_set(layer_id) {
@@ -91,7 +99,7 @@ impl Tile {
                     if let Some(feature_id) = layer_collection.get_feature_id(&selector) {
                         builder.set_current_feature_id(feature_id);
                     } else {
-                        builder.set_current_feature_id(layer_collection.add_feature(Feature::new(selector)));
+                        builder.set_current_feature_id(layer_collection.add_feature(Feature::new(selector.clone())));
                     }
                 }
 
@@ -102,10 +110,17 @@ impl Tile {
                 );
             }
 
+            features.push((last_selector.clone(), index_start_before..builder.get_current_index()));
+
+            if features.len() > 0 {
+                features.remove(0);
+            }
+
             layers.push(crate::vector_tile::transform::Layer {
                 name: layer.name.to_string(),
                 id: layer_id,
                 indices_range: index_start_before..builder.get_current_index(),
+                features,
             });
         }
 

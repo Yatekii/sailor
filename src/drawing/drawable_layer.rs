@@ -1,3 +1,4 @@
+use crate::css::Selector;
 use crate::vector_tile::transform::Layer;
 use core::ops::Range;
 
@@ -5,6 +6,7 @@ use core::ops::Range;
 pub struct DrawableLayer {
     pub id: u32,
     pub indices_range: Range<u32>,
+    pub features: Vec<(Selector, Range<u32>)>,
 }
 
 impl DrawableLayer {
@@ -12,6 +14,7 @@ impl DrawableLayer {
         Self {
             id: layer.id,
             indices_range: layer.indices_range.clone(),
+            features: layer.features.clone(),
         }
     }
 }

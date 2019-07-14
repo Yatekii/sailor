@@ -1,3 +1,4 @@
+use crate::css::Selector;
 use core::ops::Range;
 use crate::drawing::mesh::MeshBuilder;
 
@@ -17,6 +18,7 @@ pub struct Layer {
     pub name: String,
     pub id: u32,
     pub indices_range: Range<u32>,
+    pub features: Vec<(Selector, Range<u32>)>,
 }
 
 fn area(path: &Path) -> f32 {
@@ -168,13 +170,15 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
                     normal = -normal;
                 }
 
+                let factor = normal.dot(last_normal) / (normal.length() * last_normal.length());
+
                 let vertex_1 = builder.add_vertex(FillVertex {
-                    position: points[i] + normal,
+                    position: points[i] + normal * factor,
                     normal: normal,
                 }).unwrap();
 
                 let vertex_2 = builder.add_vertex(FillVertex {
-                    position: points[i] - normal,
+                    position: points[i] - normal * factor,
                     normal: - normal,
                 }).unwrap();
 
