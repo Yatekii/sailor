@@ -1,3 +1,4 @@
+use crate::drawing::layer_collection::LayerCollection;
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
     drawable_layer::DrawableLayer,
@@ -55,6 +56,7 @@ impl DrawableTile {
     pub fn paint(
         &mut self,
         render_pass: &mut RenderPass,
+        layer_collection: &LayerCollection,
         tile_id: u32,
         layer_id: u32,
         outline: bool
@@ -62,13 +64,17 @@ impl DrawableTile {
         if let Some(layer) = self.layers.iter().find(|l| l.id == layer_id) {
             render_pass.set_index_buffer(&self.index_buffer, 0);
             render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
-            for feature in &layer.features {
-                if outline {
-                    let range_start = tile_id << 1;
-                    render_pass.draw_indexed(feature.1.clone(), 0, 0 + range_start .. 1 + range_start);
-                } else {
-                    let range_start = (tile_id << 1) | 1;
-                    render_pass.draw_indexed(feature.1.clone(), 0, 0 + range_start .. 1 + range_start);
+            for (feature_id, range) in &layer.features {
+                if range.len() > 0 {
+                    if layer_collection.is_visible(*feature_id) {
+                        if outline {
+                            let range_start = tile_id << 1;
+                            render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
+                        } else {
+                            let range_start = (tile_id << 1) | 1;
+                            render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
+                        }
+                    }
                 }
             }
         }

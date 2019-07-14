@@ -6,7 +6,7 @@ use core::ops::Range;
 pub struct DrawableLayer {
     pub id: u32,
     pub indices_range: Range<u32>,
-    pub features: Vec<(Selector, Range<u32>)>,
+    pub features: Vec<(u32, Range<u32>)>,
 }
 
 impl DrawableLayer {

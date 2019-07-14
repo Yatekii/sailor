@@ -61,6 +61,13 @@ impl LayerCollection {
         false
     }
 
+    pub fn is_visible(&self, feature_id: u32) -> bool {
+        if self.features[feature_id as usize].style.display {
+            return true;
+        }
+        false
+    }
+
     pub fn load_styles(&mut self, zoom: f32, css_cache: &mut RulesCache) {
         for feature in &mut self.features {
             feature.load_style(zoom, css_cache)

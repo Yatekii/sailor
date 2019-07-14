@@ -1,6 +1,5 @@
 layer[name=water] {
     background-color: rgba(14, 181, 223, 1.0);
-    border-color: red;
     border-width: 3px;
 }
 
@@ -18,11 +17,6 @@ layer[name=landcover] {
 
 layer[name=landuse] {
     background-color: rgba(209, 196, 14, 0.438);
-}
-
-layer[name=landuse][zoom=12] {
-    border-color: red;
-    border-width: 3px;
 }
 
 layer[name=transportation] {

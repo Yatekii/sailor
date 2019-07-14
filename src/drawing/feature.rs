@@ -27,7 +27,8 @@ pub struct FeatureStyle {
     pub background_color: DrawableColor,
     pub border_color: DrawableColor,
     pub border_width: f32,
-    _padding: [u32; 3],
+    pub display: bool,
+    _padding: [u32; 2],
 }
 
 #[derive(Debug, Clone, Default)]
@@ -117,6 +118,25 @@ impl Feature {
                     log::info!("The value '{:?}' is currently not supported for 'border-width'.", value);
                 }
             }
+        }
+
+        let display = rules
+            .iter()
+            .filter_map(|r| r.kvs.get("display"))
+            .last();
+
+        if let Some(width) = display {
+            match width {
+                CSSValue::String(value) => match &value[..] {
+                    "none" => self.style.display = false,
+                    _ => self.style.display = true,
+                },
+                value => {
+                    log::info!("The value '{:?}' is currently not supported for 'border-width'.", value);
+                }
+            }
+        } else {
+            self.style.display = true;
         }
     }
 }

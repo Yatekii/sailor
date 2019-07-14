@@ -714,8 +714,11 @@ impl Painter {
     pub fn paint(&mut self, app_state: &mut AppState) {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         self.load_tiles(app_state);
-        let lock = self.layer_collection.clone();
-        let layer_collection = lock.read().unwrap();
+        let layer_collection = {
+            let lock = self.layer_collection.clone();
+            let layer_collection = lock.read().unwrap();
+            (*layer_collection).clone()
+        };
         self.update_uniforms(&mut encoder, &app_state, &layer_collection);
         self.bind_group = Self::create_blend_bind_group(
             &self.device,
@@ -770,13 +773,13 @@ impl Painter {
 
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
                         if *layer {
-                            drawable_tile.paint(&mut render_pass, i as u32, id as u32, false);
+                            drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, id as u32, false);
                         }
                     }
 
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
                         if *layer {
-                            drawable_tile.paint(&mut render_pass, i as u32, id as u32, true);
+                            drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, id as u32, true);
                         }
                     }
                 }

@@ -67,6 +67,7 @@ impl Tile {
             let mut index_start_before = builder.get_current_index();
             let layer_id = layer_num(&layer.name);
             let mut last_selector = crate::css::Selector::new();
+            let mut current_feature_id = 0;
             let mut features = vec![];
             for feature in &layer.features {
                 let mut selector = crate::css::Selector::new()
@@ -86,7 +87,7 @@ impl Tile {
                 }
 
                 if last_selector != selector {
-                    features.push((last_selector.clone(), index_start_before..builder.get_current_index()));
+                    features.push((current_feature_id, index_start_before..builder.get_current_index()));
                     last_selector = selector.clone();
                     index_start_before = builder.get_current_index();
                 }
@@ -96,11 +97,12 @@ impl Tile {
                     if !layer_collection.is_layer_set(layer_id) {
                         layer_collection.set_layer(layer_id);
                     }
-                    if let Some(feature_id) = layer_collection.get_feature_id(&selector) {
-                        builder.set_current_feature_id(feature_id);
+                    current_feature_id = if let Some(feature_id) = layer_collection.get_feature_id(&selector) {
+                        feature_id
                     } else {
-                        builder.set_current_feature_id(layer_collection.add_feature(Feature::new(selector.clone())));
-                    }
+                        layer_collection.add_feature(Feature::new(selector.clone()))
+                    };
+                    builder.set_current_feature_id(current_feature_id);
                 }
 
                 geometry_commands_to_drawable(
@@ -110,7 +112,7 @@ impl Tile {
                 );
             }
 
-            features.push((last_selector.clone(), index_start_before..builder.get_current_index()));
+            features.push((current_feature_id, index_start_before..builder.get_current_index()));
 
             if features.len() > 0 {
                 features.remove(0);
