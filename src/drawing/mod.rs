@@ -1,7 +1,7 @@
 mod helpers;
 mod painter;
 pub mod vertex;
-mod drawable_tile;
+pub mod drawable_tile;
 mod drawable_layer;
 pub mod mesh;
 pub mod feature;

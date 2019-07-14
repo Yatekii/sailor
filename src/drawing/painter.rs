@@ -712,11 +712,8 @@ impl Painter {
     }
 
     pub fn paint(&mut self, app_state: &mut AppState) {
-        let mut t = timestamp(std::time::Instant::now(), "===========================");
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-        t = timestamp(t, "Create encoder");
         self.load_tiles(app_state);
-        t = timestamp(t, "Load tiles");
         let lock = self.layer_collection.clone();
         let layer_collection = lock.read().unwrap();
         self.update_uniforms(&mut encoder, &app_state, &layer_collection);
@@ -728,15 +725,11 @@ impl Painter {
             &self.framebuffer,
             &self.sampler
         );
-        t = timestamp(t, "Update uniforms");
         let num_tiles = self.loaded_tiles.len();
         if layer_collection.iter_layers().count() > 0 && num_tiles > 0 {
             let frame = self.swap_chain.get_next_texture();
-            t = timestamp(t, "Create rendertarget");
             let mut first = true;
             let mut toggle = false;
-            t = timestamp(t, "======== Start Layer Loop ========");
-            let mut num_drawcalls = 0;
             'outer: for (id, layer) in layer_collection.iter_layers().enumerate() {
                 {
                     // Check if we have anything to draw on a specific layer. If not, continue with the next layer.
@@ -752,7 +745,6 @@ impl Painter {
                         continue 'outer;
                     }
 
-                    t = timestamp(t, &format!("\tBegin Layer {}", id));
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                             attachment: if MSAA_SAMPLES > 1 { &self.multisampled_framebuffer } else { &frame.view },
@@ -771,41 +763,32 @@ impl Painter {
                             clear_stencil: 0,
                         }),
                     });
-                    t = timestamp(t, "\tRender Pass 1 created");
 
                     render_pass.set_pipeline(&self.layer_render_pipeline);
                     render_pass.set_stencil_reference(0);
-                    t = timestamp(t, "\tPipeline 1 set");
                     render_pass.set_bind_group(0, &self.bind_group, &[]);
-                    t = timestamp(t, "\t Bind Group set");
 
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
                         if *layer {
                             drawable_tile.paint(&mut render_pass, i as u32, id as u32, false);
-                            num_drawcalls += 1;
                         }
                     }
 
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
                         if *layer {
                             drawable_tile.paint(&mut render_pass, i as u32, id as u32, true);
-                            num_drawcalls += 1;
                         }
                     }
-
-                    t = timestamp(t, "\tPolygons drawn");
                 }
                 first = false;
                 toggle = !toggle;
             }
             self.device.get_queue().submit(&[encoder.finish()]);
-            
-            timestamp(t, &format!("\tFrame with {} drawcalls submitted", num_drawcalls));
         }
     }
 }
 
-fn timestamp(old: std::time::Instant, string: &str) -> std::time::Instant {
+pub fn timestamp(old: std::time::Instant, string: &str) -> std::time::Instant {
     log::debug!("{}: {}", string, old.elapsed().as_micros());
     std::time::Instant::now()
 }

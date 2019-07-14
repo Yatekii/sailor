@@ -146,7 +146,7 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
             let points = path.points();
 
             let line = points[1] - points[0].to_vector();
-            let mut last_normal: Vector = vector(line.y, -line.x).normalize() / 2f32.powi(10);
+            let mut last_normal: Vector = vector(line.y, -line.x).normalize() * 4.0;
 
             let mut last_vertex_1 = builder.add_vertex(FillVertex {
                 position: points[0] + last_normal,
@@ -162,7 +162,7 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
                 let next_line = points[i + 1] - points[i].to_vector();
                 let next_normal: Vector = vector(next_line.y, -next_line.x);
 
-                let mut normal = (last_normal + next_normal).normalize() / 2f32.powi(10);
+                let mut normal = (last_normal + next_normal).normalize() * 4.0;
 
                 if normal.dot(next_line.to_vector()) >= 0.0 {
                     normal = -normal;
@@ -187,7 +187,7 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
             }
 
             let line = points[points.len() - 1] - points[points.len() - 2].to_vector();
-            let normal: Vector = vector(line.y, -line.x).normalize() / 2f32.powi(10);
+            let normal: Vector = vector(line.y, -line.x).normalize() * 4.0;
 
             let vertex_1 = builder.add_vertex(FillVertex {
                 position: points[points.len() - 1] + normal,
