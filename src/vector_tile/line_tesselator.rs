@@ -8,8 +8,8 @@ use lyon::tessellation::{
 
 const LINE_WIDTH: f32 = 12.0;
 
-pub fn between(a: &Vector, b: &Vector, c: &Vector) -> bool {
-    num_traits::sign::signum(a.y * b.x - a.x * b.y) != num_traits::sign::signum(a.y * c.x - a.x * c.y)
+pub fn get_side(a: &Point, b: &Point, c: &Point) -> i32 {
+    num_traits::sign::signum((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) as i32
 }
 
 pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
@@ -18,11 +18,14 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
     builder.set_current_vertex_type(false);
     let points = path.points();
 
-    let mut last_line = points[1].to_vector() - points[0].to_vector();
+    let first = points[0];
+    let second = points[1];
+    let mut last_line = second.to_vector() - first.to_vector();
     let normal = vector(last_line.y, -last_line.x);
     let mut last_normal = if points.len() > 2 {
-        let nl = points[2].to_vector() - points[1].to_vector();
-        let dot = normal.dot(last_line.normalize() + nl.normalize());
+        let third = points[2];
+        let next_line = third.to_vector() - second.to_vector();
+        let dot = normal.dot(last_line.normalize() + next_line.normalize());
         if dot <= 1.0 && dot >= 0.0 {
             normal
         } else {
@@ -32,20 +35,33 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
         normal
     }.normalize() * LINE_WIDTH;
 
-    let mut last_vertex_1 = builder.add_vertex(FillVertex {
-        position: points[0] + last_normal,
-        normal: last_normal,
+    let (vl, vr) = {
+        let v1 = (first + last_normal, last_normal);
+        let v2 = (first - last_normal, -last_normal);
+        if get_side(&second, &first, &v1.0) == 1 {
+            (v1, v2)
+        } else {
+            (v2, v1)
+        }
+    };
+
+    let mut last_vertex_left = builder.add_vertex(FillVertex {
+        position: vl.0,
+        normal: vl.1,
     }).unwrap();
 
-    let mut last_vertex_2 = builder.add_vertex(FillVertex {
-        position: points[0] - last_normal,
-        normal: -last_normal,
+    let mut last_vertex_right = builder.add_vertex(FillVertex {
+        position: vr.0,
+        normal: vr.1,
     }).unwrap();
 
     if points.len() > 2 {
         for i in 0..points.len() - 2 {
-            let current_line = points[i + 1].to_vector() - points[i].to_vector();
-            let next_line = points[i + 2].to_vector() - points[i + 1].to_vector();
+            let previous = points[i];
+            let current = points[i + 1];
+            let next = points[i + 2];
+            let current_line = current.to_vector() - previous.to_vector();
+            let next_line = current.to_vector() - next.to_vector();
 
             let normal = current_line.normalize() + next_line.normalize();
             let local_normal = vector(last_line.y, -last_line.x);
@@ -54,31 +70,53 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
                 local_normal
             } else {
                 -local_normal
-            };
+            }.normalize();
 
-            let normal = if normal.x == 0.0 && normal.y == 0.0 {
+            let dot = local_normal.dot(normal);
+            let normal = if dot == 0.0 {
                 local_normal
             } else {
                 normal
-            }.normalize() * LINE_WIDTH;
+            }.normalize();
 
-            let factor = normal.dot(local_normal) / (normal.length() * local_normal.length());
+            let factor = 1.0 / normal.dot(local_normal) * LINE_WIDTH;
+            // let factor = 1.0;
 
-            let vertex_1 = builder.add_vertex(FillVertex {
-                position: points[i] + normal * factor,
-                normal: normal,
+            let (vl, vr) = {
+                let v1 = (current + normal * factor, normal * factor);
+                let v2 = (current - normal * factor, -normal * factor);
+                if get_side(&current, &previous, &v1.0) == 1 {
+                    (v1, v2)
+                } else {
+                    (v2, v1)
+                }
+            };
+
+            let vertex_left = builder.add_vertex(FillVertex {
+                position: vl.0,
+                normal: vl.1,
             }).unwrap();
 
-            let vertex_2 = builder.add_vertex(FillVertex {
-                position: points[i] - normal * factor,
-                normal: - normal,
+            let vertex_right = builder.add_vertex(FillVertex {
+                position: vr.0,
+                normal: vr.1,
             }).unwrap();
 
-            GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_1, last_vertex_2, vertex_1);
-            GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_2, vertex_2, vertex_1);
+            GeometryBuilder::<FillVertex>::add_triangle(
+                builder,
+                last_vertex_left,
+                last_vertex_right,
+                vertex_left
+            );
+            GeometryBuilder::<FillVertex>::add_triangle(
+                builder,
+                last_vertex_right,
+                vertex_right,
+                vertex_left
+            );
 
-            last_vertex_1 = vertex_1;
-            last_vertex_2 = vertex_2;
+            last_vertex_left = vertex_left;
+            last_vertex_right = vertex_right;
             last_normal = normal;
             last_line = next_line;
         }
@@ -95,103 +133,38 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
         -normal
     };
 
-    let vertex_1 = builder.add_vertex(FillVertex {
-        position: points[points.len() - 1] + normal,
-        normal: normal,
-    }).unwrap();
-
-    let vertex_2 = builder.add_vertex(FillVertex {
-        position: points[points.len() - 1] - normal,
-        normal: -normal,
-    }).unwrap();
-
-    GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_1, last_vertex_2, vertex_1);
-    GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_2, vertex_2, vertex_1);
-
-    GeometryBuilder::<FillVertex>::end_geometry(builder);
-}
-
-pub fn tesselate_line<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
-    GeometryBuilder::<FillVertex>::begin_geometry(builder);
-    // Fill
-    builder.set_current_vertex_type(false);
-    let points = path.points();
-
-    let mut last_line = points[1].to_vector() - points[0].to_vector();
-    let next_line = if points.len() > 2 {
-        points[2].to_vector() - points[1].to_vector()
-    } else {
-        last_line
+    let (vl, vr) = {
+        let v1 = (points[points.len() - 1] + normal, normal);
+        let v2 = (points[points.len() - 1] - normal, -normal);
+        if get_side(&points[points.len() - 1], &points[points.len() - 2], &v1.0) == 1 {
+            (v1, v2)
+        } else {
+            (v2, v1)
+        }
     };
-    let mut last_normal: Vector = vector(last_line.y, -last_line.x).normalize() * 4.0;
 
-    if between(&last_normal, &last_line, &next_line) {
-        last_normal = -last_normal;
-    }
-
-    let mut last_vertex_1 = builder.add_vertex(FillVertex {
-        position: points[0] + last_normal,
-        normal: last_normal,
+    let vertex_left = builder.add_vertex(FillVertex {
+        position: vl.0,
+        normal: vl.1,
     }).unwrap();
 
-    let mut last_vertex_2 = builder.add_vertex(FillVertex {
-        position: points[0] - last_normal,
-        normal: -last_normal,
+    let vertex_right = builder.add_vertex(FillVertex {
+        position: vr.0,
+        normal: vr.1,
     }).unwrap();
 
-    for i in 1..points.len() - 1{
-        let next_line = points[i + 1].to_vector() - points[i].to_vector();
-        let mut next_normal: Vector = vector(next_line.y, -next_line.x).normalize() * 4.0;
-        
-        if between(&next_normal, &last_line, &next_line) {
-            next_normal = -next_normal;
-        }
-
-        let mut normal = last_normal + next_normal;
-        if normal.x == 0.0 && normal.y == 0.0 {
-            normal = last_normal - next_normal;
-        }
-
-        let factor = normal.dot(last_normal) / (normal.length() * last_normal.length());
-
-        let vertex_1 = builder.add_vertex(FillVertex {
-            position: points[i] + normal * factor,
-            normal: normal,
-        }).unwrap();
-
-        let vertex_2 = builder.add_vertex(FillVertex {
-            position: points[i] - normal * factor,
-            normal: - normal,
-        }).unwrap();
-
-        GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_1, last_vertex_2, vertex_1);
-        GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_2, vertex_2, vertex_1);
-
-        last_vertex_1 = vertex_1;
-        last_vertex_2 = vertex_2;
-        last_normal = next_normal;
-        last_line = next_line;
-    }
-
-    let line = points[points.len() - 1].to_vector() - points[points.len() - 2].to_vector();
-    let mut normal: Vector = vector(line.y, -line.x).normalize() * 4.0;
-
-    if between(&normal, &last_line, &line) {
-        normal = -normal;
-    }
-
-    let vertex_1 = builder.add_vertex(FillVertex {
-        position: points[points.len() - 1] + normal,
-        normal: normal,
-    }).unwrap();
-
-    let vertex_2 = builder.add_vertex(FillVertex {
-        position: points[points.len() - 1] - normal,
-        normal: -normal,
-    }).unwrap();
-
-    GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_1, last_vertex_2, vertex_1);
-    GeometryBuilder::<FillVertex>::add_triangle(builder, last_vertex_2, vertex_2, vertex_1);
+    GeometryBuilder::<FillVertex>::add_triangle(
+        builder,
+        last_vertex_left,
+        last_vertex_right,
+        vertex_left
+    );
+    GeometryBuilder::<FillVertex>::add_triangle(
+        builder,
+        last_vertex_right,
+        vertex_right,
+        vertex_left
+    );
 
     GeometryBuilder::<FillVertex>::end_geometry(builder);
 }

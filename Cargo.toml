@@ -33,7 +33,7 @@ nom = "5.0.0-beta2"
 notify = "5.0.0-pre.0"
 crossbeam-channel = "0.3.8"
 take_mut = "0.2.2"
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"], rev="4233fee6e21f22362a019691d7c9643b0d6068d2" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"], rev="ce382f37355195f7ea6c204a22aa77e5280a236c" }
 # wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs" }
 # wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs", branch = "stencil" }
 # wgpu = { package = "wgpu", features = ["vulkan"], path = "../wgpu-rs" }
