@@ -10,7 +10,7 @@ addons:
             - libxcb1-dev
             - xorg-dev
 script:
-    - cargo build
+    - cargo build --release
 before_deploy:
     - git config --local user.name "travis"
     - git config --local user.email "yatekii@yatekii.ch"
