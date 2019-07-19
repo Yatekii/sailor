@@ -18,7 +18,7 @@ before_deploy:
     - git tag $TRAVIS_TAG
     - mkdir sailor
     - cp ${REPO}target/release/sailor sailor
-    - cp ${REPO}config sailor
+    - cp -r ${REPO}config sailor
     - zip -r ${TRAVIS_BUILD_DIR}${REPO}-${BUILD_ENV}-${TRAVIS_TAG}-${TRAVIS_BUILD_NUMBER}.zip sailor
 deploy:
   provider: releases
