@@ -32,6 +32,9 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         assert!(!vertex.position.x.is_nan());
         assert!(!vertex.position.y.is_nan());
         // println!("{:?}", vertex.position);
+        if vertex.normal.length() > 300.0 {
+            println!("KEKEKKE");
+        }
         Vertex {
             // position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
             position: [vertex.position.x as f32, vertex.position.y as f32],

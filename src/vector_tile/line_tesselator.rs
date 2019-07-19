@@ -79,8 +79,7 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
                 normal
             }.normalize();
 
-            let factor = 1.0 / normal.dot(local_normal) * LINE_WIDTH;
-            // let factor = 1.0;
+            let factor = (1.0 / normal.dot(local_normal).abs()).min(3.0) * LINE_WIDTH;
 
             let (vl, vr) = {
                 let v1 = (current + normal * factor, normal * factor);
