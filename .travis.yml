@@ -16,7 +16,6 @@ before_deploy:
     - git config --local user.email "yatekii@yatekii.ch"
     - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
     - git tag $TRAVIS_TAG
-    - cd ..
     - mkdir sailor
     - cp ${REPO}target/release/sailor sailor
     - cp ${REPO}config sailor
