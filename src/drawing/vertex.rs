@@ -4,8 +4,9 @@ use lyon::tessellation::geometry_builder::VertexConstructor;
 use crate::vector_tile::math;
 
 #[derive(Copy, Clone, Debug)]
+#[repr(C,packed)]
 pub struct Vertex<> {
-    pub position: [f32; 2],
+    pub position: [i16; 2],
     pub normal: [f32; 2],
     pub layer_id: u32,
 }
@@ -37,7 +38,7 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
         }
         Vertex {
             // position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
-            position: [vertex.position.x as f32, vertex.position.y as f32],
+            position: [vertex.position.x as i16, vertex.position.y as i16],
             normal: vertex.normal.to_array(),
             layer_id: self.layer_id,
         }
@@ -51,7 +52,7 @@ impl VertexConstructor<tessellation::StrokeVertex, Vertex> for LayerVertexCtor {
         // println!("{:?}", vertex.position);
         let pos = math::tile_to_global_space(&self.tile_id, vertex.position);
         Vertex {
-            position: [pos.x as f32, pos.y as f32],
+            position: [pos.x as i16, pos.y as i16],
             normal: vertex.normal.to_array(),
             layer_id: self.layer_id,
         }

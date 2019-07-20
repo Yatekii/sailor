@@ -280,6 +280,7 @@ impl Painter {
         vs_module: &ShaderModule,
         fs_module: &ShaderModule
     ) -> RenderPipeline {
+        dbg!(std::mem::size_of::<Vertex>());
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
         });
@@ -342,18 +343,18 @@ impl Painter {
                 step_mode: wgpu::InputStepMode::Vertex,
                 attributes: &[
                     wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float2,
+                        format: wgpu::VertexFormat::Short2,
                         offset: 0,
                         shader_location: 0,
                     },
                     wgpu::VertexAttributeDescriptor {
                         format: wgpu::VertexFormat::Float2,
-                        offset: 8,
+                        offset: 4,
                         shader_location: 1,
                     },
                     wgpu::VertexAttributeDescriptor {
                         format: wgpu::VertexFormat::Uint,
-                        offset: 16,
+                        offset: 12,
                         shader_location: 2,
                     },
                 ],
