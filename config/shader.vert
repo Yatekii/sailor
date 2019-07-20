@@ -40,7 +40,7 @@ void main() {
     TileData tile_data = tile_datas[tile_id];
     gl_Position = tile_data.transform * vec4(position / tile_data.extent, 0.0, 1.0);
     if(is_outline){
-        gl_Position.xy += normal / canvas_size * layer_data.border_width / 2;
+        gl_Position.xy += normal / 256 * layer_data.border_width / 2;
         outColor = layer_data.outline_color;
     } else {
         outColor = layer_data.background_color;

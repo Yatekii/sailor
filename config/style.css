@@ -1,27 +1,22 @@
 layer[name=water] {
     background-color: rgba(14, 181, 223, 1.0);
     border-width: 3px;
-    display: none;
 }
 
 layer[name=park] {
     background-color: rgba(14, 124, 82, 1.0);
-    display: none;
 }
 
 layer[name=building] {
     background-color: rgba(151, 46, 28, 1.0);
-    display: none;
 }
 
 layer[name=landcover] {
     background-color: rgba(11, 85, 11, 0.527);
-    display: none;
 }
 
 layer[name=landuse] {
     background-color: rgba(209, 196, 14, 0.438);
-    display: none;
 }
 
 layer[name=transportation] {
@@ -30,10 +25,8 @@ layer[name=transportation] {
 
 layer[name=waterway] {
     background-color: rgb(14, 28, 223);
-    display: none;
 }
 
 layer[name=boundary] {
     background-color: rgb(223, 45, 14);
-    display: none;
 }

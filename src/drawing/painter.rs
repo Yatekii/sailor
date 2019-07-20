@@ -322,16 +322,16 @@ impl Painter {
                 depth_write_enabled: false,
                 depth_compare: wgpu::CompareFunction::Always,
                 stencil_front: wgpu::StencilStateFaceDescriptor {
-                    compare: wgpu::CompareFunction::Equal,
+                    compare: wgpu::CompareFunction::NotEqual,
                     fail_op: wgpu::StencilOperation::Keep,
-                    depth_fail_op: wgpu::StencilOperation::IncrementClamp,
-                    pass_op: wgpu::StencilOperation::IncrementClamp,
+                    depth_fail_op: wgpu::StencilOperation::Replace,
+                    pass_op: wgpu::StencilOperation::Replace,
                 },
                 stencil_back: wgpu::StencilStateFaceDescriptor {
-                    compare: wgpu::CompareFunction::Equal,
+                    compare: wgpu::CompareFunction::NotEqual,
                     fail_op: wgpu::StencilOperation::Keep,
-                    depth_fail_op: wgpu::StencilOperation::IncrementClamp,
-                    pass_op: wgpu::StencilOperation::IncrementClamp,
+                    depth_fail_op: wgpu::StencilOperation::Replace,
+                    pass_op: wgpu::StencilOperation::Replace,
                 },
                 stencil_read_mask: std::u32::MAX,
                 stencil_write_mask: std::u32::MAX,
@@ -720,10 +720,27 @@ impl Painter {
         let num_tiles = self.loaded_tiles.len();
         if layer_collection.iter_layers().count() > 0 && num_tiles > 0 {
             let frame = self.swap_chain.get_next_texture();
-            let mut first = true;
-            let mut toggle = false;
-            'outer: for (id, layer) in layer_collection.iter_layers().enumerate() {
-                {
+            {
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: if MSAA_SAMPLES > 1 { &self.multisampled_framebuffer } else { &frame.view },
+                        resolve_target: if MSAA_SAMPLES > 1 { Some(&frame.view) } else { None },
+                        load_op: wgpu::LoadOp::Clear,
+                        store_op: wgpu::StoreOp::Store,
+                        clear_color: wgpu::Color::WHITE,
+                    }],
+                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
+                        attachment: &self.stencil,
+                        depth_load_op: LoadOp::Clear,
+                        depth_store_op: StoreOp::Store,
+                        clear_depth: 0.0,
+                        stencil_load_op: LoadOp::Clear,
+                        stencil_store_op: StoreOp::Store,
+                        clear_stencil: 255,
+                    }),
+                });
+
+                'outer: for (id, layer) in layer_collection.iter_layers().enumerate() {
                     // Check if we have anything to draw on a specific layer. If not, continue with the next layer.
                     let mut hit = false;
                     for drawable_tile in self.loaded_tiles.values_mut() {
@@ -737,27 +754,8 @@ impl Painter {
                         continue 'outer;
                     }
 
-                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: if MSAA_SAMPLES > 1 { &self.multisampled_framebuffer } else { &frame.view },
-                            resolve_target: if MSAA_SAMPLES > 1 { Some(&frame.view) } else { None },
-                            load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
-                            store_op: wgpu::StoreOp::Store,
-                            clear_color: wgpu::Color::WHITE,
-                        }],
-                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
-                            attachment: &self.stencil,
-                            depth_load_op: LoadOp::Clear,
-                            depth_store_op: StoreOp::Store,
-                            clear_depth: 0.0,
-                            stencil_load_op: if toggle { LoadOp::Load } else { LoadOp::Clear },
-                            stencil_store_op: StoreOp::Store,
-                            clear_stencil: 0,
-                        }),
-                    });
-
                     render_pass.set_pipeline(&self.layer_render_pipeline);
-                    render_pass.set_stencil_reference(0);
+                    render_pass.set_stencil_reference(id as u32);
                     render_pass.set_bind_group(0, &self.bind_group, &[]);
 
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
@@ -772,8 +770,6 @@ impl Painter {
                         }
                     }
                 }
-                first = false;
-                toggle = !toggle;
             }
             self.device.get_queue().submit(&[encoder.finish()]);
         }

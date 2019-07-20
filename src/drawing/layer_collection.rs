@@ -62,10 +62,12 @@ impl LayerCollection {
     }
 
     pub fn is_visible(&self, feature_id: u32) -> bool {
-        if self.features[feature_id as usize].style.display {
-            return true;
-        }
-        false
+        self.features[feature_id as usize].style.display
+    }
+
+    pub fn has_outline(&self, feature_id: u32) -> bool {
+           self.features[feature_id as usize].style.border_width > 0.0
+        && self.features[feature_id as usize].style.border_color.a > 0.0
     }
 
     pub fn load_styles(&mut self, zoom: f32, css_cache: &mut RulesCache) {

@@ -68,8 +68,10 @@ impl DrawableTile {
                 if range.len() > 0 {
                     if layer_collection.is_visible(*feature_id) {
                         if outline {
-                            let range_start = tile_id << 1;
-                            render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
+                            if layer_collection.has_outline(*feature_id) {
+                                let range_start = tile_id << 1;
+                                render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
+                            }
                         } else {
                             let range_start = (tile_id << 1) | 1;
                             render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
