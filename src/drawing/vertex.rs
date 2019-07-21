@@ -7,14 +7,14 @@ use crate::vector_tile::math;
 #[repr(C,packed)]
 pub struct Vertex<> {
     pub position: [i16; 2],
-    pub normal: [f32; 2],
-    pub layer_id: u32,
+    pub normal: [i16; 2],
+    pub feature_id: u32,
 }
 
 // A very simple vertex constructor that only outputs the vertex position
 pub struct LayerVertexCtor {
     pub tile_id: math::TileId,
-    pub layer_id: u32,
+    pub feature_id: u32,
     pub extent: f32,
 }
 
@@ -22,7 +22,7 @@ impl LayerVertexCtor {
     pub fn new(tile_id: &TileId, extent: f32) -> Self {
         Self {
             tile_id: tile_id.clone(),
-            layer_id: 0,
+            feature_id: 0,
             extent,
         }
     }
@@ -41,8 +41,8 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
 
         Vertex {
             position: [vertex.position.x as i16, vertex.position.y as i16],
-            normal: normal.to_array(),
-            layer_id: self.layer_id,
+            normal: [normal.x.round() as i16, normal.y.round() as i16],
+            feature_id: self.feature_id,
         }
     }
 }
@@ -59,8 +59,8 @@ impl VertexConstructor<tessellation::StrokeVertex, Vertex> for LayerVertexCtor {
 
         Vertex {
             position: [vertex.position.x as i16, vertex.position.y as i16],
-            normal: normal.to_array(),
-            layer_id: self.layer_id,
+            normal: [normal.x.round() as i16, normal.y.round() as i16],
+            feature_id: self.feature_id,
         }
     }
 }

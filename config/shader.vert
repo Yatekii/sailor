@@ -2,8 +2,8 @@
 #extension GL_AMD_gpu_shader_int16 : enable
 
 layout(location = 0) in ivec2 position;
-layout(location = 1) in vec2 normal;
-layout(location = 2) in uint layer_id;
+layout(location = 1) in ivec2 normal;
+layout(location = 2) in uint feature_id;
 
 layout(location = 0) out vec4 outColor;
 
@@ -40,7 +40,7 @@ void main() {
     uint tile_id = (gl_InstanceIndex >> 1);
 
     // Shortcut the array indexing.
-    LayerData layer_data = layer_datas[layer_id];
+    LayerData layer_data = layer_datas[feature_id];
     TileData tile_data = tile_datas[tile_id];
 
     // Is the line we are currently handling sized in world coordinates or pixels?

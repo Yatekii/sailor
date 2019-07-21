@@ -348,13 +348,13 @@ impl Painter {
                         shader_location: 0,
                     },
                     wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float2,
+                        format: wgpu::VertexFormat::Short2,
                         offset: 4,
                         shader_location: 1,
                     },
                     wgpu::VertexAttributeDescriptor {
                         format: wgpu::VertexFormat::Uint,
-                        offset: 12,
+                        offset: 8,
                         shader_location: 2,
                     },
                 ],
