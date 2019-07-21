@@ -387,6 +387,8 @@ fn css_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSS
         whitespace(rgba_color),
         whitespace(rgb_color),
         whitespace(px_value),
+        whitespace(world_value),
+        whitespace(unitless_value),
         whitespace(string),
     ))(input)
 }
@@ -394,6 +396,8 @@ fn css_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSS
 #[derive(Debug, Copy, Clone)]
 pub enum Number {
     Px(f32),
+    Unitless(f32),
+    World(f32),
 }
 
 /// Any type of CSS value.
@@ -419,6 +423,19 @@ fn px_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSV
   let (input, (value, _)) = tuple((float, tag("px")))(input)?;
 
   Ok((input, CSSValue::Number(Number::Px(value))))
+}
+
+fn world_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+  let (input, (value, _)) = tuple((float, tag("w")))(input)?;
+    println!("{:?}", value);
+  Ok((input, CSSValue::Number(Number::World(value))))
+}
+
+/// Parses a single CSS unitless value.
+fn unitless_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+  let (input, value) = float(input)?;
+
+  Ok((input, CSSValue::Number(Number::Unitless(value))))
 }
 
 /// A struct to represent any RGB color.

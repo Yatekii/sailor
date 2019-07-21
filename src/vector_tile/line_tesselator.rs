@@ -6,17 +6,16 @@ use lyon::tessellation::{
     FillVertex,
 };
 
-const LINE_WIDTH: f32 = 12.0;
-
 pub fn get_side(a: &Point, b: &Point, c: &Point) -> i32 {
     num_traits::sign::signum((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) as i32
 }
 
-pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
+pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>, z: u32) {
     GeometryBuilder::<FillVertex>::begin_geometry(builder);
     // Fill
-    builder.set_current_vertex_type(false);
     let points = path.points();
+
+    let width_factor = 2f32.powi(z as i32 - 14);
 
     let first = points[0];
     let second = points[1];
@@ -33,12 +32,12 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
         }
     } else {
         normal
-    }.normalize() * LINE_WIDTH;
+    }.normalize() * width_factor;
 
     let (vl, vr) = {
-        let v1 = (first + last_normal, last_normal);
-        let v2 = (first - last_normal, -last_normal);
-        if get_side(&second, &first, &v1.0) == 1 {
+        let v1 = (first, last_normal);
+        let v2 = (first, -last_normal);
+        if get_side(&second, &first, &(first + last_normal)) == 1 {
             (v1, v2)
         } else {
             (v2, v1)
@@ -77,14 +76,14 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
                 local_normal
             } else {
                 normal
-            }.normalize();
+            }.normalize() * width_factor;
 
-            let factor = (1.0 / normal.dot(local_normal).abs()).min(3.0) * LINE_WIDTH;
+            let factor = (1.0 / normal.dot(local_normal).abs()).min(3.0);
 
             let (vl, vr) = {
-                let v1 = (current + normal * factor, normal * factor);
-                let v2 = (current - normal * factor, -normal * factor);
-                if get_side(&current, &previous, &v1.0) == 1 {
+                let v1 = (current, normal * factor);
+                let v2 = (current, -normal * factor);
+                if get_side(&current, &previous, &(current + normal)) == 1 {
                     (v1, v2)
                 } else {
                     (v2, v1)
@@ -121,8 +120,10 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
         }
     }
 
-    let line = points[points.len() - 1].to_vector() - points[points.len() - 2].to_vector();
-    let normal: Vector = vector(line.y, -line.x).normalize() * LINE_WIDTH;
+    let last = points[points.len() - 1];
+    let second_last = points[points.len() - 2];
+    let line = last.to_vector() - second_last.to_vector();
+    let normal: Vector = vector(line.y, -line.x).normalize() * width_factor;
 
     let dot = normal.dot(last_line.normalize() + line.normalize());
 
@@ -133,9 +134,9 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>) {
     };
 
     let (vl, vr) = {
-        let v1 = (points[points.len() - 1] + normal, normal);
-        let v2 = (points[points.len() - 1] - normal, -normal);
-        if get_side(&points[points.len() - 1], &points[points.len() - 2], &v1.0) == 1 {
+        let v1 = (last, normal);
+        let v2 = (last, -normal);
+        if get_side(&last, &second_last, &(last + normal * width_factor)) == 1 {
             (v1, v2)
         } else {
             (v2, v1)

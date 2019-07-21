@@ -103,7 +103,9 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, cursor: &mut 
 pub fn geometry_commands_to_drawable<'a, 'l>(
     builder: &'a mut MeshBuilder<'l>,
     geometry_type: GeomType,
-    geometry: &Vec<u32>
+    geometry: &Vec<u32>,
+    extent: f32,
+    z: u32,
 ) {
     let mut cursor = 0;
     let mut c = point(0f32, 0f32);
@@ -124,7 +126,7 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
             //     .expect("Failed to tesselate path.");
 
             // Fill
-            builder.set_current_vertex_type(false);
+            builder.set_current_extent(extent);
             let mut tessellator = FillTessellator::new();
             let _ = tessellator
                 .tessellate_path(
@@ -138,8 +140,8 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
     if geometry_type == GeomType::LINESTRING {
         while cursor < geometry.len() {
             let path = parse_one_to_path(geometry_type, geometry, &mut cursor, &mut c);
-
-            tesselate_line2(&path, builder);
+            builder.set_current_extent(extent);
+            tesselate_line2(&path, builder, z);
         }
     }
 }

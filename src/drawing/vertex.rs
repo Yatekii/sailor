@@ -14,15 +14,15 @@ pub struct Vertex<> {
 pub struct LayerVertexCtor {
     pub tile_id: math::TileId,
     pub layer_id: u32,
-    pub stroke: u32,
+    pub extent: f32,
 }
 
 impl LayerVertexCtor {
-    pub fn new(tile_id: &TileId) -> Self {
+    pub fn new(tile_id: &TileId, extent: f32) -> Self {
         Self {
             tile_id: tile_id.clone(),
             layer_id: 0,
-            stroke: 0,
+            extent,
         }
     }
 }
@@ -31,14 +31,16 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
     fn new_vertex(&mut self, vertex: tessellation::FillVertex) -> Vertex {
         assert!(!vertex.position.x.is_nan());
         assert!(!vertex.position.y.is_nan());
-        // println!("{:?}", vertex.position);
-        if vertex.normal.length() > 300.0 {
-            println!("KEKEKKE");
-        }
+        let normal = if vertex.normal.length() > 3.0 {
+            vertex.normal.normalize() * 3.0
+        } else {
+            vertex.normal
+        } * self.extent;
+
         Vertex {
             // position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
             position: [vertex.position.x as f32, vertex.position.y as f32],
-            normal: vertex.normal.to_array(),
+            normal: normal.to_array(),
             layer_id: self.layer_id,
         }
     }

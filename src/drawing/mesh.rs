@@ -41,12 +41,11 @@ impl<'l> MeshBuilder<'l> {
     }
 
     pub fn set_current_feature_id(&mut self, layer_id: u32) {
-        // dbg!(&layer_id);
         self.vertex_constructor.layer_id = layer_id;
     }
 
-    pub fn set_current_vertex_type(&mut self, stroke: bool) {
-        self.vertex_constructor.stroke = if stroke { 1 } else { 0 };
+    pub fn set_current_extent(&mut self, extent: f32) {
+        self.vertex_constructor.extent = extent;
     }
 
     pub fn get_current_index(&mut self) -> u32 {

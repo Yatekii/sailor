@@ -61,7 +61,7 @@ impl Tile {
 
         let mut layers = Vec::with_capacity(tile.layers.len());
         let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::with_capacity(100_000, 100_000);
-        let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id));
+        let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id, 1.0));
 
         for layer in &tile.layers {
             let mut index_start_before = builder.get_current_index();
@@ -108,7 +108,9 @@ impl Tile {
                 geometry_commands_to_drawable(
                     &mut builder,
                     feature.type_pb,
-                    &feature.geometry
+                    &feature.geometry,
+                    layer.extent as f32,
+                    tile_id.z
                 );
             }
 

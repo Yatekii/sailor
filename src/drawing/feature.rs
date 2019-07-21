@@ -27,8 +27,9 @@ pub struct FeatureStyle {
     pub background_color: DrawableColor,
     pub border_color: DrawableColor,
     pub border_width: f32,
+    pub line_width: u32,
     pub display: bool,
-    _padding: [u32; 2],
+    _padding: [u32; 1],
 }
 
 #[derive(Debug, Clone, Default)]
@@ -110,14 +111,13 @@ impl Feature {
             .filter_map(|r| r.kvs.get("border-width"))
             .last();
 
-        if let Some(width) = border_width {
-            match width {
+        if let Some(border_width) = border_width {
+            match border_width {
                 CSSValue::Number(number) => match number {
-                    Number::Px(px) => self.style.border_width = px.clone().into()
+                    Number::Px(px) => self.style.border_width = px.clone().into(),
+                    value => log::info!("The value '{:?}' is currently not supported for 'border-width'.", value)
                 },
-                value => {
-                    log::info!("The value '{:?}' is currently not supported for 'border-width'.", value);
-                }
+                value => log::info!("The value '{:?}' is currently not supported for 'border-width'.", value)
             }
         }
 
@@ -126,18 +126,34 @@ impl Feature {
             .filter_map(|r| r.kvs.get("display"))
             .last();
 
-        if let Some(width) = display {
-            match width {
+        if let Some(display) = display {
+            match display {
                 CSSValue::String(value) => match &value[..] {
                     "none" => self.style.display = false,
                     _ => self.style.display = true,
                 },
-                value => {
-                    log::info!("The value '{:?}' is currently not supported for 'border-width'.", value);
-                }
+                value => log::info!("The value '{:?}' is currently not supported for 'display'.", value)
             }
         } else {
             self.style.display = true;
+        }
+
+        let line_width = rules
+            .iter()
+            .filter_map(|r| r.kvs.get("line-width"))
+            .last();
+
+        if let Some(line_width) = line_width {
+            match line_width {
+                CSSValue::Number(number) => match number {
+                    Number::Px(px) => self.style.line_width = (px.clone() as u32) << 1 | 0,
+                    Number::World(world) => self.style.line_width = ((world.clone() as u32) << 1) | 1,
+                    value => log::info!("The value '{:?}' is currently not supported for 'line-width'.", value)
+                },
+                value => log::info!("The value '{:?}' is currently not supported for 'line-width'.", value)
+            }
+        } else {
+            self.style.line_width = 0;
         }
     }
 }

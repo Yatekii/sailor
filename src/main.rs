@@ -90,7 +90,7 @@ fn main() {
         painter.paint(&mut app_state);
 
         stats.capture_frame();
-        log::warn!("Frametime {:.2} at zoom {:.2}", stats.get_average(), app_state.zoom);
+        // log::warn!("Frametime {:.2} at zoom {:.2}", stats.get_average(), app_state.zoom);
 
         if !status {
             break;
