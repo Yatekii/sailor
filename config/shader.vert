@@ -67,7 +67,7 @@ void main() {
 
     // If we handle an outline, add the normal to the vertex (always pixel space) and pick the appropriate color.
     if(is_outline){
-        gl_Position.xy += local_normal / canvas_size * layer_data.border_width;
+        gl_Position.xy += local_normal / canvas_size * layer_data.border_width * 2;
         outColor = layer_data.outline_color;
     } else {
         outColor = layer_data.background_color;

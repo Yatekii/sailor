@@ -32,14 +32,14 @@ impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
     fn new_vertex(&mut self, vertex: tessellation::FillVertex) -> Vertex {
         assert!(!vertex.position.x.is_nan());
         assert!(!vertex.position.y.is_nan());
-        let normal = if vertex.normal.length() > 3.0 {
-            vertex.normal.normalize() * 3.0
+        const LIMIT: f32 = 3.0;
+        let normal = if vertex.normal.length() > LIMIT {
+            vertex.normal.normalize() * LIMIT
         } else {
             vertex.normal
         } * self.extent;
 
         Vertex {
-            // position: math::tile_to_global_space(&self.tile_id, vertex.position).to_array(),
             position: [vertex.position.x as i16, vertex.position.y as i16],
             normal: normal.to_array(),
             layer_id: self.layer_id,
@@ -51,11 +51,15 @@ impl VertexConstructor<tessellation::StrokeVertex, Vertex> for LayerVertexCtor {
     fn new_vertex(&mut self, vertex: tessellation::StrokeVertex) -> Vertex {
         assert!(!vertex.position.x.is_nan());
         assert!(!vertex.position.y.is_nan());
-        // println!("{:?}", vertex.position);
-        let pos = math::tile_to_global_space(&self.tile_id, vertex.position);
+        let normal = if vertex.normal.length() > 8.0 {
+            vertex.normal.normalize() * 8.0
+        } else {
+            vertex.normal
+        } * self.extent;
+
         Vertex {
-            position: [pos.x as i16, pos.y as i16],
-            normal: vertex.normal.to_array(),
+            position: [vertex.position.x as i16, vertex.position.y as i16],
+            normal: normal.to_array(),
             layer_id: self.layer_id,
         }
     }

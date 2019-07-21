@@ -30,5 +30,5 @@ layer[name=waterway] {
 
 layer[name=boundary] {
     background-color: rgb(223, 45, 14);
-    line-width: 5px;
+    line-width: 2px;
 }
