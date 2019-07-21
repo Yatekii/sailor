@@ -417,15 +417,29 @@ impl Painter {
                 data.push(dt.extent as f32);
                 data
             }).collect::<Vec<f32>>();
-        (
-            device
-            .create_buffer_mapped::<f32>(
-                tile_data.len(),
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+
+        let size = tile_data.len();
+        if size > 0 {
+            (
+                device
+                .create_buffer_mapped::<f32>(
+                    size,
+                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+                )
+                .fill_from_slice(tile_data.as_slice()),
+                size as u64
             )
-            .fill_from_slice(tile_data.as_slice()),
-            tile_data.len() as u64
-        )
+        } else {
+            (
+                device
+                .create_buffer_mapped::<f32>(
+                    16,
+                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+                )
+                .fill_from_slice(&[0f32; 16]),
+                16
+            )
+        }
     }
 
     fn copy_uniform_buffers(encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>, destination: &Buffer) {
