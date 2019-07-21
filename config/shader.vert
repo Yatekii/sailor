@@ -1,7 +1,7 @@
 #version 450
 #extension GL_AMD_gpu_shader_int16 : enable
 
-layout(location = 0) in vec2 position;
+layout(location = 0) in ivec2 position;
 layout(location = 1) in vec2 normal;
 layout(location = 2) in uint layer_id;
 
