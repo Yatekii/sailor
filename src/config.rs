@@ -5,6 +5,9 @@ lazy_static! {
 
 #[derive(Debug, Deserialize)]
 pub struct Renderer {
+    pub vertex_shader: String,
+    pub fragment_shader: String,
+    pub css: String,
     pub max_tiles: usize,
     pub max_features: u64,
     pub tile_size: usize,

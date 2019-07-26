@@ -3,6 +3,9 @@ log_level = "Warn"
 display_framerate = true
 
 [renderer]
+vertex_shader = "config/shader.vert"
+fragment_shader = "config/shader.frag"
+css = "config/style.css"
 max_tiles = 200
 max_features = 1000
 tile_size = 384

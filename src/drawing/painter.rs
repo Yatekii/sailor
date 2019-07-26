@@ -81,8 +81,6 @@ pub struct Painter {
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    vertex_shader: String,
-    fragment_shader: String,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
     layer_collection: Arc<RwLock<LayerCollection>>,
@@ -152,26 +150,26 @@ impl Painter {
             },
         };
 
-        let layer_vertex_shader = "config/shader.vert".to_string();
-        let layer_fragment_shader = "config/shader.frag".to_string();
-
-        match watcher.watch(&layer_vertex_shader, RecursiveMode::Recursive) {
+        match watcher.watch(&CONFIG.renderer.vertex_shader, RecursiveMode::Recursive) {
             Ok(_) => {},
             Err(err) => {
-                log::info!("Failed to start watching {}:", &layer_vertex_shader);
+                log::info!("Failed to start watching {}:", &CONFIG.renderer.vertex_shader);
                 log::info!("{}", err);
             },
         };
 
-        match watcher.watch(&layer_fragment_shader, RecursiveMode::Recursive) {
+        match watcher.watch(&CONFIG.renderer.fragment_shader, RecursiveMode::Recursive) {
             Ok(_) => {},
             Err(err) => {
-                log::info!("Failed to start watching {}:", &layer_fragment_shader);
+                log::info!("Failed to start watching {}:", &CONFIG.renderer.fragment_shader);
                 log::info!("{}", err);
             },
         };
 
-        let (layer_vs_module, layer_fs_module) = Self::load_shader(&device, &layer_vertex_shader, &layer_fragment_shader).expect("Fatal Error. Unable to load shaders.");
+        let (layer_vs_module, layer_fs_module) = Self::load_shader(
+            &device, &CONFIG.renderer.vertex_shader,
+            &CONFIG.renderer.fragment_shader
+        ).expect("Fatal Error. Unable to load shaders.");
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
                 wgpu::BindGroupLayoutBinding {
@@ -250,8 +248,6 @@ impl Painter {
             loaded_tiles: BTreeMap::new(),
             bind_group_layout,
             bind_group,
-            vertex_shader: layer_vertex_shader,
-            fragment_shader: layer_fragment_shader,
             _watcher: watcher,
             rx,
             layer_collection,
@@ -480,8 +476,16 @@ impl Painter {
                 kind: EventKind::Modify(ModifyKind::Data(_)),
                 ..
             })) => {
-                if let Ok((vs_module, fs_module)) = Self::load_shader(&self.device, &self.vertex_shader, &self.fragment_shader) {
-                    self.layer_render_pipeline = Self::create_layer_render_pipeline(&self.device, &self.bind_group_layout, &vs_module, &fs_module);
+                if let Ok((vs_module, fs_module)) = Self::load_shader(
+                    &self.device,
+                    &CONFIG.renderer.vertex_shader,
+                    &CONFIG.renderer.fragment_shader
+                ) {
+                    self.layer_render_pipeline = Self::create_layer_render_pipeline(
+                        &self.device,
+                        &self.bind_group_layout,
+                        &vs_module, &fs_module
+                    );
                     true
                 } else {
                     false
