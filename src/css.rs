@@ -39,7 +39,7 @@ use notify::{
         ModifyKind,
     },
 };
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Tries to parse an entire stylesheet.
 pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
@@ -165,11 +165,11 @@ pub struct Rule {
     /// The selector that the rule is intended for.
     pub selector: Selector,
     /// The key/value pairs the rule holds.
-    pub kvs: std::collections::HashMap<String, CSSValue>,
+    pub kvs: BTreeMap<String, CSSValue>,
 }
 
 /// A single CSS selector.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Selector {
     /// The type a selector matches.
     /// E.g. `"layer"`.
@@ -182,7 +182,7 @@ pub struct Selector {
     pub classes: Vec<String>,
     /// The name a selector matches.
     /// E.g. `"water"`.
-    pub any: HashMap<String, String>,
+    pub any: BTreeMap<String, String>,
 }
 
 impl Default for Selector {
@@ -191,7 +191,7 @@ impl Default for Selector {
             typ: None,
             id: None,
             classes: vec![],
-            any: HashMap::new(),
+            any: BTreeMap::new(),
         }
     }
 }
@@ -203,7 +203,7 @@ impl Selector {
             typ: None,
             id: None,
             classes: vec![],
-            any: HashMap::new(),
+            any: BTreeMap::new(),
         }
     }
 
@@ -359,8 +359,8 @@ fn any<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorP
 
 /// Parses the body of a CSS rule.
 /// E.g. `{}`.
-fn body<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, std::collections::HashMap::<String, CSSValue>, E> {
-    let mut hm = std::collections::HashMap::new();
+fn body<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, std::collections::BTreeMap::<String, CSSValue>, E> {
+    let mut hm = std::collections::BTreeMap::new();
     many0(kv)(input).map(|v| { v.1.into_iter().for_each(|v| { hm.insert(v.0.into(), v.1); }); (v.0, hm) })
 }
 
