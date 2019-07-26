@@ -65,6 +65,8 @@ use std::sync::{
 use crate::app_state::AppState;
 
 const MSAA_SAMPLES: u32 = 1;
+const TILE_DATA_BUFFER_SIZE: usize = 200;
+const TILE_DATA_SIZE: usize = 20;
 
 pub struct Painter {
     #[cfg(feature = "vulkan")]
@@ -403,43 +405,30 @@ impl Painter {
         z: f32,
         drawable_tiles: impl Iterator<Item=&'a DrawableTile>
     ) -> (Buffer, u64) {
-        let tile_data = drawable_tiles
-            .flat_map(|dt| {
-                let mut data = screen
-                    .tile_to_global_space(z, &dt.tile_id)
-                    .as_slice()
-                    .iter()
-                    .map(|f| *f)
-                    .collect::<Vec<_>>();
-                data.push(dt.extent as f32);
-                data.push(dt.extent as f32);
-                data.push(dt.extent as f32);
-                data.push(dt.extent as f32);
-                data
-            }).collect::<Vec<f32>>();
+        const TILE_DATA_BUFFER_BYTE_SIZE: usize = TILE_DATA_SIZE * 4 * TILE_DATA_BUFFER_SIZE;
+        let mut data = vec![0f32; TILE_DATA_BUFFER_BYTE_SIZE];
 
-        let size = tile_data.len();
-        if size > 0 {
-            (
-                device
-                .create_buffer_mapped::<f32>(
-                    size,
-                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
-                )
-                .fill_from_slice(tile_data.as_slice()),
-                size as u64
-            )
-        } else {
-            (
-                device
-                .create_buffer_mapped::<f32>(
-                    16,
-                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
-                )
-                .fill_from_slice(&[0f32; 16]),
-                16
-            )
+        let mut i = 0;
+        for dt in drawable_tiles {
+            let matrix = screen.tile_to_global_space(z, &dt.tile_id);
+            for float in matrix.as_slice() {
+                data[i] = *float;
+                i += 1;
+            }
+            for _ in 0..4 {
+                data[i] = dt.extent as f32;
+                i += 1;
+            }
         }
+        (
+            device
+            .create_buffer_mapped::<f32>(
+                TILE_DATA_BUFFER_BYTE_SIZE,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+            )
+            .fill_from_slice(data.as_slice()),
+            TILE_DATA_BUFFER_BYTE_SIZE as u64
+        )
     }
 
     fn copy_uniform_buffers(encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>, destination: &Buffer) {
