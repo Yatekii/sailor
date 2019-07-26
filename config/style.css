@@ -5,7 +5,7 @@ layer[name=water] {
 }
 
 layer[name=park] {
-    background-color: rgba(14, 124, 82, 1.0);
+    background-color: rgba(14, 124, 82, 0.5);
 }
 
 layer[name=building] {

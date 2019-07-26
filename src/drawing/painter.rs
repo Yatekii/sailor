@@ -458,7 +458,7 @@ impl Painter {
 
     const fn uniform_buffer_size() -> u64 {
         4 * 4
-      + 12 * 4 * 500
+      + 12 * 4 * 1000
     }
 
     pub fn create_blend_bind_group(
