@@ -39,7 +39,6 @@ use wgpu::{
     BindGroupLayout,
     BindGroup,
     RenderPipeline,
-    Sampler,
     PresentMode,
     LoadOp,
     StoreOp,
@@ -76,14 +75,12 @@ pub struct Painter {
     swap_chain: SwapChain,
     layer_render_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
-    framebuffer: TextureView,
     stencil: TextureView,
     uniform_buffer: Buffer,
     tile_transform_buffer: (Buffer, u64),
     loaded_tiles: BTreeMap<TileId, DrawableTile>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    sampler: Sampler,
     vertex_shader: String,
     fragment_shader: String,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
@@ -187,29 +184,7 @@ impl Painter {
                     visibility: wgpu::ShaderStage::VERTEX,
                     ty: wgpu::BindingType::UniformBuffer,
                 },
-                wgpu::BindGroupLayoutBinding {
-                    binding: 2,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::SampledTexture,
-                },
-                wgpu::BindGroupLayoutBinding {
-                    binding: 3,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler,
-                }
             ]
-        });
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            lod_min_clamp: -100.0,
-            lod_max_clamp: 100.0,
-            compare_function: wgpu::CompareFunction::Always,
         });
 
         let layer_collection = Arc::new(RwLock::new(LayerCollection::new(20, 500)));
@@ -227,7 +202,6 @@ impl Painter {
             &swap_chain_descriptor,
             CONFIG.renderer.msaa_samples
         );
-        let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
         let stencil = Self::create_stencil(&device, &swap_chain_descriptor);
 
         let uniform_buffer = Self::create_uniform_buffer(&device);
@@ -254,9 +228,7 @@ impl Painter {
             &device,
             &bind_group_layout,
             &uniform_buffer,
-            &tile_transform_buffer,
-            &framebuffer,
-            &sampler
+            &tile_transform_buffer
         );
 
         let init_command_buf = init_encoder.finish();
@@ -272,14 +244,12 @@ impl Painter {
             swap_chain,
             layer_render_pipeline,
             multisampled_framebuffer,
-            framebuffer,
             uniform_buffer,
             stencil,
             tile_transform_buffer,
             loaded_tiles: BTreeMap::new(),
             bind_group_layout,
             bind_group,
-            sampler,
             vertex_shader: layer_vertex_shader,
             fragment_shader: layer_fragment_shader,
             _watcher: watcher,
@@ -468,9 +438,7 @@ impl Painter {
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         uniform_buffer: &Buffer,
-        tile_transform_buffer: &(Buffer, u64),
-        texture_view: &TextureView,
-        sampler: &Sampler,
+        tile_transform_buffer: &(Buffer, u64)
     ) -> BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
@@ -489,14 +457,6 @@ impl Painter {
                         range: 0 .. tile_transform_buffer.1,
                     },
                 },
-                wgpu::Binding {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(texture_view),
-                },
-                wgpu::Binding {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(&sampler)
-                }
             ],
         })
     }
@@ -559,7 +519,6 @@ impl Painter {
             &self.swap_chain_descriptor,
             CONFIG.renderer.msaa_samples
         );
-        self.framebuffer = Self::create_framebuffer(&self.device, &self.swap_chain_descriptor);
         self.stencil = Self::create_stencil(&self.device, &self.swap_chain_descriptor);
     }
 
@@ -587,7 +546,11 @@ impl Painter {
         );
     }
 
-    fn create_multisampled_framebuffer(device: &Device, swap_chain_descriptor: &SwapChainDescriptor, sample_count: u32) -> wgpu::TextureView {
+    fn create_multisampled_framebuffer(
+        device: &Device,
+        swap_chain_descriptor: &SwapChainDescriptor,
+        sample_count: u32
+    ) -> wgpu::TextureView {
         let multisampled_texture_extent = wgpu::Extent3d {
             width: swap_chain_descriptor.width,
             height: swap_chain_descriptor.height,
@@ -604,25 +567,6 @@ impl Painter {
         };
 
         device.create_texture(multisampled_frame_descriptor).create_default_view()
-    }
-
-    fn create_framebuffer(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> wgpu::TextureView {
-        let texture_extent = wgpu::Extent3d {
-            width: swap_chain_descriptor.width,
-            height: swap_chain_descriptor.height,
-            depth: 1,
-        };
-        let frame_descriptor = &wgpu::TextureDescriptor {
-            size: texture_extent,
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: swap_chain_descriptor.format,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
-        };
-
-        device.create_texture(frame_descriptor).create_default_view()
     }
 
     fn create_stencil(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> wgpu::TextureView {
@@ -735,9 +679,7 @@ impl Painter {
             &self.device,
             &self.bind_group_layout,
             &self.uniform_buffer,
-            &self.tile_transform_buffer,
-            &self.framebuffer,
-            &self.sampler
+            &self.tile_transform_buffer
         );
         let num_tiles = self.loaded_tiles.len();
         if layer_collection.iter_layers().count() > 0 && num_tiles > 0 {
