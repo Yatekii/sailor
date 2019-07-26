@@ -9,6 +9,7 @@ addons:
             - libvulkan-dev
             - libxcb1-dev
             - xorg-dev
+            - libssl-dev
 script:
     - cargo build --release
 before_deploy:
