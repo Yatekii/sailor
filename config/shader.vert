@@ -29,7 +29,7 @@ layout(std140) struct TileData {
 };
 
 layout(std140, set = 0, binding = 1) uniform Transform {
-    TileData tile_datas[200];
+    TileData tile_datas[50];
 };
 
 void main() {
