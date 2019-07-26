@@ -373,21 +373,24 @@ impl Painter {
     }
 
     fn create_uniform_buffer(device: &Device) -> Buffer {
+        let data = vec![0; Self::uniform_buffer_size() as usize];
         device
             .create_buffer_mapped::<u8>(
                 Self::uniform_buffer_size() as usize,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
-            .fill_from_slice(&[0; Self::uniform_buffer_size() as usize])
+            .fill_from_slice(&data)
     }
 
+    /// Creates a new transform buffer from the tile transforms.
+    /// 
+    /// Ensures that the buffer has the size configured in the config, to match the size configured in the shader.
     fn create_tile_transform_buffer<'a>(
         device: &Device,
         screen: &Screen,
         z: f32,
         drawable_tiles: impl Iterator<Item=&'a DrawableTile>
     ) -> (Buffer, u64) {
-
         const TILE_DATA_SIZE: usize = 20;
         let tile_data_buffer_byte_size = TILE_DATA_SIZE * 4 * CONFIG.renderer.max_tiles;
         let mut data = vec![0f32; tile_data_buffer_byte_size];
@@ -429,9 +432,9 @@ impl Painter {
         }
     }
 
-    const fn uniform_buffer_size() -> u64 {
+    fn uniform_buffer_size() -> u64 {
         4 * 4
-      + 12 * 4 * 1000
+      + 12 * 4 * CONFIG.renderer.max_features
     }
 
     pub fn create_blend_bind_group(

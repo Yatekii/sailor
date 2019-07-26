@@ -6,7 +6,7 @@ lazy_static! {
 #[derive(Debug, Deserialize)]
 pub struct Renderer {
     pub max_tiles: usize,
-    pub max_features: usize,
+    pub max_features: u64,
     pub tile_size: usize,
     pub msaa_samples: u32,
 }
