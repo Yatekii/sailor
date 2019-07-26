@@ -3,9 +3,13 @@ mod drawing;
 mod app_state;
 mod css;
 mod stats;
+mod config;
 
 extern crate lyon;
 extern crate nalgebra_glm as glm;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate serde_derive;
+
 
 use crate::vector_tile::*;
 use lyon::math::{
@@ -14,7 +18,10 @@ use lyon::math::{
 
 pub const PIXEL_SIZE: f32 = 256.0;
 
+use crate::config::CONFIG;
+
 fn main() {
+    log::set_max_level(CONFIG.general.log_level.to_level_filter());
     pretty_env_logger::init();
 
     let z = 8.0;
@@ -32,7 +39,6 @@ fn main() {
     let mut status = true;
     let mut mouse_down = false;
     let mut last_pos = wgpu::winit::dpi::LogicalPosition::new(0.0, 0.0);
-
 
     let mut stats = stats::Stats::new();
 
@@ -90,7 +96,9 @@ fn main() {
         painter.paint(&mut app_state);
 
         stats.capture_frame();
-        log::warn!("Frametime {:.2} at zoom {:.2}", stats.get_average(), app_state.zoom);
+        if CONFIG.general.display_framerate {
+            println!("Frametime {:.2} at zoom {:.2}", stats.get_average(), app_state.zoom);
+        }
 
         if !status {
             break;

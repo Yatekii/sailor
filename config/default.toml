@@ -1,0 +1,9 @@
+[general]
+log_level = "Warn"
+display_framerate = true
+
+[renderer]
+max_tiles = 200
+max_features = 1000
+tile_size = 256
+msaa_samples = 1

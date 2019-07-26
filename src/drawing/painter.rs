@@ -64,9 +64,7 @@ use std::sync::{
 
 use crate::app_state::AppState;
 
-const MSAA_SAMPLES: u32 = 1;
-const TILE_DATA_BUFFER_SIZE: usize = 200;
-const TILE_DATA_SIZE: usize = 20;
+use crate::config::CONFIG;
 
 pub struct Painter {
     #[cfg(feature = "vulkan")]
@@ -224,14 +222,28 @@ impl Painter {
             present_mode: PresentMode::NoVsync,
         };
 
-        let multisampled_framebuffer = Self::create_multisampled_framebuffer(&device, &swap_chain_descriptor, MSAA_SAMPLES);
+        let multisampled_framebuffer = Self::create_multisampled_framebuffer(
+            &device,
+            &swap_chain_descriptor,
+            CONFIG.renderer.msaa_samples
+        );
         let framebuffer = Self::create_framebuffer(&device, &swap_chain_descriptor);
         let stencil = Self::create_stencil(&device, &swap_chain_descriptor);
 
         let uniform_buffer = Self::create_uniform_buffer(&device);
-        let tile_transform_buffer = Self::create_tile_transform_buffer(&device, &app_state.screen, app_state.zoom, std::iter::empty::<&DrawableTile>());
+        let tile_transform_buffer = Self::create_tile_transform_buffer(
+            &device,
+            &app_state.screen,
+            app_state.zoom,
+            std::iter::empty::<&DrawableTile>()
+        );
 
-        let layer_render_pipeline = Self::create_layer_render_pipeline(&device, &bind_group_layout, &layer_vs_module, &layer_fs_module);
+        let layer_render_pipeline = Self::create_layer_render_pipeline(
+            &device,
+            &bind_group_layout,
+            &layer_vs_module,
+            &layer_fs_module
+        );
 
         let swap_chain = device.create_swap_chain(
             &surface,
@@ -361,7 +373,7 @@ impl Painter {
                     },
                 ],
             }],
-            sample_count: MSAA_SAMPLES,
+            sample_count: CONFIG.renderer.msaa_samples,
         })
     }
 
@@ -405,8 +417,10 @@ impl Painter {
         z: f32,
         drawable_tiles: impl Iterator<Item=&'a DrawableTile>
     ) -> (Buffer, u64) {
-        const TILE_DATA_BUFFER_BYTE_SIZE: usize = TILE_DATA_SIZE * 4 * TILE_DATA_BUFFER_SIZE;
-        let mut data = vec![0f32; TILE_DATA_BUFFER_BYTE_SIZE];
+
+        const TILE_DATA_SIZE: usize = 20;
+        let tile_data_buffer_byte_size = TILE_DATA_SIZE * 4 * CONFIG.renderer.max_tiles;
+        let mut data = vec![0f32; tile_data_buffer_byte_size];
 
         let mut i = 0;
         for dt in drawable_tiles {
@@ -423,11 +437,11 @@ impl Painter {
         (
             device
             .create_buffer_mapped::<f32>(
-                TILE_DATA_BUFFER_BYTE_SIZE,
+                tile_data_buffer_byte_size,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
             )
             .fill_from_slice(data.as_slice()),
-            TILE_DATA_BUFFER_BYTE_SIZE as u64
+            tile_data_buffer_byte_size as u64
         )
     }
 
@@ -540,7 +554,11 @@ impl Painter {
         self.swap_chain_descriptor.width = width;
         self.swap_chain_descriptor.height = height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
-        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(&self.device, &self.swap_chain_descriptor, MSAA_SAMPLES);
+        self.multisampled_framebuffer = Self::create_multisampled_framebuffer(
+            &self.device,
+            &self.swap_chain_descriptor,
+            CONFIG.renderer.msaa_samples
+        );
         self.framebuffer = Self::create_framebuffer(&self.device, &self.swap_chain_descriptor);
         self.stencil = Self::create_stencil(&self.device, &self.swap_chain_descriptor);
     }
@@ -727,8 +745,8 @@ impl Painter {
             {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: if MSAA_SAMPLES > 1 { &self.multisampled_framebuffer } else { &frame.view },
-                        resolve_target: if MSAA_SAMPLES > 1 { Some(&frame.view) } else { None },
+                        attachment: if CONFIG.renderer.msaa_samples > 1 { &self.multisampled_framebuffer } else { &frame.view },
+                        resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
                         clear_color: wgpu::Color::WHITE,
