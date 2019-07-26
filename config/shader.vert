@@ -7,21 +7,20 @@ layout(location = 2) in uint feature_id;
 
 layout(location = 0) out vec4 outColor;
 
-struct LayerData {
+layout(std140) struct LayerData {
     vec4 background_color;
     vec4 outline_color;
     float border_width;
     uint line_width;
 };
 
-layout(set = 0, binding = 0) uniform Locals {
+layout(std140, set = 0, binding = 0) uniform Locals {
     vec2 canvas_size;
     vec2 _unused;
     LayerData layer_datas[1000];
 };
 
-// std140
-struct TileData {
+layout(std140) struct TileData {
     mat4 transform;
     float extent;
     float _unused;
@@ -29,7 +28,7 @@ struct TileData {
     float _unused3;
 };
 
-layout(set = 0, binding = 1) uniform Transform {
+layout(std140, set = 0, binding = 1) uniform Transform {
     TileData tile_datas[200];
 };
 
