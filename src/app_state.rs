@@ -26,11 +26,12 @@ impl AppState {
         width: u32,
         height: u32,
         zoom: f32,
+        hidpi_factor: f64,
     ) -> Self {
         Self {
             tile_cache: TileCache::new(),
             css_cache: RulesCache::try_load_from_file(style).expect("Unable to load the style file. Please consult the log."),
-            screen: Screen::new(center, width, height),
+            screen: Screen::new(center, width, height, hidpi_factor),
             tile_field: TileField::new(TileId::new(8, 0, 0), TileId::new(8, 0, 0)),
             zoom,
         }
