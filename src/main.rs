@@ -29,8 +29,9 @@ fn main() {
     let size = 600;
 
     let mut events_loop = wgpu::winit::EventsLoop::new();
+    let hdpi_factor = events_loop.get_available_monitors().next().expect("No monitors found").get_hidpi_factor();
 
-    let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), size, size, z);
+    let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), size, size, z, hdpi_factor);
 
     let mut painter = drawing::Painter::init(&events_loop, size, size, &app_state);
 
@@ -72,7 +73,7 @@ fn main() {
                         }
                     },
                     WindowEvent::CursorMoved { position, .. } => {
-                        let size = crate::config::CONFIG.renderer.tile_size as f32;
+                        let size = app_state.screen.get_tile_size();
                         let mut delta = vector((position.x - last_pos.x) as f32, (position.y - last_pos.y) as f32);
                         let zoom_x = (app_state.screen.width as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
                         let zoom_y = (app_state.screen.height as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
