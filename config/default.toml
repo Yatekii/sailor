@@ -9,4 +9,4 @@ css = "config/style.css"
 max_tiles = 200
 max_features = 1000
 tile_size = 384
-msaa_samples = 1
+msaa_samples = 4

@@ -586,7 +586,7 @@ impl Painter {
             size: texture_extent,
             array_layer_count: 1,
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count: CONFIG.renderer.msaa_samples,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::D24UnormS8Uint,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
