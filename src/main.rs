@@ -91,7 +91,7 @@ fn main() {
         });
 
         painter.update_shader();
-        painter.update_styles(app_state.zoom, &mut app_state.css_cache);
+        painter.update_styles(app_state.zoom.max(14.0), &mut app_state.css_cache);
         painter.paint(&mut app_state);
 
         stats.capture_frame();

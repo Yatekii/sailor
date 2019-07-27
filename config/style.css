@@ -22,6 +22,15 @@ layer[name=landuse] {
 
 layer[name=transportation] {
     background-color: rgba(21, 124, 102, 0.959);
+    line-width: 2px;
+}
+
+layer[name=transportation][zoom=13] {
+    line-width: 2w;
+}
+
+layer[name=transportation][zoom=14] {
+    line-width: 2w;
 }
 
 layer[name=waterway] {

@@ -12,6 +12,7 @@ layout(std140) struct LayerData {
     vec4 outline_color;
     float border_width;
     uint line_width;
+    float z_index;
 };
 
 layout(std140, set = 0, binding = 0) uniform Locals {
@@ -51,10 +52,10 @@ void main() {
     vec4 tile_local_position = vec4(position / tile_data.extent, 0.0, 1.0);
 
     // If we have a world scale line, add the normal to the vertex before the world transform.
-    // if(is_world_scale_line) {
-    //     vec2 n = local_normal / tile_data.extent * (layer_data.line_width >> 1);
-    //     tile_local_position.xy += n;
-    // }
+    if(is_world_scale_line) {
+        vec2 n = local_normal / tile_data.extent * (layer_data.line_width >> 1);
+        tile_local_position.xy += n;
+    }
 
     // Transform the vertex.
     gl_Position = tile_data.transform * tile_local_position;
@@ -71,4 +72,5 @@ void main() {
     } else {
         outColor = layer_data.background_color;
     }
+    // gl_Position.z = -layer_data.z_index;
 }

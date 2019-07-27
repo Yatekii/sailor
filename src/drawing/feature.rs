@@ -29,19 +29,21 @@ pub struct FeatureStyle {
     pub border_width: f32,
     pub line_width: u32,
     pub display: bool,
-    _padding: [u32; 1],
+    pub z_index: f32,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Feature {
     pub selector: Selector,
+    pub layer_id: u32,
     pub style: FeatureStyle,
 }
 
 impl Feature {
-    pub fn new(selector: Selector) -> Self {
+    pub fn new(selector: Selector, layer_id: u32) -> Self {
         Self {
             selector,
+            layer_id,
             style: Default::default(),
         }
     }
@@ -114,7 +116,7 @@ impl Feature {
         if let Some(border_width) = border_width {
             match border_width {
                 CSSValue::Number(number) => match number {
-                    Number::Px(px) => self.style.border_width = px.clone().into(),
+                    Number::Px(px) => self.style.border_width = (*px).into(),
                     value => log::info!("The value '{:?}' is currently not supported for 'border-width'.", value)
                 },
                 value => log::info!("The value '{:?}' is currently not supported for 'border-width'.", value)
@@ -146,14 +148,31 @@ impl Feature {
         if let Some(line_width) = line_width {
             match line_width {
                 CSSValue::Number(number) => match number {
-                    Number::Px(px) => self.style.line_width = (px.clone() as u32) << 1 | 0,
-                    Number::World(world) => self.style.line_width = ((world.clone() as u32) << 1) | 1,
+                    Number::Px(px) => self.style.line_width = (*px as u32) << 1 | 0,
+                    Number::World(world) => self.style.line_width = ((*world as u32) << 1) | 1,
                     value => log::info!("The value '{:?}' is currently not supported for 'line-width'.", value)
                 },
                 value => log::info!("The value '{:?}' is currently not supported for 'line-width'.", value)
             }
         } else {
             self.style.line_width = 0;
+        }
+
+        let z_index = rules
+            .iter()
+            .filter_map(|r| r.kvs.get("z-index"))
+            .last();
+
+        if let Some(z_index) = z_index {
+            match z_index {
+                CSSValue::Number(number) => match number {
+                    Number::Unitless(unitless) => self.style.z_index = *unitless,
+                    value => log::info!("The value '{:?}' is currently not supported for 'z-index'.", value)
+                },
+                value => log::info!("The value '{:?}' is currently not supported for 'z-index'.", value)
+            }
+        } else {
+            self.style.z_index = self.layer_id as f32;
         }
     }
 }

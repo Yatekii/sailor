@@ -112,7 +112,7 @@ impl Tile {
                         current_feature_id = if let Some(feature_id) = layer_collection.get_feature_id(&selector) {
                             feature_id
                         } else {
-                            layer_collection.add_feature(Feature::new(selector.clone()))
+                            layer_collection.add_feature(Feature::new(selector.clone(), layer_id))
                         };
                         builder.set_current_feature_id(current_feature_id);
                     }
