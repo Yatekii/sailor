@@ -36,6 +36,7 @@ pub struct FeatureStyle {
 pub struct Feature {
     pub selector: Selector,
     pub layer_id: u32,
+    pub id: u32,
     pub style: FeatureStyle,
 }
 
@@ -44,6 +45,8 @@ impl Feature {
         Self {
             selector,
             layer_id,
+            // The featureid is set later on.
+            id: 0,
             style: Default::default(),
         }
     }

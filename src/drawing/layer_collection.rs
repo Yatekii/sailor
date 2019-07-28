@@ -33,12 +33,17 @@ impl LayerCollection {
         self.layers.iter()
     }
 
+    pub fn iter_features(&self) -> Iter<'_, Feature> {
+        self.features.iter()
+    }
+
     pub fn get_feature_id(&mut self, selector: &crate::css::Selector) -> Option<u32> {
         self.features.iter_mut().enumerate().find(|(_, feature)| &feature.selector == selector).map(|(i, _)| i as u32)
     }
 
-    pub fn add_feature(&mut self, feature: Feature) -> u32 {
+    pub fn add_feature(&mut self, mut feature: Feature) -> u32 {
         assert!(self.features.len() < self.n_features_max as usize);
+        feature.id = self.features.len() as u32;
         self.features.push(feature);
         self.features.len() as u32 - 1
     }

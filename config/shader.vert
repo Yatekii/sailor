@@ -72,5 +72,5 @@ void main() {
     } else {
         outColor = layer_data.background_color;
     }
-    // gl_Position.z = -layer_data.z_index;
+    gl_Position.z = layer_data.z_index / 1000 + 0.001;
 }

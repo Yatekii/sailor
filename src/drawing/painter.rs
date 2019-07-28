@@ -73,7 +73,8 @@ pub struct Painter {
     surface: Surface,
     swap_chain_descriptor: SwapChainDescriptor,
     swap_chain: SwapChain,
-    layer_render_pipeline: RenderPipeline,
+    blend_pipeline: RenderPipeline,
+    noblend_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
     stencil: TextureView,
     uniform_buffer: Buffer,
@@ -210,11 +211,30 @@ impl Painter {
             std::iter::empty::<&DrawableTile>()
         );
 
-        let layer_render_pipeline = Self::create_layer_render_pipeline(
+        let blend_pipeline = Self::create_layer_render_pipeline(
             &device,
             &bind_group_layout,
             &layer_vs_module,
-            &layer_fs_module
+            &layer_fs_module,
+            wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
+            wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            }
+        );
+
+        let noblend_pipeline = Self::create_layer_render_pipeline(
+            &device,
+            &bind_group_layout,
+            &layer_vs_module,
+            &layer_fs_module,
+            wgpu::BlendDescriptor::REPLACE,
+            wgpu::BlendDescriptor::REPLACE
         );
 
         let swap_chain = device.create_swap_chain(
@@ -240,7 +260,8 @@ impl Painter {
             surface,
             swap_chain_descriptor,
             swap_chain,
-            layer_render_pipeline,
+            blend_pipeline,
+            noblend_pipeline,
             multisampled_framebuffer,
             uniform_buffer,
             stencil,
@@ -258,9 +279,10 @@ impl Painter {
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         vs_module: &ShaderModule,
-        fs_module: &ShaderModule
+        fs_module: &ShaderModule,
+        color_blend: wgpu::BlendDescriptor,
+        alpha_blend: wgpu::BlendDescriptor,
     ) -> RenderPipeline {
-        dbg!(std::mem::size_of::<Vertex>());
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
         });
@@ -285,23 +307,14 @@ impl Painter {
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
                 format: wgpu::TextureFormat::Bgra8Unorm,
-                color_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::SrcAlpha,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::Add,
-                },
-                alpha_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::One,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::Add,
-                },
+                color_blend,
+                alpha_blend,
                 write_mask: wgpu::ColorWrite::ALL,
             }],
-            // depth_stencil_state: None,
             depth_stencil_state: Some(DepthStencilStateDescriptor {
                 format: wgpu::TextureFormat::D24UnormS8Uint,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::Always,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Greater,
                 stencil_front: wgpu::StencilStateFaceDescriptor {
                     compare: wgpu::CompareFunction::NotEqual,
                     fail_op: wgpu::StencilOperation::Keep,
@@ -481,10 +494,30 @@ impl Painter {
                     &CONFIG.renderer.vertex_shader,
                     &CONFIG.renderer.fragment_shader
                 ) {
-                    self.layer_render_pipeline = Self::create_layer_render_pipeline(
+                    self.blend_pipeline = Self::create_layer_render_pipeline(
                         &self.device,
                         &self.bind_group_layout,
-                        &vs_module, &fs_module
+                        &vs_module,
+                        &fs_module,
+                        wgpu::BlendDescriptor {
+                            src_factor: wgpu::BlendFactor::SrcAlpha,
+                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                            operation: wgpu::BlendOperation::Add,
+                        },
+                        wgpu::BlendDescriptor {
+                            src_factor: wgpu::BlendFactor::One,
+                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                            operation: wgpu::BlendOperation::Add,
+                        }
+                    );
+
+                    self.noblend_pipeline = Self::create_layer_render_pipeline(
+                        &self.device,
+                        &self.bind_group_layout,
+                        &vs_module,
+                        &fs_module,
+                        wgpu::BlendDescriptor::REPLACE,
+                        wgpu::BlendDescriptor::REPLACE
                     );
                     true
                 } else {
@@ -689,56 +722,37 @@ impl Painter {
             &self.tile_transform_buffer
         );
         let num_tiles = self.loaded_tiles.len();
-        if layer_collection.iter_layers().count() > 0 && num_tiles > 0 {
+        if layer_collection.iter_features().count() > 0 && num_tiles > 0 {
             let frame = self.swap_chain.get_next_texture();
             {
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: if CONFIG.renderer.msaa_samples > 1 { &self.multisampled_framebuffer } else { &frame.view },
-                        resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
-                        load_op: wgpu::LoadOp::Clear,
-                        store_op: wgpu::StoreOp::Store,
-                        clear_color: wgpu::Color::WHITE,
-                    }],
-                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
-                        attachment: &self.stencil,
-                        depth_load_op: LoadOp::Clear,
-                        depth_store_op: StoreOp::Store,
-                        clear_depth: 0.0,
-                        stencil_load_op: LoadOp::Clear,
-                        stencil_store_op: StoreOp::Store,
-                        clear_stencil: 255,
-                    }),
-                });
-
-                'outer: for (id, layer) in layer_collection.iter_layers().enumerate() {
-                    // Check if we have anything to draw on a specific layer. If not, continue with the next layer.
-                    let mut hit = false;
-                    for drawable_tile in self.loaded_tiles.values_mut() {
-                        if *layer {
-                            if drawable_tile.layer_has_data(id as u32) {
-                                hit = true;
-                            }
-                        }
-                    }
-                    if !hit {
-                        continue 'outer;
-                    }
-
-                    render_pass.set_pipeline(&self.layer_render_pipeline);
-                    render_pass.set_stencil_reference(id as u32);
+                for feature in layer_collection.iter_features() {
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: if CONFIG.renderer.msaa_samples > 1 { &self.multisampled_framebuffer } else { &frame.view },
+                            resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
+                            load_op: wgpu::LoadOp::Load,
+                            store_op: wgpu::StoreOp::Store,
+                            clear_color: wgpu::Color::WHITE,
+                        }],
+                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
+                            attachment: &self.stencil,
+                            depth_load_op: LoadOp::Clear,
+                            depth_store_op: StoreOp::Store,
+                            clear_depth: 0.0,
+                            stencil_load_op: LoadOp::Clear,
+                            stencil_store_op: StoreOp::Store,
+                            clear_stencil: 255,
+                        }),
+                    });
+                    render_pass.set_pipeline(&self.blend_pipeline);
+                    render_pass.set_stencil_reference(feature.id as u32);
                     render_pass.set_bind_group(0, &self.bind_group, &[]);
-
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
-                        if *layer {
-                            drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, id as u32, false);
-                        }
+                        drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, feature.id, false);
                     }
 
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
-                        if *layer {
-                            drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, id as u32, true);
-                        }
+                        drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, feature.id, true);
                     }
                 }
             }

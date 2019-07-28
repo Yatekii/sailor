@@ -1,3 +1,4 @@
+use core::ops::Range;
 use crate::drawing::layer_collection::LayerCollection;
 use crate::vector_tile::math::TileId;
 use crate::drawing::{
@@ -16,7 +17,7 @@ pub struct DrawableTile {
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
     pub index_count: u32,
-    pub layers: Vec<DrawableLayer>,
+    pub features: Vec<(u32, Range<u32>)>,
     pub extent: u16,
 }
 
@@ -26,9 +27,9 @@ impl DrawableTile {
         tile_id: TileId,
         tile: &Tile,
     ) -> DrawableTile {
-        let mut layers = Vec::with_capacity(tile.layers.len());
-        for l in &tile.layers {
-            layers.push(DrawableLayer::from_layer(&l))
+        let mut features = Vec::new();
+        for l in tile.layers.clone() {
+            features.extend(l.features);
         }
 
         DrawableTile {
@@ -39,18 +40,10 @@ impl DrawableTile {
                 .create_buffer_mapped(tile.mesh.indices.len(), wgpu::BufferUsage::INDEX)
                 .fill_from_slice(&tile.mesh.indices),
             index_count: tile.mesh.indices.len() as u32,
-            layers: layers,
+            features,
             tile_id,
             extent: tile.extent,
         }
-    }
-
-    pub fn layer_has_data(&self, layer_id: u32) -> bool {
-        self.layers
-            .iter()
-            .find(|dl| dl.id == layer_id)
-            .map(|dl| dl.indices_range.end - dl.indices_range.start > 1)
-            .unwrap_or(false)
     }
 
     pub fn paint(
@@ -58,25 +51,21 @@ impl DrawableTile {
         render_pass: &mut RenderPass,
         layer_collection: &LayerCollection,
         tile_id: u32,
-        layer_id: u32,
+        feature_id: u32,
         outline: bool
     ) {
-        if let Some(layer) = self.layers.iter().find(|l| l.id == layer_id) {
-            render_pass.set_index_buffer(&self.index_buffer, 0);
-            render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
-            for (feature_id, range) in &layer.features {
-                if range.len() > 0 {
-                    if layer_collection.is_visible(*feature_id) {
-                        if outline {
-                            if layer_collection.has_outline(*feature_id) {
-                                let range_start = tile_id << 1;
-                                render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
-                            }
-                        } else {
-                            let range_start = (tile_id << 1) | 1;
-                            render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
-                        }
+        render_pass.set_index_buffer(&self.index_buffer, 0);
+        render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
+        for (id, range) in &self.features {
+            if feature_id == *id && layer_collection.is_visible(*id) {
+                if outline {
+                    if layer_collection.has_outline(*id) {
+                        let range_start = tile_id << 1;
+                        render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
                     }
+                } else {
+                    let range_start = (tile_id << 1) | 1;
+                    render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
                 }
             }
         }
