@@ -727,25 +727,25 @@ impl Painter {
         if layer_collection.iter_features().count() > 0 && num_tiles > 0 {
             let frame = self.swap_chain.get_next_texture();
             {
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: if CONFIG.renderer.msaa_samples > 1 { &self.multisampled_framebuffer } else { &frame.view },
+                        resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
+                        load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
+                        store_op: wgpu::StoreOp::Store,
+                        clear_color: wgpu::Color::WHITE,
+                    }],
+                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
+                        attachment: &self.stencil,
+                        depth_load_op: LoadOp::Clear,
+                        depth_store_op: StoreOp::Store,
+                        clear_depth: 0.0,
+                        stencil_load_op: LoadOp::Clear,
+                        stencil_store_op: StoreOp::Store,
+                        clear_stencil: 255,
+                    }),
+                });
                 for feature in layer_collection.iter_features() {
-                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: if CONFIG.renderer.msaa_samples > 1 { &self.multisampled_framebuffer } else { &frame.view },
-                            resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
-                            load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
-                            store_op: wgpu::StoreOp::Store,
-                            clear_color: wgpu::Color::WHITE,
-                        }],
-                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
-                            attachment: &self.stencil,
-                            depth_load_op: LoadOp::Clear,
-                            depth_store_op: StoreOp::Store,
-                            clear_depth: 0.0,
-                            stencil_load_op: LoadOp::Clear,
-                            stencil_store_op: StoreOp::Store,
-                            clear_stencil: 255,
-                        }),
-                    });
                     render_pass.set_pipeline(&self.blend_pipeline);
                     render_pass.set_stencil_reference(feature.id as u32);
                     render_pass.set_bind_group(0, &self.bind_group, &[]);
