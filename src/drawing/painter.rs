@@ -745,10 +745,10 @@ impl Painter {
                         clear_stencil: 255,
                     }),
                 });
+                render_pass.set_pipeline(&self.blend_pipeline);
+                render_pass.set_bind_group(0, &self.bind_group, &[]);
                 for feature in layer_collection.iter_features() {
-                    render_pass.set_pipeline(&self.blend_pipeline);
                     render_pass.set_stencil_reference(feature.id as u32);
-                    render_pass.set_bind_group(0, &self.bind_group, &[]);
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
                         drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, feature.id, false);
                     }
