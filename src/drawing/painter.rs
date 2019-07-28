@@ -1,3 +1,7 @@
+use nalgebra_glm::{
+    vec4,
+    vec2,
+};
 use crate::drawing::layer_collection::LayerCollection;
 use crate::vector_tile::math::Screen;
 use wgpu::TextureView;
@@ -747,15 +751,61 @@ impl Painter {
                 });
                 render_pass.set_pipeline(&self.blend_pipeline);
                 render_pass.set_bind_group(0, &self.bind_group, &[]);
+                let tile_size = app_state.screen.get_tile_size() as f32;
+                let vec = vec4(0.0, 0.0, 0.0, 1.0);
+                let screen_dimensions = vec2(app_state.screen.width as f32, app_state.screen.height as f32) / 2.0;
                 for feature in layer_collection.iter_features() {
                     render_pass.set_stencil_reference(feature.id as u32);
-                    for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
-                        drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, feature.id, false);
+                    println!("start ================================");
+                    for (i, dt) in self.loaded_tiles.values_mut().enumerate() {
+                        let matrix = app_state.screen.tile_to_global_space(
+                            app_state.zoom,
+                            &dt.tile_id
+                        );
+                        let start = (matrix * &vec);
+                        dbg!(start);
+                        let s = vec2({
+                            let x = (start.x * screen_dimensions.x).round();
+                            if x < 0.0 { 0.0 } else { x }
+                        }, {
+                            let y = (start.y * screen_dimensions.y).round();
+                            if y < 0.0 { 0.0 } else { y }
+                        });
+                        dbg!(s);
+                        let matrix = app_state.screen.tile_to_global_space(
+                            app_state.zoom,
+                            &(dt.tile_id + TileId::new(dt.tile_id.z, 1, 1))
+                        );
+                        let end = (matrix * &vec);
+                        dbg!(end);
+                        let e = vec2({
+                            let x = (end.x * screen_dimensions.x).round();
+                            if x < 0.0 { 0.0 } else { x }
+                        }, {
+                            let y = (end.y * screen_dimensions.y).round();
+                            if y < 0.0 { 0.0 } else { y }
+                        });
+                        dbg!(e);
+
+                        dbg!((
+                            (s.x),
+                            (s.y),
+                            ((e.x - s.x)),
+                            ((e.y - s.y))
+                        ));
+
+                        render_pass.set_scissor_rect(
+                            s.x as u32,
+                            s.y as u32,
+                            (e.x - s.x) as u32,
+                            (e.y - s.y) as u32
+                        );
+                        dt.paint(&mut render_pass, &layer_collection, i as u32, feature.id, false);
                     }
 
-                    for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
-                        drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, feature.id, true);
-                    }
+                    // for (i, dt) in self.loaded_tiles.values_mut().enumerate() {
+                    //     dt.paint(&mut render_pass, &layer_collection, i as u32, feature.id, true);
+                    // }
                     first = false;
                 }
             }
