@@ -722,6 +722,8 @@ impl Painter {
             &self.tile_transform_buffer
         );
         let num_tiles = self.loaded_tiles.len();
+        let mut first = true;
+        dbg!(layer_collection.iter_features().count());
         if layer_collection.iter_features().count() > 0 && num_tiles > 0 {
             let frame = self.swap_chain.get_next_texture();
             {
@@ -730,7 +732,7 @@ impl Painter {
                         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                             attachment: if CONFIG.renderer.msaa_samples > 1 { &self.multisampled_framebuffer } else { &frame.view },
                             resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
-                            load_op: wgpu::LoadOp::Load,
+                            load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
                             store_op: wgpu::StoreOp::Store,
                             clear_color: wgpu::Color::WHITE,
                         }],
@@ -754,6 +756,7 @@ impl Painter {
                     for (i, drawable_tile) in self.loaded_tiles.values_mut().enumerate() {
                         drawable_tile.paint(&mut render_pass, &layer_collection, i as u32, feature.id, true);
                     }
+                    first = false;
                 }
             }
             self.device.get_queue().submit(&[encoder.finish()]);

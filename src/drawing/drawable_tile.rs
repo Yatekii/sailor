@@ -57,7 +57,7 @@ impl DrawableTile {
         render_pass.set_index_buffer(&self.index_buffer, 0);
         render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
         for (id, range) in &self.features {
-            if feature_id == *id && layer_collection.is_visible(*id) {
+            if feature_id == *id && range.len() > 0 && layer_collection.is_visible(*id) {
                 if outline {
                     if layer_collection.has_outline(*id) {
                         let range_start = tile_id << 1;
