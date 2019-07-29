@@ -756,14 +756,14 @@ impl Painter {
                 let screen_dimensions = vec2(app_state.screen.width as f32, app_state.screen.height as f32) / 2.0;
                 for feature in layer_collection.iter_features() {
                     render_pass.set_stencil_reference(feature.id as u32);
-                    println!("start ================================");
+                    // println!("start ================================");
                     for (i, dt) in self.loaded_tiles.values_mut().enumerate() {
                         let matrix = app_state.screen.tile_to_global_space(
                             app_state.zoom,
                             &dt.tile_id
                         );
-                        let start = (matrix * &vec);
-                        dbg!(start);
+                        let start = (matrix * &vec).xy() + &vec2(1.0, 1.0);
+                        // dbg!(start);
                         let s = vec2({
                             let x = (start.x * screen_dimensions.x).round();
                             if x < 0.0 { 0.0 } else { x }
@@ -771,13 +771,13 @@ impl Painter {
                             let y = (start.y * screen_dimensions.y).round();
                             if y < 0.0 { 0.0 } else { y }
                         });
-                        dbg!(s);
+                        // dbg!(s);
                         let matrix = app_state.screen.tile_to_global_space(
                             app_state.zoom,
                             &(dt.tile_id + TileId::new(dt.tile_id.z, 1, 1))
                         );
-                        let end = (matrix * &vec);
-                        dbg!(end);
+                        let end = (matrix * &vec).xy() + &vec2(1.0, 1.0);
+                        // dbg!(end);
                         let e = vec2({
                             let x = (end.x * screen_dimensions.x).round();
                             if x < 0.0 { 0.0 } else { x }
@@ -785,14 +785,14 @@ impl Painter {
                             let y = (end.y * screen_dimensions.y).round();
                             if y < 0.0 { 0.0 } else { y }
                         });
-                        dbg!(e);
+                        // dbg!(e);
 
-                        dbg!((
-                            (s.x),
-                            (s.y),
-                            ((e.x - s.x)),
-                            ((e.y - s.y))
-                        ));
+                        // dbg!((
+                        //     (s.x),
+                        //     (s.y),
+                        //     ((e.x - s.x)),
+                        //     ((e.y - s.y))
+                        // ));
 
                         render_pass.set_scissor_rect(
                             s.x as u32,
