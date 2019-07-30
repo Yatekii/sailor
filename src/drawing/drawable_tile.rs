@@ -51,20 +51,19 @@ impl DrawableTile {
         render_pass: &mut RenderPass,
         layer_collection: &LayerCollection,
         tile_id: u32,
-        feature_id: u32,
         outline: bool
     ) {
         render_pass.set_index_buffer(&self.index_buffer, 0);
         render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
         for (id, range) in &self.features {
-            if feature_id == *id && range.len() > 0 && layer_collection.is_visible(*id) {
-                if outline {
-                    if layer_collection.has_outline(*id) {
-                        let range_start = tile_id << 1;
-                        render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
-                    }
-                } else {
-                    let range_start = (tile_id << 1) | 1;
+            if range.len() > 0 && layer_collection.is_visible(*id) {
+                render_pass.set_stencil_reference(*id as u32);
+                
+                let range_start = (tile_id << 1) | 1;
+                render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
+
+                if layer_collection.has_outline(*id) {
+                    let range_start = tile_id << 1;
                     render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
                 }
             }
