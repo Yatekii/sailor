@@ -55,10 +55,12 @@ impl DrawableTile {
     ) {
         render_pass.set_index_buffer(&self.index_buffer, 0);
         render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
+        let mut i = 0;
         for (id, range) in &self.features {
             if range.len() > 0 && layer_collection.is_visible(*id) {
-                render_pass.set_stencil_reference(*id as u32);
-                
+                render_pass.set_stencil_reference(i as u32);
+                i += 1;
+
                 let range_start = (tile_id << 1) | 1;
                 render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
 
