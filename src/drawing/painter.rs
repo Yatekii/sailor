@@ -229,7 +229,8 @@ impl Painter {
                 src_factor: wgpu::BlendFactor::One,
                 dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
                 operation: wgpu::BlendOperation::Add,
-            }
+            },
+            false
         );
 
         let noblend_pipeline = Self::create_layer_render_pipeline(
@@ -238,7 +239,8 @@ impl Painter {
             &layer_vs_module,
             &layer_fs_module,
             wgpu::BlendDescriptor::REPLACE,
-            wgpu::BlendDescriptor::REPLACE
+            wgpu::BlendDescriptor::REPLACE,
+            true
         );
 
         let swap_chain = device.create_swap_chain(
@@ -286,6 +288,7 @@ impl Painter {
         fs_module: &ShaderModule,
         color_blend: wgpu::BlendDescriptor,
         alpha_blend: wgpu::BlendDescriptor,
+        depth_write_enabled: bool,
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
@@ -317,7 +320,7 @@ impl Painter {
             }],
             depth_stencil_state: Some(DepthStencilStateDescriptor {
                 format: wgpu::TextureFormat::D24UnormS8Uint,
-                depth_write_enabled: true,
+                depth_write_enabled,
                 depth_compare: wgpu::CompareFunction::Greater,
                 stencil_front: wgpu::StencilStateFaceDescriptor {
                     compare: wgpu::CompareFunction::NotEqual,
@@ -512,7 +515,8 @@ impl Painter {
                             src_factor: wgpu::BlendFactor::One,
                             dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
                             operation: wgpu::BlendOperation::Add,
-                        }
+                        },
+                        false
                     );
 
                     self.noblend_pipeline = Self::create_layer_render_pipeline(
@@ -521,7 +525,8 @@ impl Painter {
                         &vs_module,
                         &fs_module,
                         wgpu::BlendDescriptor::REPLACE,
-                        wgpu::BlendDescriptor::REPLACE
+                        wgpu::BlendDescriptor::REPLACE,
+                        true
                     );
                     true
                 } else {
@@ -726,16 +731,15 @@ impl Painter {
             &self.tile_transform_buffer
         );
         let num_tiles = self.loaded_tiles.len();
-        let mut first = true;
-        dbg!(layer_collection.iter_features().count());
-        if layer_collection.iter_features().count() > 0 && num_tiles > 0 {
+        let features = layer_collection.get_features();
+        if features.len() > 0 && num_tiles > 0 {
             let frame = self.swap_chain.get_next_texture();
             {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                         attachment: if CONFIG.renderer.msaa_samples > 1 { &self.multisampled_framebuffer } else { &frame.view },
                         resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
-                        load_op: if first { wgpu::LoadOp::Clear } else { wgpu::LoadOp::Load },
+                        load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
                         clear_color: wgpu::Color::WHITE,
                     }],
@@ -749,7 +753,6 @@ impl Painter {
                         clear_stencil: 255,
                     }),
                 });
-                render_pass.set_pipeline(&self.blend_pipeline);
                 render_pass.set_bind_group(0, &self.bind_group, &[]);
                 let vec = vec4(0.0, 0.0, 0.0, 1.0);
                 let screen_dimensions = vec2(app_state.screen.width as f32, app_state.screen.height as f32) / 2.0;
@@ -785,7 +788,7 @@ impl Painter {
                         (e.x - s.x) as u32,
                         (e.y - s.y) as u32
                     );
-                    dt.paint(&mut render_pass, &layer_collection, i as u32, false);
+                    dt.paint(&mut render_pass, &self.blend_pipeline, &self.noblend_pipeline, &layer_collection, i as u32, false);
                 }
             }
             self.device.get_queue().submit(&[encoder.finish()]);

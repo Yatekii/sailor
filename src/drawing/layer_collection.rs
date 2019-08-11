@@ -29,12 +29,8 @@ impl LayerCollection {
         self.layers[id as usize] = true;
     }
 
-    pub fn iter_layers(&self) -> Iter<'_, bool> {
-        self.layers.iter()
-    }
-
-    pub fn iter_features(&self) -> Iter<'_, Feature> {
-        self.features.iter()
+    pub fn get_features(&self) -> &Vec<Feature> {
+        &self.features
     }
 
     pub fn get_feature_id(&mut self, selector: &crate::css::Selector) -> Option<u32> {
@@ -67,12 +63,28 @@ impl LayerCollection {
     }
 
     pub fn is_visible(&self, feature_id: u32) -> bool {
-        self.features[feature_id as usize].style.display
+        let feature = &self.features[feature_id as usize];
+        let bga = feature.style.background_color.a;
+        let bca = feature.style.border_color.a;
+        !(!feature.style.display || (bga == 0.0 && bca == 0.0))
+    }
+
+    pub fn has_alpha(&self, feature_id: u32) -> bool {
+        let feature = &self.features[feature_id as usize];
+        let bga = feature.style.background_color.a;
+        let bca = feature.style.border_color.a;
+        bga < 1.0 || bca < 1.0
     }
 
     pub fn has_outline(&self, feature_id: u32) -> bool {
-           self.features[feature_id as usize].style.border_width > 0.0
-        && self.features[feature_id as usize].style.border_color.a > 0.0
+        let feature = &self.features[feature_id as usize];
+        let bw = feature.style.background_color.a;
+        let bca = feature.style.border_color.a;
+        bw > 0.0 && bca > 0.0
+    }
+
+    pub fn get_zindex(&self, feature_id: u32) -> f32 {
+        self.features[feature_id as usize].style.z_index
     }
 
     pub fn load_styles(&mut self, zoom: f32, css_cache: &mut RulesCache) {

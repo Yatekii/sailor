@@ -1,3 +1,4 @@
+use wgpu::RenderPipeline;
 use core::ops::Range;
 use crate::drawing::layer_collection::LayerCollection;
 use crate::vector_tile::math::TileId;
@@ -49,14 +50,52 @@ impl DrawableTile {
     pub fn paint(
         &mut self,
         render_pass: &mut RenderPass,
+        blend_pipeline: &RenderPipeline,
+        noblend_pipeline: &RenderPipeline,
         layer_collection: &LayerCollection,
         tile_id: u32,
         outline: bool
     ) {
         render_pass.set_index_buffer(&self.index_buffer, 0);
         render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
-        let mut i = 0;
+
+        let mut alpha_set = vec![];
+        let mut opaque_set = vec![];
+
+        self.features.sort_by(|a, b| {
+            layer_collection
+                .get_zindex(a.0)
+                .partial_cmp(&layer_collection.get_zindex(b.0)).unwrap()
+        });
+
         for (id, range) in &self.features {
+            if layer_collection.has_alpha(*id) {
+                alpha_set.push((id, range));
+            } else {
+                opaque_set.push((id, range));
+            }
+        }
+
+        let mut i = 0;
+        render_pass.set_pipeline(noblend_pipeline);
+        for (id, range) in opaque_set {
+            if range.len() > 0 && layer_collection.is_visible(*id) {
+                render_pass.set_stencil_reference(i as u32);
+                i += 1;
+
+                let range_start = (tile_id << 1) | 1;
+                render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
+
+                if layer_collection.has_outline(*id) {
+                    let range_start = tile_id << 1;
+                    render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
+                }
+            }
+        }
+
+        let mut i = 0;
+        render_pass.set_pipeline(blend_pipeline);
+        for (id, range) in alpha_set {
             if range.len() > 0 && layer_collection.is_visible(*id) {
                 render_pass.set_stencil_reference(i as u32);
                 i += 1;

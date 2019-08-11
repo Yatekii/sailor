@@ -37,6 +37,10 @@ layer[name=waterway] {
     background-color: rgb(14, 28, 223);
 }
 
+layer[name=aeroway] {
+    background-color: rgba(223, 14, 84, 0.2);
+}
+
 layer[name=boundary] {
     background-color: rgb(223, 45, 14);
     line-width: 2px;
