@@ -1,4 +1,4 @@
-use crate::drawing::layer_collection::LayerCollection;
+use crate::drawing::feature_collection::FeatureCollection;
 use crate::drawing::feature::Feature;
 use std::sync::{
     Arc,
@@ -50,7 +50,7 @@ pub fn layer_num(name: &str) -> u32 {
 }
 
 impl Tile {
-    pub fn from_mbvt(tile_id: &math::TileId, data: &Vec<u8>, layer_collection: Arc<RwLock<LayerCollection>>) -> Self {
+    pub fn from_mbvt(tile_id: &math::TileId, data: &Vec<u8>, feature_collection: Arc<RwLock<FeatureCollection>>) -> Self {
         // let t = std::time::Instant::now();
 
         // we can build a bytes reader directly out of the bytes
@@ -105,14 +105,11 @@ impl Tile {
                 index_start_before = builder.get_current_index();
                 for feature in fs {
                     {
-                        let mut layer_collection = layer_collection.write().unwrap();
-                        if !layer_collection.is_layer_set(layer_id) {
-                            layer_collection.set_layer(layer_id);
-                        }
-                        current_feature_id = if let Some(feature_id) = layer_collection.get_feature_id(&selector) {
+                        let mut feature_collection = feature_collection.write().unwrap();
+                        current_feature_id = if let Some(feature_id) = feature_collection.get_feature_id(&selector) {
                             feature_id
                         } else {
-                            layer_collection.add_feature(Feature::new(selector.clone(), layer_id))
+                            feature_collection.add_feature(Feature::new(selector.clone(), layer_id))
                         };
                         builder.set_current_feature_id(current_feature_id);
                     }

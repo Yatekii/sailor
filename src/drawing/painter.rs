@@ -2,7 +2,7 @@ use nalgebra_glm::{
     vec4,
     vec2,
 };
-use crate::drawing::layer_collection::LayerCollection;
+use crate::drawing::feature_collection::FeatureCollection;
 use crate::vector_tile::math::Screen;
 use wgpu::TextureView;
 use crossbeam_channel::{
@@ -88,7 +88,7 @@ pub struct Painter {
     bind_group: BindGroup,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
-    layer_collection: Arc<RwLock<LayerCollection>>,
+    feature_collection: Arc<RwLock<FeatureCollection>>,
 }
 
 impl Painter {
@@ -190,7 +190,7 @@ impl Painter {
             ]
         });
 
-        let layer_collection = Arc::new(RwLock::new(LayerCollection::new(20, 500)));
+        let feature_collection = Arc::new(RwLock::new(FeatureCollection::new(500)));
 
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -277,7 +277,7 @@ impl Painter {
             bind_group,
             _watcher: watcher,
             rx,
-            layer_collection,
+            feature_collection,
         }
     }
 
@@ -364,7 +364,7 @@ impl Painter {
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_uniform_buffers(device: &Device, screen: &Screen, layer_collection: &LayerCollection) -> Vec<(Buffer, usize)> {
+    fn create_uniform_buffers(device: &Device, screen: &Screen, feature_collection: &FeatureCollection) -> Vec<(Buffer, usize)> {
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device
             .create_buffer_mapped(
@@ -373,7 +373,7 @@ impl Painter {
             )
             .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
 
-        let buffer = layer_collection.assemble_style_buffer();
+        let buffer = feature_collection.assemble_style_buffer();
         let layer_data_len = buffer.len() * 12 * 4;
         let layer_data_buffer = device
             .create_buffer_mapped(
@@ -550,8 +550,8 @@ impl Painter {
 
     pub fn update_styles(&mut self, zoom: f32, css_cache: &mut RulesCache) {
         if css_cache.update() {
-            let mut layer_collection = self.layer_collection.write().unwrap();
-            layer_collection.load_styles(zoom, css_cache);
+            let mut feature_collection = self.feature_collection.write().unwrap();
+            feature_collection.load_styles(zoom, css_cache);
         }
     }
 
@@ -575,14 +575,14 @@ impl Painter {
         &mut self,
         encoder: &mut CommandEncoder,
         app_state: &AppState,
-        layer_collection: &LayerCollection
+        feature_collection: &FeatureCollection
     ) {
         Self::copy_uniform_buffers(
             encoder,
             &Self::create_uniform_buffers(
                 &self.device,
                 &app_state.screen,
-                layer_collection
+                feature_collection
             ),
             &self.uniform_buffer
         );
@@ -658,7 +658,7 @@ impl Painter {
         app_state.tile_cache.fetch_tiles();
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
-                app_state.tile_cache.request_tile(&tile_id, self.layer_collection.clone());
+                app_state.tile_cache.request_tile(&tile_id, self.feature_collection.clone());
                 
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
@@ -711,19 +711,19 @@ impl Painter {
             }
         }
 
-        let mut layer_collection = self.layer_collection.write().unwrap();
-        layer_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
+        let mut feature_collection = self.feature_collection.write().unwrap();
+        feature_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
     }
 
     pub fn paint(&mut self, app_state: &mut AppState) {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         self.load_tiles(app_state);
-        let layer_collection = {
-            let lock = self.layer_collection.clone();
-            let layer_collection = lock.read().unwrap();
-            (*layer_collection).clone()
+        let feature_collection = {
+            let lock = self.feature_collection.clone();
+            let feature_collection = lock.read().unwrap();
+            (*feature_collection).clone()
         };
-        self.update_uniforms(&mut encoder, &app_state, &layer_collection);
+        self.update_uniforms(&mut encoder, &app_state, &feature_collection);
         self.bind_group = Self::create_blend_bind_group(
             &self.device,
             &self.bind_group_layout,
@@ -731,7 +731,7 @@ impl Painter {
             &self.tile_transform_buffer
         );
         let num_tiles = self.loaded_tiles.len();
-        let features = layer_collection.get_features();
+        let features = feature_collection.get_features();
         if features.len() > 0 && num_tiles > 0 {
             let frame = self.swap_chain.get_next_texture();
             {
@@ -788,15 +788,10 @@ impl Painter {
                         (e.x - s.x) as u32,
                         (e.y - s.y) as u32
                     );
-                    dt.paint(&mut render_pass, &self.blend_pipeline, &self.noblend_pipeline, &layer_collection, i as u32, false);
+                    dt.paint(&mut render_pass, &self.blend_pipeline, &self.noblend_pipeline, &feature_collection, i as u32);
                 }
             }
             self.device.get_queue().submit(&[encoder.finish()]);
         }
     }
 }
-
-// pub fn timestamp(old: std::time::Instant, string: &str) -> std::time::Instant {
-//     log::debug!("{}: {}", string, old.elapsed().as_micros());
-//     std::time::Instant::now()
-// }

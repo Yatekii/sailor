@@ -9,14 +9,6 @@ fn deg2rad(deg: f32) -> f32 {
     2.0 * PI * deg / 360.0
 }
 
-// fn rad2deg(rad: f32) -> f32 {
-//     360.0 * rad / (2.0 * PI)
-// }
-
-// pub fn deg2tile(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileId {
-//     deg2num(lat_deg, lon_deg, zoom).into()
-// }
-
 pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileCoordinate {
     let lat_rad = deg2rad(lat_deg);
     let n = 2f32.powi(zoom as i32);
@@ -30,22 +22,6 @@ pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileCoordinate {
     TileCoordinate::new(zoom, xtile, ytile)
 }
 
-// pub fn num2deg(tile_coordinate: &TileCoordinate) -> Point {
-//     let n = 2f32.powi(tile_coordinate.z as i32);
-//     let lon_deg = tile_coordinate.x as f32 / n * 360.0 - 180.0;
-//     let lat_rad = ((PI * (1f32 - 2f32 * tile_coordinate.y as f32 / n)).sinh()).atan();
-//     let lat_deg = rad2deg(lat_rad);
-//     point(lat_deg, lon_deg)
-// }
-
-// pub fn tile2deg(tile_coordinate: &TileId) -> Point {
-//     num2deg(&tile_coordinate.clone().into())
-// }
-
-pub fn tile_to_global_space(coordinate: &TileId, point: Point) -> Point {
-    (point + vector(coordinate.x as f32, coordinate.y as f32)) * 1.0/2f32.powi(coordinate.z as i32)
-}
-
 pub fn num_to_global_space(coordinate: &TileCoordinate) -> Point {
     point(0.0, 0.0) + vector(coordinate.x, coordinate.y) * 1.0/2f32.powi(coordinate.z as i32)
 }
@@ -54,16 +30,10 @@ pub fn global_to_num_space(point: &Point, z: u32) -> TileCoordinate {
     let p = *point / 2f32.powi(-(z as i32));
     TileCoordinate::new(z, p.x, p.y)
 }
-
-// pub fn global_to_tile_space(z: u32, x: u32, y: u32, point: Point) -> Point {
-//     point - vector(x as f32, y as f32) * 2f32.powi(z as i32)
-// }
-
 pub struct Screen {
     pub center: Point,
     pub width: u32,
     pub height: u32,
-    hidpi_factor: f64,
     tile_size: u32,
 }
 
@@ -73,7 +43,6 @@ impl Screen {
             center,
             width,
             height,
-            hidpi_factor,
             tile_size: (crate::config::CONFIG.renderer.tile_size as f64 * hidpi_factor) as u32,
         }
     }

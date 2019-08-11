@@ -1,4 +1,3 @@
-use std::slice::Iter;
 use crate::css::RulesCache;
 use crate::drawing::feature::{
     Feature,
@@ -6,27 +5,17 @@ use crate::drawing::feature::{
 };
 
 #[derive(Debug, Clone)]
-pub struct LayerCollection {
-    layers: Vec<bool>,
+pub struct FeatureCollection {
     features: Vec<Feature>,
     n_features_max: u32,
 }
 
-impl LayerCollection {
-    pub fn new(n_layers: u32, n_features_max: u32) -> Self {
+impl FeatureCollection {
+    pub fn new(n_features_max: u32) -> Self {
         Self {
-            layers: vec![false; n_layers as usize],
             features: vec![],
             n_features_max,
         }
-    }
-
-    pub fn is_layer_set(&self, id: u32) -> bool {
-        self.layers[id as usize]
-    }
-
-    pub fn set_layer(&mut self, id: u32) {
-        self.layers[id as usize] = true;
     }
 
     pub fn get_features(&self) -> &Vec<Feature> {
@@ -42,24 +31,6 @@ impl LayerCollection {
         feature.id = self.features.len() as u32;
         self.features.push(feature);
         self.features.len() as u32 - 1
-    }
-
-    pub fn _has_outline(&self) -> bool {
-        for feature in &self.features {
-            if feature.style.border_width > 0.0 && feature.style.border_color.a > 0.0 {
-                return true;
-            }
-        }
-        false
-    }
-
-    pub fn _has_fill(&self) -> bool {
-        for feature in &self.features {
-            if feature.style.background_color.a > 0.0 {
-                return true;
-            }
-        }
-        false
     }
 
     pub fn is_visible(&self, feature_id: u32) -> bool {

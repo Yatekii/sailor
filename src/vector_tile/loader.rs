@@ -30,7 +30,7 @@
 //         app_state.tile_cache.fetch_tiles();
 //         for tile_id in tile_field.iter() {
 //             if !self.loaded_tiles.contains_key(&tile_id) {
-//                 app_state.tile_cache.request_tile(&tile_id, self.layer_collection.clone());
+//                 app_state.tile_cache.request_tile(&tile_id, self.feature_collection.clone());
                 
 //                 let tile_cache = &mut app_state.tile_cache;
 //                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
@@ -83,7 +83,7 @@
 //             }
 //         }
 
-//         let mut layer_collection = self.layer_collection.write().unwrap();
-//         layer_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
+//         let mut feature_collection = self.feature_collection.write().unwrap();
+//         feature_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
 //     }
 // }
