@@ -6,6 +6,7 @@ layout(location = 1) in ivec2 normal;
 layout(location = 2) in uint feature_id;
 
 layout(location = 0) out vec4 outColor;
+layout(location = 1) out float d;
 
 layout(std140) struct LayerData {
     vec4 background_color;
@@ -44,25 +45,32 @@ void main() {
     TileData tile_data = tile_datas[tile_id];
 
     // Is the line we are currently handling sized in world coordinates or pixels?
-    bool is_world_scale_line = (layer_data.line_width & 0x01) == 1;
+    bool is_world_scale_line = (layer_data.line_width & 0x02) == 1;
+    bool is_line = (layer_data.line_width & 0x01) == 1;
+    float line_width = layer_data.line_width >> 2;
 
     // Calculate the tile normal normal in [0.0, 1.0] coordinates.
     vec2 local_normal = normal / tile_data.extent;
+    if(is_line) {
+        d = sign(local_normal.y);
+    } else {
+        d = 0;
+    }
 
     vec4 tile_local_position = vec4(position / tile_data.extent, 0.0, 1.0);
 
-    // If we have a world scale line, add the normal to the vertex before the world transform.
-    if(is_world_scale_line) {
-        vec2 n = local_normal / tile_data.extent * (layer_data.line_width >> 1);
-        tile_local_position.xy += n;
-    }
+    // // If we have a world scale line, add the normal to the vertex before the world transform.
+    // if(is_line && is_world_scale_line) {
+    //     vec2 n = local_normal / tile_data.extent * line_width;
+    //     tile_local_position.xy += n;
+    // }
 
     // Transform the vertex.
     gl_Position = tile_data.transform * tile_local_position;
 
     // If we have a pixel scale line, add the normal to the vertex after the world transform.
-    if(!is_world_scale_line) {
-        gl_Position.xy += local_normal / canvas_size * (layer_data.line_width >> 1);
+    if(is_line && !is_world_scale_line) {
+        gl_Position.xy += local_normal / canvas_size * line_width;
     }
 
     // If we handle an outline, add the normal to the vertex (always pixel space) and pick the appropriate color.
@@ -72,5 +80,9 @@ void main() {
     } else {
         outColor = layer_data.background_color;
     }
+
+    // Feather
+    gl_Position.xy += local_normal / canvas_size * 2;
+
     gl_Position.z = layer_data.z_index / 1000 + 0.001;
 }

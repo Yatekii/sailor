@@ -35,6 +35,7 @@ layer[name=transportation][zoom=14] {
 
 layer[name=waterway] {
     background-color: rgb(14, 28, 223);
+    line-width: 2px;
 }
 
 layer[name=aeroway] {
