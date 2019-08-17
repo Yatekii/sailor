@@ -3,7 +3,7 @@
 
 layout(location = 0) in ivec2 position;
 layout(location = 1) in ivec2 normal;
-layout(location = 2) in uint feature_id;
+layout(location = 2) in uint feature;
 
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out float d;
@@ -40,13 +40,17 @@ void main() {
     // The current tile.
     uint tile_id = (gl_InstanceIndex >> 1);
 
+    uint feature_id = feature & 0xFFFF;
+    uint feature_type = (feature >> 16) & 0x3;
+
     // Shortcut the array indexing.
     LayerData layer_data = layer_datas[feature_id];
     TileData tile_data = tile_datas[tile_id];
 
     // Is the line we are currently handling sized in world coordinates or pixels?
     bool is_world_scale_line = (layer_data.line_width & 0x02) == 1;
-    bool is_line = (layer_data.line_width & 0x01) == 1;
+    bool is_line = feature_type == 1;
+
     float line_width = layer_data.line_width >> 2;
 
     // Calculate the tile normal normal in [0.0, 1.0] coordinates.

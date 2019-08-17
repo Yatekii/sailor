@@ -11,6 +11,7 @@ use lyon::tessellation::{
 use varint::ZigZag;
 
 use crate::vector_tile::mod_Tile::GeomType;
+use crate::drawing::vertex::VertexType;
 
 #[derive(Debug, Clone)]
 pub struct Layer {
@@ -127,6 +128,7 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
 
             // Fill
             builder.set_current_extent(extent);
+            builder.set_current_vertex_type(VertexType::Polygon);
             let mut tessellator = FillTessellator::new();
             let _ = tessellator
                 .tessellate_path(
@@ -140,6 +142,7 @@ pub fn geometry_commands_to_drawable<'a, 'l>(
     if geometry_type == GeomType::LINESTRING {
         while cursor < geometry.len() {
             let path = parse_one_to_path(geometry_type, geometry, &mut cursor, &mut c);
+            builder.set_current_vertex_type(VertexType::Line);
             builder.set_current_extent(extent);
             tesselate_line2(&path, builder, z);
         }

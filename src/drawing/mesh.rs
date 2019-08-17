@@ -1,3 +1,4 @@
+use crate::drawing::vertex::VertexType;
 use crate::drawing::vertex::{
     Vertex,
     LayerVertexCtor
@@ -50,6 +51,10 @@ impl<'l> MeshBuilder<'l> {
 
     pub fn get_current_index(&mut self) -> u32 {
         self.buffers.indices.len() as u32
+    }
+
+    pub fn set_current_vertex_type(&mut self, vertex_type: VertexType) {
+        self.vertex_constructor.vertex_type = vertex_type;
     }
 }
 
