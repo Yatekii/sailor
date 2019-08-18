@@ -1,6 +1,6 @@
 [general]
 log_level = "Warn"
-display_framerate = true
+display_framerate = false
 
 [renderer]
 vertex_shader = "config/shader.vert"

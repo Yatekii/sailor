@@ -101,50 +101,46 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, cursor: &mut 
     }
 }
 
-pub fn geometry_commands_to_drawable<'a, 'l>(
-    builder: &'a mut MeshBuilder<'l>,
+pub fn geometry_commands_to_paths(
     geometry_type: GeomType,
     geometry: &Vec<u32>,
+) -> Vec<Path> {
+    let mut cursor = 0;
+    let mut c = point(0f32, 0f32);
+    let mut paths = Vec::new();
+
+    while cursor < geometry.len() {
+        let path = parse_one_to_path(geometry_type, geometry, &mut cursor, &mut c);
+        paths.push(path);
+    }
+
+    paths
+}
+
+pub fn paths_to_drawable<'a, 'l>(
+    builder: &'a mut MeshBuilder<'l>,
+    geometry_type: GeomType,
+    paths: &Vec<Path>,
     extent: f32,
     z: u32,
 ) {
-    let mut cursor = 0;
-    let mut c = point(0f32, 0f32);
-
-    if geometry_type == GeomType::POLYGON {
-        while cursor < geometry.len() {
-            let path = parse_one_to_path(geometry_type, geometry, &mut cursor, &mut c);
-            
-            // Outline
-            // builder.set_current_vertex_type(true);
-            // let mut tessellator = StrokeTessellator::new();
-            // tessellator
-            //     .tessellate_path(
-            //         &path,
-            //         &StrokeOptions::default().with_line_width(0.0),
-            //         builder,
-            //     )
-            //     .expect("Failed to tesselate path.");
-
-            // Fill
+    for path in paths {
+        if geometry_type == GeomType::POLYGON {
             builder.set_current_extent(extent);
             builder.set_current_vertex_type(VertexType::Polygon);
             let mut tessellator = FillTessellator::new();
             let _ = tessellator
                 .tessellate_path(
-                    &path,
+                    path,
                     &FillOptions::tolerance(0.0001).with_normals(true),
                     builder,
                 ).map_err(|_e| { log::error!("Broken path."); });
         }
-    }
 
-    if geometry_type == GeomType::LINESTRING {
-        while cursor < geometry.len() {
-            let path = parse_one_to_path(geometry_type, geometry, &mut cursor, &mut c);
+        if geometry_type == GeomType::LINESTRING {
             builder.set_current_vertex_type(VertexType::Line);
             builder.set_current_extent(extent);
-            tesselate_line2(&path, builder, z);
+            tesselate_line2(path, builder, z);
         }
     }
 }

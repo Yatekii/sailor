@@ -1,3 +1,5 @@
+use crate::vector_tile::object::Object;
+use crate::interaction::collider::Collider;
 use lyon::math::Point;
 use crate::vector_tile::{
     math::{
@@ -17,6 +19,7 @@ pub struct AppState {
     pub screen: Screen,
     pub tile_field: TileField,
     pub zoom: f32,
+    pub hovered_objects: Vec<Object>,
 }
 
 impl AppState {
@@ -34,6 +37,14 @@ impl AppState {
             screen: Screen::new(center, width, height, hidpi_factor),
             tile_field: TileField::new(TileId::new(8, 0, 0), TileId::new(8, 0, 0)),
             zoom,
+            hovered_objects: vec![],
         }
+    }
+
+    pub fn update_hovered_objects(&mut self, point: (f32, f32)) {
+        self.hovered_objects = Collider::get_hovered_objects(self, point)
+            .iter()
+            .map(|o| (**o).clone())
+            .collect();
     }
 }

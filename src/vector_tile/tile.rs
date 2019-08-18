@@ -4,12 +4,16 @@ use std::sync::{
     Arc,
     RwLock,
 };
-use crate::vector_tile::transform::geometry_commands_to_drawable;
+use crate::vector_tile::transform::{
+    geometry_commands_to_paths,
+    paths_to_drawable
+};
 use crate::vector_tile::math::TileId;
 use crate::drawing::mesh::MeshBuilder;
 use crate::vector_tile::*;
 use quick_protobuf::{MessageRead, BytesReader};
-
+use crate::vector_tile::mod_Tile::GeomType;
+use crate::vector_tile::object::ObjectType;
 use lyon::tessellation::geometry_builder::{
     VertexBuffers,
 };
@@ -19,12 +23,15 @@ use crate::drawing::vertex::{
     LayerVertexCtor,
 };
 
-#[derive(Debug, Clone)]
+use lyon::path::Path;
+
 pub struct Tile {
     pub tile_id: TileId,
     pub layers: Vec<crate::vector_tile::transform::Layer>,
     pub mesh: VertexBuffers<Vertex, u32>,
     pub extent: u16,
+    pub objects: Vec<object::Object>,
+    pub collider: crate::interaction::tile_collider::TileCollider,
 }
 
 pub fn layer_num(name: &str) -> u32 {
@@ -50,7 +57,11 @@ pub fn layer_num(name: &str) -> u32 {
 }
 
 impl Tile {
-    pub fn from_mbvt(tile_id: &math::TileId, data: &Vec<u8>, feature_collection: Arc<RwLock<FeatureCollection>>) -> Self {
+    pub fn from_mbvt(
+        tile_id: &math::TileId,
+        data: &Vec<u8>,
+        feature_collection: Arc<RwLock<FeatureCollection>>
+    ) -> Self {
         // let t = std::time::Instant::now();
 
         // we can build a bytes reader directly out of the bytes
@@ -60,6 +71,7 @@ impl Tile {
         // dbg!(t.elapsed().as_millis());
 
         let mut layers = Vec::with_capacity(tile.layers.len());
+        let mut objects = Vec::new();
         let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::with_capacity(100_000, 100_000);
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id, 1.0));
         let extent = tile.layers[0].extent as u16;
@@ -71,7 +83,7 @@ impl Tile {
 
             let mut map: std::collections::HashMap<
                 crate::css::Selector,
-                Vec<(vector_tile::mod_Tile::GeomType, std::vec::Vec<u32>)>
+                Vec<(vector_tile::mod_Tile::GeomType, Vec<Path>)>
             > = std::collections::HashMap::new();
 
             // Preevaluate the selectors and group features by the selector they belong to.
@@ -79,23 +91,56 @@ impl Tile {
                 let mut selector = crate::css::Selector::new()
                     .with_type("layer".to_string())
                     .with_any("name".to_string(), layer.name.to_string());
+
+                let mut tags = std::collections::HashMap::<String, String>::new();
                 
                 for tag in feature.tags.chunks(2) {
                     let key = layer.keys[tag[0] as usize].to_string();
-                    
+                    let value = layer.values[tag[1] as usize].clone();
                     match &key[..] {
                         "class" | "subclass" => {
-                            let value = layer.values[tag[1] as usize].clone();
-                            selector = selector.with_any(key, value.string_value.unwrap().to_string())
+                            selector = selector.with_any(
+                                key.clone(),
+                                value.string_value.clone().unwrap().to_string()
+                            )
                         },
                         _ => (),
                     }
+
+                    tags.insert(key, {
+                        value.string_value.map_or(String::new(), |v| v.to_string())
+                     + &value.float_value.map_or(String::new(), |v| v.to_string())
+                     + &value.double_value.map_or(String::new(), |v| v.to_string())
+                     + &value.int_value.map_or(String::new(), |v| v.to_string())
+                     + &value.uint_value.map_or(String::new(), |v| v.to_string())
+                     + &value.sint_value.map_or(String::new(), |v| v.to_string())
+                     + &value.bool_value.map_or(String::new(), |v| v.to_string())
+                    });
                 }
 
+                let paths = geometry_commands_to_paths(
+                    feature.type_pb,
+                    &feature.geometry
+                );
+
+                let object_type = match feature.type_pb {
+                    GeomType::POLYGON => Some(ObjectType::Polygon),
+                    GeomType::LINESTRING => Some(ObjectType::Line),
+                    GeomType::POINT => Some(ObjectType::Point),
+                    _ => None,
+                };
+                
+                object_type.map(|ot| objects.push(object::Object::new(
+                    selector.clone(),
+                    tags,
+                    paths[0].points().iter().cloned().collect(),
+                    ot
+                )));
+
                 if let Some(value) = map.get_mut(&selector) {
-                    value.push((feature.type_pb, feature.geometry));
+                    value.push((feature.type_pb, paths));
                 } else {
-                    map.insert(selector, vec![(feature.type_pb, feature.geometry)]);
+                    map.insert(selector.clone(), vec![(feature.type_pb, paths)]);
                 }
             }
 
@@ -114,7 +159,7 @@ impl Tile {
                         builder.set_current_feature_id(current_feature_id);
                     }
 
-                    geometry_commands_to_drawable(
+                    paths_to_drawable(
                         &mut builder,
                         feature.0,
                         &feature.1,
@@ -135,11 +180,22 @@ impl Tile {
             });
         }
 
+        let mut collider = crate::interaction::tile_collider::TileCollider::new();
+
+        for object_id in 0..objects.len() {
+            println!("{}/{}", object_id, objects.len());
+            if objects[object_id].points.len() >= 2 {
+                collider.add_object(object_id, &objects[object_id]);
+            }
+        }
+
         Self {
             tile_id: tile_id.clone(),
             layers,
             mesh,
             extent,
+            objects,
+            collider,
         }
     }
 }

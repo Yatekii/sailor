@@ -1,6 +1,7 @@
 mod vector_tile;
 mod drawing;
 mod app_state;
+mod interaction;
 mod css;
 mod stats;
 mod config;
@@ -9,6 +10,7 @@ extern crate lyon;
 extern crate nalgebra_glm as glm;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate serde_derive;
+#[macro_use] extern crate derivative;
 
 
 use crate::vector_tile::*;
@@ -85,6 +87,8 @@ fn main() {
                         if mouse_down {
                             app_state.screen.center -= delta;
                         }
+
+                        app_state.update_hovered_objects((position.x as f32, position.y as f32))
                     }
                     _ => (),
                 }

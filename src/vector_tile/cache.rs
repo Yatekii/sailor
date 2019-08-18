@@ -89,7 +89,7 @@ impl TileCache {
         }
     }
 
-    pub fn try_get_tile(&mut self, tile_id: &math::TileId) -> Option<&Tile> {
+    pub fn try_get_tile(&self, tile_id: &math::TileId) -> Option<&Tile> {
         self.cache.get(&tile_id)
     }
 }
