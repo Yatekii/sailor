@@ -34,6 +34,7 @@ fn main() {
     let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), size, size, z, hdpi_factor);
 
     let mut painter = drawing::Painter::init(&events_loop, size, size, &app_state);
+    let mut hud = drawing::ui::HUD::new(&painter.window, &mut painter.device);
 
     let mut status = true;
     let mut mouse_down = false;
@@ -44,7 +45,7 @@ fn main() {
     loop {
         use wgpu::winit::{Event, WindowEvent, ElementState, MouseButton, MouseScrollDelta, KeyboardInput, VirtualKeyCode};
         events_loop.poll_events(|event| {
-            match event {
+            match event.clone() {
                 Event::WindowEvent {
                     event: WindowEvent::Resized(size),
                     ..
@@ -89,11 +90,12 @@ fn main() {
                 }
                 _ => (),
             }
+            hud.interact(&painter.window, &event);
         });
 
         painter.update_shader();
         painter.update_styles(app_state.zoom.max(14.0), &mut app_state.css_cache);
-        painter.paint(&mut app_state);
+        painter.paint(&mut hud, &mut app_state);
 
         stats.capture_frame();
         if CONFIG.general.display_framerate {

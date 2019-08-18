@@ -1,6 +1,6 @@
 mod helpers;
 mod painter;
-mod ui;
+pub mod ui;
 pub mod vertex;
 pub mod drawable_tile;
 mod drawable_layer;

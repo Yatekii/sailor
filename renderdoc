@@ -1,0 +1,27 @@
+{
+    "rdocCaptureSettings": 1,
+    "settings": {
+        "autoStart": false,
+        "commandLine": "",
+        "environment": [
+        ],
+        "executable": "/home/yatekii/repos/sailor/target/release/sailor",
+        "inject": false,
+        "numQueuedFrames": 0,
+        "options": {
+            "allowFullscreen": true,
+            "allowVSync": true,
+            "apiValidation": true,
+            "captureAllCmdLists": false,
+            "captureCallstacks": true,
+            "captureCallstacksOnlyDraws": false,
+            "debugOutputMute": true,
+            "delayForDebugger": 0,
+            "hookIntoChildren": false,
+            "refAllResources": false,
+            "verifyBufferAccess": true
+        },
+        "queuedFrameCap": 0,
+        "workingDir": "/home/yatekii/repos/sailor"
+    }
+}

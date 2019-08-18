@@ -71,9 +71,9 @@ use crate::config::CONFIG;
 
 pub struct Painter {
     #[cfg(feature = "vulkan")]
-    _window: Window,
+    pub window: Window,
     hidpi_factor: f64,
-    device: Device,
+    pub device: Device,
     surface: Surface,
     swap_chain_descriptor: SwapChainDescriptor,
     swap_chain: SwapChain,
@@ -260,7 +260,7 @@ impl Painter {
 
         Self {
             #[cfg(feature = "vulkan")]
-            _window: window,
+            window: window,
             hidpi_factor: factor,
             device,
             surface,
@@ -715,7 +715,7 @@ impl Painter {
         feature_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
     }
 
-    pub fn paint(&mut self, app_state: &mut AppState) {
+    pub fn paint(&mut self, hud: &mut super::ui::HUD, app_state: &mut AppState) {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         self.load_tiles(app_state);
         let feature_collection = {
@@ -791,6 +791,15 @@ impl Painter {
                     dt.paint(&mut render_pass, &self.blend_pipeline, &self.noblend_pipeline, &feature_collection, i as u32);
                 }
             }
+            hud.paint(
+                &self.window,
+                app_state.screen.width as f64,
+                app_state.screen.height as f64,
+                self.hidpi_factor,
+                &mut self.device,
+                &mut encoder,
+                &frame.view,
+            );
             self.device.get_queue().submit(&[encoder.finish()]);
         }
     }
