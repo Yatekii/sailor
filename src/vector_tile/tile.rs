@@ -183,11 +183,11 @@ impl Tile {
         let mut collider = crate::interaction::tile_collider::TileCollider::new();
 
         for object_id in 0..objects.len() {
-            println!("{}/{}", object_id, objects.len());
             if objects[object_id].points.len() >= 2 {
                 collider.add_object(object_id, &objects[object_id]);
             }
         }
+        collider.update();
 
         Self {
             tile_id: tile_id.clone(),

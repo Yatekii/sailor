@@ -1,3 +1,4 @@
+use crate::app_state::AppState;
 use imgui::*;
 
 pub struct HUD {
@@ -30,7 +31,7 @@ impl HUD {
                 })
             }
         ]);
-        
+
         let renderer = imgui_wgpu::Renderer::new(
             &mut imgui,
             device,
@@ -48,6 +49,7 @@ impl HUD {
 
     pub fn paint(
         &mut self,
+        app_state: &mut AppState,
         window: &wgpu::winit::Window,
         width: f64,
         height: f64,
@@ -65,7 +67,7 @@ impl HUD {
             window
                 .size([300.0, 100.0], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
-                    ui.text(im_str!("Hello world!"));
+                    ui.text(im_str!("{:#?}", app_state.hovered_objects.iter().map(|o| o.tags.clone()).collect::<Vec<_>>()));
                     ui.text(im_str!("This...is...imgui-rs on WGPU!"));
                     ui.separator();
                     let mouse_pos = ui.io().mouse_pos;

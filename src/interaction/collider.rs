@@ -19,7 +19,6 @@ impl Collider {
 
         let tile_cache = &app_state.tile_cache;
 
-        println!("START =================");
         for tile_id in tile_field.iter() {
             if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
                 let matrix = app_state.screen.tile_to_global_space(
@@ -28,8 +27,8 @@ impl Collider {
                 );
                 let matrix = nalgebra_glm::inverse(&matrix);
                 let screen_point = Point::new(
-                    point.0 / (app_state.screen.width / 2) as f32,
-                    point.1 / (app_state.screen.height / 2) as f32
+                    point.0 / (app_state.screen.width / 2) as f32 - 1.0,
+                    point.1 / (app_state.screen.height / 2) as f32 - 1.0
                 );
                 let global_point = matrix * Vector4::new(screen_point.x, screen_point.y, 0.0, 1.0);
                 let tile_point = Point::new(global_point.x, global_point.y) * tile.extent as f32;
@@ -40,7 +39,6 @@ impl Collider {
                     for object_id in object_ids {
                         objects.push(&tile.objects[object_id])
                     }
-                    println!("FOUND");
                     return objects
                 }
             } else {

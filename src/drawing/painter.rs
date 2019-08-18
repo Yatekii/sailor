@@ -792,6 +792,7 @@ impl Painter {
                 }
             }
             hud.paint(
+                app_state,
                 &self.window,
                 app_state.screen.width as f64,
                 app_state.screen.height as f64,

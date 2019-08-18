@@ -10,12 +10,14 @@ use ncollide2d::{
         Isometry,
         Point,
         Vector,
-        Rotation,
-        Translation
+    },
+    query::{
+        Ray,
     },
     shape::{
         ShapeHandle,
         Polyline,
+        Segment,
     },
 };
 use crate::vector_tile::object::Object;
@@ -54,12 +56,36 @@ impl TileCollider {
     }
 
     pub fn get_hovered_objects(&self, point: &Point<f32>) -> Vec<usize> {
-        self.world
+        let mut object_ids = vec![];
+        let mut interferences = vec![];
+        self.world.broad_phase
             .interferences_with_point(
                 point,
-                &CollisionGroups::new()
-            )
-            .map(|co| *co.1.data())
-            .collect()
+                &mut interferences
+            );
+
+        let ray = Ray::new(point.clone(), Vector::x());
+        for handle in interferences {
+            if let Some(co) = self.world.collision_object(*handle) {
+                if let Some(polyline) = co.shape().downcast_ref::<Polyline<f32>>() {
+                    let mut winding_number = 0;
+                    let points = polyline.points();
+                    for edge in polyline.edges() {
+                        let segment = Segment::new(points[edge.indices.x], points[edge.indices.y]);
+                        use ncollide2d::query::RayCast;
+                        if segment.intersects_ray(&Isometry::identity(), &ray) {
+                            winding_number += 1;
+                        }
+                    }
+
+                    if winding_number % 2 == 1 {
+                        // We found a general polygon that contains our mouse pointer.
+                        object_ids.push(*co.data());
+                    }
+                }
+            }
+        }
+
+        object_ids
     }
 }
