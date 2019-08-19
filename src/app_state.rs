@@ -20,6 +20,7 @@ pub struct AppState {
     pub tile_field: TileField,
     pub zoom: f32,
     pub hovered_objects: Vec<Object>,
+    pub selected_objects: Vec<EditableObject>,
 }
 
 impl AppState {
@@ -38,6 +39,7 @@ impl AppState {
             tile_field: TileField::new(TileId::new(8, 0, 0), TileId::new(8, 0, 0)),
             zoom,
             hovered_objects: vec![],
+            selected_objects: vec![],
         }
     }
 
@@ -46,5 +48,37 @@ impl AppState {
             .iter()
             .map(|o| (**o).clone())
             .collect();
+    }
+
+    pub fn update_selected_hover_objects(&mut self) {
+        self.selected_objects =
+            self.hovered_objects
+                .iter()
+                .map(|o| EditableObject::new(o.clone()))
+                .collect();
+    }
+
+    pub fn advance_selected_object(&mut self) {
+        let len = self.selected_objects.len();
+        for i in 0..len {
+            if self.selected_objects[i].selected {
+                self.selected_objects[(i + 1) % len].selected = true;
+                self.selected_objects[i].selected = true;
+            }
+        }
+    }
+}
+
+pub struct EditableObject {
+    pub object: Object,
+    pub selected: bool,
+}
+
+impl EditableObject {
+    pub fn new(object: Object) -> Self {
+        Self {
+            object,
+            selected: false,
+        }
     }
 }

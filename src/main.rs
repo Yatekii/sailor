@@ -47,54 +47,64 @@ fn main() {
     loop {
         use wgpu::winit::{Event, WindowEvent, ElementState, MouseButton, MouseScrollDelta, KeyboardInput, VirtualKeyCode};
         events_loop.poll_events(|event| {
-            match event.clone() {
-                Event::WindowEvent {
-                    event: WindowEvent::Resized(size),
-                    ..
-                } => {
-                    let physical = size.to_physical(painter.get_hidpi_factor());
-                    app_state.screen.width = physical.width.round() as u32;
-                    app_state.screen.height = physical.height.round() as u32;
-                    painter.resize(physical.width.round() as u32, physical.height.round() as u32);
-                },
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::Destroyed => { status = false }
-                    WindowEvent::KeyboardInput {
-                        input: KeyboardInput { virtual_keycode: Some(VirtualKeyCode::Escape), .. },
+            let route = hud.interact(&painter.window, &event);
+            if !route {
+                match event.clone() {
+                    Event::WindowEvent {
+                        event: WindowEvent::Resized(size),
                         ..
-                    } | WindowEvent::CloseRequested => { status = false },
-                    WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
-                        mouse_down = true;
+                    } => {
+                        let physical = size.to_physical(painter.get_hidpi_factor());
+                        app_state.screen.width = physical.width.round() as u32;
+                        app_state.screen.height = physical.height.round() as u32;
+                        painter.resize(physical.width.round() as u32, physical.height.round() as u32);
                     },
-                    WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
-                        mouse_down = false;
-                    },
-                    WindowEvent::MouseWheel { delta, .. } => {
-                        match delta {
-                            MouseScrollDelta::LineDelta(_x, y) => app_state.zoom += 0.1 * y,
-                            _ => ()
-                        }
-                    },
-                    WindowEvent::CursorMoved { position, .. } => {
-                        let size = app_state.screen.get_tile_size() as f32;
-                        let mut delta = vector((position.x - last_pos.x) as f32, (position.y - last_pos.y) as f32);
-                        let zoom_x = (app_state.screen.width as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
-                        let zoom_y = (app_state.screen.height as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
-                        delta.x *= zoom_x;
-                        delta.y *= zoom_y;
+                    Event::WindowEvent { event, .. } => match event {
+                        WindowEvent::Destroyed => { status = false }
+                        WindowEvent::KeyboardInput {
+                            input: KeyboardInput { virtual_keycode: Some(keycode), .. },
+                            ..
+                        } => {
+                            match keycode {
+                                VirtualKeyCode::Escape => status = false,
+                                VirtualKeyCode::Tab => app_state.advance_selected_object(),
+                                _ => {}
+                            }
+                        },
+                        WindowEvent::CloseRequested => { status = false },
+                        WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
+                            mouse_down = true;
+                        },
+                        WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
+                            mouse_down = false;
+                            app_state.update_selected_hover_objects();
+                        },
+                        WindowEvent::MouseWheel { delta, .. } => {
+                            match delta {
+                                MouseScrollDelta::LineDelta(_x, y) => app_state.zoom += 0.1 * y,
+                                _ => ()
+                            }
+                        },
+                        WindowEvent::CursorMoved { position, .. } => {
+                            let size = app_state.screen.get_tile_size() as f32;
+                            let mut delta = vector((position.x - last_pos.x) as f32, (position.y - last_pos.y) as f32);
+                            let zoom_x = (app_state.screen.width as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
+                            let zoom_y = (app_state.screen.height as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
+                            delta.x *= zoom_x;
+                            delta.y *= zoom_y;
 
-                        last_pos = position;
-                        if mouse_down {
-                            app_state.screen.center -= delta;
-                        }
+                            last_pos = position;
+                            if mouse_down {
+                                app_state.screen.center -= delta;
+                            }
 
-                        app_state.update_hovered_objects((position.x as f32, position.y as f32))
+                            app_state.update_hovered_objects((position.x as f32, position.y as f32))
+                        }
+                        _ => (),
                     }
                     _ => (),
                 }
-                _ => (),
             }
-            hud.interact(&painter.window, &event);
         });
 
         painter.update_shader();

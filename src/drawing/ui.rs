@@ -68,7 +68,6 @@ impl HUD {
                 .size([300.0, 100.0], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
                     ui.text(im_str!("{:#?}", app_state.hovered_objects.iter().map(|o| o.tags.clone()).collect::<Vec<_>>()));
-                    ui.text(im_str!("This...is...imgui-rs on WGPU!"));
                     ui.separator();
                     let mouse_pos = ui.io().mouse_pos;
                     ui.text(im_str!(
@@ -83,7 +82,24 @@ impl HUD {
                 .size([400.0, 200.0], Condition::FirstUseEver)
                 .position([400.0, 200.0], Condition::FirstUseEver)
                 .build(&ui, || {
+                    let mut item = 0;
+                    // for i in 0..app_state.selected_objects.len() {
+                    //     if app_state.selected_objects[i].selected {
+                    //         item = i;
+                    //     }
+                    // }
+                    let items = app_state.selected_objects.iter().map(|o| im_str!("{:?}", o.object)).collect::<Vec<_>>();
+                    let mut item_refs = vec![];
+                    for item in &items {
+                        item_refs.push(item);
+                    }
                     ui.text(im_str!("Hello world!"));
+                    ui.list_box(
+                        im_str!("hello top"),
+                        &mut item,
+                        &item_refs,
+                        5
+                    );
                 });
 
             ui.show_demo_window(&mut true);
@@ -95,7 +111,8 @@ impl HUD {
             .expect("Rendering failed");
     }
 
-    pub fn interact(&mut self, window: &wgpu::winit::Window, event: &wgpu::winit::Event) {
+    pub fn interact(&mut self, window: &wgpu::winit::Window, event: &wgpu::winit::Event) -> bool {
         self.platform.handle_event(self.imgui.io_mut(), &window, &event);
+        self.imgui.io().want_capture_mouse
     }
 }
