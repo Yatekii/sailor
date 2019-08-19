@@ -821,7 +821,7 @@ dependencies = [
 [[package]]
 name = "imgui-wgpu"
 version = "0.1.0"
-source = "git+https://github.com/Yatekii/imgui-wgpu-rs#1ff1f36ae79a2a977cd3986d0161b74e7e5413cd"
+source = "git+https://github.com/Yatekii/imgui-wgpu-rs#ba92163571b5d320f4bb4818b9df46bab41b88d4"
 dependencies = [
  "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1931,7 +1931,6 @@ version = "0.1.0"
 dependencies = [
  "config 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-channel 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "derivative 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "glsl-to-spirv 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "imgui 0.2.0-pre (git+https://github.com/Yatekii/imgui-rs?rev=53ebb60d0c8cc6644883f9c6aa6c5efe88333c22)",
  "imgui-wgpu 0.1.0 (git+https://github.com/Yatekii/imgui-wgpu-rs)",

@@ -1,18 +1,12 @@
 use ncollide2d::math::Point;
 use crate::vector_tile::object::Object;
 use crate::app_state::AppState;
-use crate::vector_tile::math::TileId;
 use nalgebra::base::Vector4;
 
 pub struct Collider {
 }
 
 impl Collider {
-    pub fn new() -> Self  {
-        Self {
-        }
-    }
-
     pub fn get_hovered_objects<'a>(app_state: &'a AppState, point: (f32, f32)) -> Vec<&'a Object> {
         let mut objects = vec![];
         let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom, 1);
