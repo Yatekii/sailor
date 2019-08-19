@@ -75,6 +75,11 @@ impl HUD {
                         mouse_pos[0],
                         mouse_pos[1]
                     ));
+                    ui.text(im_str!(
+                        "Frametime {:.2} at zoom {:.2}",
+                        app_state.stats.get_average(),
+                        app_state.zoom
+                    ));
                 });
 
             let window = imgui::Window::new(im_str!("Hello too"));
@@ -82,12 +87,13 @@ impl HUD {
                 .size([400.0, 200.0], Condition::FirstUseEver)
                 .position([400.0, 200.0], Condition::FirstUseEver)
                 .build(&ui, || {
-                    let mut item = 0;
-                    // for i in 0..app_state.selected_objects.len() {
-                    //     if app_state.selected_objects[i].selected {
-                    //         item = i;
-                    //     }
-                    // }
+                    let mut item: i32 = 0;
+                    for i in 0..app_state.selected_objects.len() {
+                        if app_state.selected_objects[i].selected {
+                            app_state.selected_objects[i].selected = false;
+                            item = i as i32;
+                        }
+                    }
                     let items = app_state.selected_objects.iter().map(|o| im_str!("{:?}", o.object)).collect::<Vec<_>>();
                     let mut item_refs = vec![];
                     for item in &items {
@@ -100,6 +106,9 @@ impl HUD {
                         &item_refs,
                         5
                     );
+                    if item >= 0 && items.len() > 0 {
+                        app_state.selected_objects[item as usize].selected = true;
+                    }
                 });
 
             ui.show_demo_window(&mut true);

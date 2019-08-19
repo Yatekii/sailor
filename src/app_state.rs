@@ -1,3 +1,4 @@
+use crate::stats::Stats;
 use crate::vector_tile::object::Object;
 use crate::interaction::collider::Collider;
 use lyon::math::Point;
@@ -21,6 +22,7 @@ pub struct AppState {
     pub zoom: f32,
     pub hovered_objects: Vec<Object>,
     pub selected_objects: Vec<EditableObject>,
+    pub stats: Stats,
 }
 
 impl AppState {
@@ -40,6 +42,7 @@ impl AppState {
             zoom,
             hovered_objects: vec![],
             selected_objects: vec![],
+            stats: Stats::new(),
         }
     }
 

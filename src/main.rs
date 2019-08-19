@@ -42,8 +42,6 @@ fn main() {
     let mut mouse_down = false;
     let mut last_pos = wgpu::winit::dpi::LogicalPosition::new(0.0, 0.0);
 
-    let mut stats = stats::Stats::new();
-
     loop {
         use wgpu::winit::{Event, WindowEvent, ElementState, MouseButton, MouseScrollDelta, KeyboardInput, VirtualKeyCode};
         events_loop.poll_events(|event| {
@@ -111,9 +109,9 @@ fn main() {
         painter.update_styles(app_state.zoom.max(14.0), &mut app_state.css_cache);
         painter.paint(&mut hud, &mut app_state);
 
-        stats.capture_frame();
+        app_state.stats.capture_frame();
         if CONFIG.general.display_framerate {
-            println!("Frametime {:.2} at zoom {:.2}", stats.get_average(), app_state.zoom);
+            println!("Frametime {:.2} at zoom {:.2}", app_state.stats.get_average(), app_state.zoom);
         }
 
         if !status {
