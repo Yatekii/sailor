@@ -109,6 +109,19 @@ impl RulesCache {
         self.rules.iter().filter(|rule| selector.matches(&rule.selector)).collect()
     }
 
+    pub fn get_matching_rules_mut(&mut self, selector: &Selector) -> Vec<&mut Rule> {
+
+        self.rules.iter_mut().filter(|rule| selector.matches(&rule.selector)).collect()
+    }
+
+    pub fn add_rule(&mut self, rule: Rule) {
+        self.rules.push(rule);
+    }
+
+    pub fn try_get_rule_mut(&mut self, selector: Selector) -> Option<&mut Rule> {
+        self.rules.iter_mut().find(|rule| selector == rule.selector)
+    }
+
     /// Updates the CSS cache from the watched file if there was any changes.
     /// 
     /// Returns whether a successful update happened.
@@ -448,6 +461,7 @@ pub struct Color {
 }
 
 impl Color {
+    pub const TRANSPARENT: Color = Color { r: 0, g: 0, b: 0, a: 0.0, };
     pub const _WHITE: Color = Color { r: 255, g: 255, b: 255, a: 1.0, };
     pub const _BLACK: Color = Color { r:   0, g:   0, b:   0, a: 1.0, };
     pub const RED:   Color = Color { r: 255, g:   0, b:   0, a: 1.0, };

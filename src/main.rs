@@ -27,14 +27,15 @@ fn main() {
     let tile_coordinate = math::deg2num(47.3769, 8.5417, z as u32);
     let zurich = math::num_to_global_space(&tile_coordinate);
 
-    let size = 600;
+    let width = 1600;
+    let height = 1000;
 
     let mut events_loop = wgpu::winit::EventsLoop::new();
     let hdpi_factor = events_loop.get_available_monitors().next().expect("No monitors found").get_hidpi_factor();
 
-    let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), size, size, z, hdpi_factor);
+    let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), width, height, z, hdpi_factor);
 
-    let mut painter = drawing::Painter::init(&events_loop, size, size, &app_state);
+    let mut painter = drawing::Painter::init(&events_loop, width, height, &app_state);
     let mut hud = drawing::ui::HUD::new(&painter.window, &mut painter.device);
 
     let mut status = true;
