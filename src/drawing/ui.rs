@@ -138,16 +138,17 @@ impl HUD {
                         ..
                     }) = objects.iter_mut().find(|object| object.selected) {
                         let mut rules = app_state.css_cache.get_matching_rules_mut(&selector);
-                        ui.text(im_str!("Hello world!"));
-
                         for rule in rules.iter_mut() {
-                            add_color_picker(&ui, rule, "background-color");
-                            add_color_picker(&ui, rule, "border-color");
+                            let show_block = CollapsingHeader::new(&ui, &im_str!("{}", rule.selector)).build();
+                            if show_block {
+                                add_color_picker(&ui, rule, "background-color");
+                                add_color_picker(&ui, rule, "border-color");
+                            }
                         }
                     }
                 });
 
-            // ui.show_demo_window(&mut false);
+            ui.show_demo_window(&mut false);
         }
 
         self.platform.prepare_render(&ui, &window);
@@ -163,44 +164,41 @@ impl HUD {
 }
 
 fn add_color_picker(ui: &Ui, rule: &mut Rule, attribute: &str) {
-    let show_block = CollapsingHeader::new(&ui, &im_str!("{}", rule.selector)).build();
-    if show_block {
-        let default_color = CSSValue::Color(Color::TRANSPARENT);
-        let color = if let Some(color) = rule.kvs.get(attribute) {
-            color
-        } else {
-            &default_color
-        };
-        let color = match color {
-            CSSValue::String(string) => {
-                match &string[..] {
-                    "red" => Color::RED,
-                    "green" => Color::GREEN,
-                    "blue" => Color::BLUE,
-                    _ => Color::TRANSPARENT,
-                }
-            },
-            CSSValue::Color(color) => {
-                color.clone()
-            },
-            _ => Color::TRANSPARENT, // This should never happen, but transparent should be a decent fallback
-        };
-        let mut color = [
-            color.r as f32 / 255.0,
-            color.g as f32 / 255.0, 
-            color.b as f32 / 255.0,
-            color.a
-        ];
-        let label = im_str!("{}", attribute);
-        let cp = ColorPicker::new(&label, EditableColor::Float4(&mut color));
-        cp
-            .build(&ui);
+    let default_color = CSSValue::Color(Color::TRANSPARENT);
+    let color = if let Some(color) = rule.kvs.get(attribute) {
+        color
+    } else {
+        &default_color
+    };
+    let color = match color {
+        CSSValue::String(string) => {
+            match &string[..] {
+                "red" => Color::RED,
+                "green" => Color::GREEN,
+                "blue" => Color::BLUE,
+                _ => Color::TRANSPARENT,
+            }
+        },
+        CSSValue::Color(color) => {
+            color.clone()
+        },
+        _ => Color::TRANSPARENT, // This should never happen, but transparent should be a decent fallback
+    };
+    let mut color = [
+        color.r as f32 / 255.0,
+        color.g as f32 / 255.0, 
+        color.b as f32 / 255.0,
+        color.a
+    ];
+    let label = im_str!("{}", attribute);
+    let cp = ColorEdit::new(&label, EditableColor::Float4(&mut color));
+    cp
+        .build(&ui);
 
-        rule.kvs.insert(attribute.to_string(), CSSValue::Color(Color {
-            r: (color[0] * 255.0) as u8,
-            g: (color[1] * 255.0) as u8,
-            b: (color[2] * 255.0) as u8,
-            a: color[3],
-        }));
-    }
+    rule.kvs.insert(attribute.to_string(), CSSValue::Color(Color {
+        r: (color[0] * 255.0) as u8,
+        g: (color[1] * 255.0) as u8,
+        b: (color[2] * 255.0) as u8,
+        a: color[3],
+    }));
 }
