@@ -74,7 +74,12 @@ impl HUD {
             window
                 .size([400.0, 800.0], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
-                    ui.text(im_str!("{:#?}", app_state.hovered_objects.iter().map(|o| o.tags.clone()).collect::<Vec<_>>()));
+                    let objects = app_state.hovered_objects
+                        .iter()
+                        .map(|o| o.selector.to_string())
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    ui.text(im_str!("{}", objects));
                     ui.separator();
                     let mouse_pos = ui.io().mouse_pos;
                     ui.text(im_str!(
@@ -101,7 +106,7 @@ impl HUD {
                             item = i as i32;
                         }
                     }
-                    let items = app_state.selected_objects.iter().map(|o| im_str!("{:?}", o.object)).collect::<Vec<_>>();
+                    let items = app_state.selected_objects.iter().map(|o| im_str!("{}", o.object.selector)).collect::<Vec<_>>();
                     let mut item_refs = vec![];
                     for item in &items {
                         item_refs.push(item);
@@ -158,7 +163,7 @@ impl HUD {
 }
 
 fn add_color_picker(ui: &Ui, rule: &mut Rule, attribute: &str) {
-    let show_block = CollapsingHeader::new(&ui, &im_str!("{:#?}", rule.selector)).build();
+    let show_block = CollapsingHeader::new(&ui, &im_str!("{}", rule.selector)).build();
     if show_block {
         let default_color = CSSValue::Color(Color::TRANSPARENT);
         let color = if let Some(color) = rule.kvs.get(attribute) {

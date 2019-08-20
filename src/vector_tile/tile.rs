@@ -98,7 +98,10 @@ impl Tile {
                     let key = layer.keys[tag[0] as usize].to_string();
                     let value = layer.values[tag[1] as usize].clone();
                     match &key[..] {
-                        "class" | "subclass" => {
+                        "class" => {
+                            selector.classes.push(value.string_value.clone().unwrap().to_string());
+                        },
+                        "subclass" => {
                             selector = selector.with_any(
                                 key.clone(),
                                 value.string_value.clone().unwrap().to_string()

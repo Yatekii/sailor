@@ -209,6 +209,25 @@ impl Default for Selector {
     }
 }
 
+impl std::fmt::Display for Selector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut selector = self.typ.clone().unwrap_or(String::new());
+        self.id.as_ref().map(|id| selector += &id);
+        for class in &self.classes {
+            selector += ".";
+            selector += &class;
+        }
+        for (k, v) in &self.any {
+            selector += "[";
+            selector += &k;
+            selector += "=";
+            selector += &v;
+            selector += "]";
+        }
+        write!(f, "({})", selector)
+    }
+}
+
 impl Selector {
     /// Creates a new empty selector.
     pub fn new() -> Self {
