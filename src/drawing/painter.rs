@@ -24,7 +24,12 @@ use crate::vector_tile::math::TileId;
 use crate::drawing::{
     drawable_tile::DrawableTile,
 };
-use crate::css::RulesCache;
+use crate::css::{
+            CSSValue,
+            Selector,
+            Color,
+            RulesCache,
+        };
 use std::collections::BTreeMap;
 
 use wgpu::{
@@ -190,7 +195,7 @@ impl Painter {
             ]
         });
 
-        let feature_collection = Arc::new(RwLock::new(FeatureCollection::new(500)));
+        let feature_collection = Arc::new(RwLock::new(FeatureCollection::new(CONFIG.renderer.max_features as u32)));
 
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -715,6 +720,41 @@ impl Painter {
         feature_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
     }
 
+    pub fn load_background_color(&self, app_state: &AppState) -> Color {
+        let rules = app_state.css_cache.get_matching_rules(
+            &Selector::new().with_type("background".to_string()).with_any("zoom".to_string(), (app_state.zoom.floor() as u32).to_string())
+        );
+
+        let background_color = rules
+            .iter()
+            .filter_map(|r| r.kvs.get("background-color"))
+            .last();
+
+        if let Some(color) = background_color {
+            match color {
+                CSSValue::Color(bg) => bg.clone(),
+                CSSValue::String(string) => {
+                    match &string[..] {
+                        "red" => Color::RED,
+                        "green" => Color::GREEN,
+                        "blue" => Color::BLUE,
+                        // Other CSS colors to come later.
+                        color => {
+                            log::info!("The color '{}' is currently not supported.", color);
+                            Color::WHITE
+                        },
+                    }
+                },
+                value => {
+                    log::info!("The value '{:?}' is currently not supported for 'background-color'.", value);
+                    Color::WHITE
+                },
+            }
+        } else {
+            Color::WHITE
+        }
+    }
+
     pub fn paint(&mut self, hud: &mut super::ui::HUD, app_state: &mut AppState) {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         self.load_tiles(app_state);
@@ -733,6 +773,7 @@ impl Painter {
         let num_tiles = self.loaded_tiles.len();
         let features = feature_collection.get_features();
         if features.len() > 0 && num_tiles > 0 {
+            let c = self.load_background_color(app_state);
             let frame = self.swap_chain.get_next_texture();
             {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -741,7 +782,7 @@ impl Painter {
                         resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
-                        clear_color: wgpu::Color::WHITE,
+                        clear_color: wgpu::Color { r: c.r, g: c.g, b: c.b, a: c.a },
                     }],
                     depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
                         attachment: &self.stencil,

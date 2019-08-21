@@ -240,26 +240,26 @@ impl Selector {
     }
 
     /// Makes the selector require the type `typ`.
-    pub fn with_type(mut self, typ: String) -> Self {
-        self.typ = Some(typ);
+    pub fn with_type(mut self, typ: impl Into<String>) -> Self {
+        self.typ = Some(typ.into());
         self
     }
 
     /// Makes the selector require the id `id`.
-    pub fn _with_id(mut self, id: String) -> Self {
-        self.id = Some(id);
+    pub fn _with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
         self
     }
 
     /// Makes the selector require the class `class`.
-    pub fn _with_class(mut self, class: String) -> Self {
-        self.classes.push(class);
+    pub fn _with_class(mut self, class: impl Into<String>) -> Self {
+        self.classes.push(class.into());
         self
     }
 
     /// Makes the selector require the kv `key`/`value`.
-    pub fn with_any(mut self, key: String, value: String) -> Self {
-        self.any.insert(key, value);
+    pub fn with_any(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.any.insert(key.into(), value.into());
         self
     }
 
@@ -473,19 +473,19 @@ fn unitless_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str
 /// A struct to represent any RGB color.
 #[derive(Debug,PartialEq, Clone)]
 pub struct Color {
-  pub r: u8,
-  pub g: u8,
-  pub b: u8,
+  pub r: f32,
+  pub g: f32,
+  pub b: f32,
   pub a: f32,
 }
 
 impl Color {
-    pub const TRANSPARENT: Color = Color { r: 0, g: 0, b: 0, a: 0.0, };
-    pub const _WHITE: Color = Color { r: 255, g: 255, b: 255, a: 1.0, };
-    pub const _BLACK: Color = Color { r:   0, g:   0, b:   0, a: 1.0, };
-    pub const RED:   Color = Color { r: 255, g:   0, b:   0, a: 1.0, };
-    pub const GREEN: Color = Color { r:   0, g: 255, b:   0, a: 1.0, };
-    pub const BLUE:  Color = Color { r:   0, g:   0, b: 255, a: 1.0, };
+    pub const TRANSPARENT: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0, };
+    pub const WHITE: Color = Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0, };
+    pub const BLACK: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0, };
+    pub const RED:   Color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0, };
+    pub const GREEN: Color = Color { r: 0.0, g: 1.0, b: 0.0, a: 1.0, };
+    pub const BLUE:  Color = Color { r: 0.0, g: 0.0, b: 1.0, a: 1.0, };
 }
 
 /// Converts a hex string into an `u8`.
@@ -511,7 +511,7 @@ fn hex_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSS
     let (input, _) = tag("#")(input)?;
     let (input, (r, g, b)) = tuple((hex_primary, hex_primary, hex_primary))(input)?;
 
-    Ok((input, CSSValue::Color(Color { r, g, b, a: 1.0 })))
+    Ok((input, CSSValue::Color(Color { r: r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a: 1.0 })))
 }
 
 fn u8<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E> {
@@ -535,7 +535,7 @@ fn rgba_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CS
         float,
     ))(input)?;
     let (input, _) = tag(")")(input)?;
-    Ok((input, CSSValue::Color(Color { r, g, b, a })))
+    Ok((input, CSSValue::Color(Color {r:  r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a })))
 }
 
 /// Parse a single hex color code including the `#`.
@@ -549,5 +549,5 @@ fn rgb_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSS
         u8,
     ))(input)?;
     let (input, _) = tag(")")(input)?;
-    Ok((input, CSSValue::Color(Color { r, g, b, a: 1.0 })))
+    Ok((input, CSSValue::Color(Color { r: r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a: 1.0 })))
 }

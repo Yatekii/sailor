@@ -17,10 +17,16 @@ use crate::vector_tile::object::ObjectType;
 use lyon::tessellation::geometry_builder::{
     VertexBuffers,
 };
+use crate::css::Selector;
+use crate::vector_tile::object::Object;
 
 use crate::drawing::vertex::{
     Vertex,
     LayerVertexCtor,
+};
+use lyon::tessellation::{
+    FillTessellator,
+    FillOptions,
 };
 
 use lyon::path::Path;
@@ -76,6 +82,39 @@ impl Tile {
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id, 1.0));
         let extent = tile.layers[0].extent as u16;
 
+        // Add a background rectangle to each tile
+        // let selector = Selector::new().with_type("background");
+
+        // let mut path_builder = Path::builder();
+        // path_builder.move_to((-10.0, -10.0).into());
+        // path_builder.line_to((-10.0, extent as f32 + 10.0).into());
+        // path_builder.line_to((extent as f32 + 10.0, extent as f32 + 10.0).into());
+        // path_builder.line_to((extent as f32 + 10.0, -10.0).into());
+        // path_builder.close();
+        // let path = path_builder.build();
+
+        // {
+        //     let mut feature_collection = feature_collection.write().unwrap();
+        //     let current_feature_id = if let Some(feature_id) = feature_collection.get_feature_id(&selector) {
+        //         feature_id
+        //     } else {
+        //         feature_collection.add_feature(Feature::new(selector.clone(), 0))
+        //     };
+        //     builder.set_current_feature_id(current_feature_id);
+        // }
+
+        // FillTessellator::new().tessellate_path(
+        //     &path,
+        //     &FillOptions::tolerance(0.0001).with_normals(true),
+        //     &mut builder,
+        // ).expect("This is a bug. Please report it.");
+
+        // objects.push(Object::new(
+        //     selector,
+        //     path.points().iter().cloned().collect(),
+        //     ObjectType::Polygon
+        // ));
+
         for layer in tile.layers {
             let mut index_start_before = builder.get_current_index();
             let layer_id = layer_num(&layer.name);
@@ -91,8 +130,6 @@ impl Tile {
                 let mut selector = crate::css::Selector::new()
                     .with_type("layer".to_string())
                     .with_any("name".to_string(), layer.name.to_string());
-
-                let mut tags = std::collections::HashMap::<String, String>::new();
                 
                 for tag in feature.tags.chunks(2) {
                     let key = layer.keys[tag[0] as usize].to_string();
@@ -107,18 +144,18 @@ impl Tile {
                                 value.string_value.clone().unwrap().to_string()
                             )
                         },
-                        _ => (),
+                        _ => {
+                            selector = selector.with_any(key.clone(), {
+                                value.string_value.map_or(String::new(), |v| v.to_string())
+                             + &value.float_value.map_or(String::new(), |v| v.to_string())
+                             + &value.double_value.map_or(String::new(), |v| v.to_string())
+                             + &value.int_value.map_or(String::new(), |v| v.to_string())
+                             + &value.uint_value.map_or(String::new(), |v| v.to_string())
+                             + &value.sint_value.map_or(String::new(), |v| v.to_string())
+                             + &value.bool_value.map_or(String::new(), |v| v.to_string())
+                            });
+                        },
                     }
-
-                    tags.insert(key, {
-                        value.string_value.map_or(String::new(), |v| v.to_string())
-                     + &value.float_value.map_or(String::new(), |v| v.to_string())
-                     + &value.double_value.map_or(String::new(), |v| v.to_string())
-                     + &value.int_value.map_or(String::new(), |v| v.to_string())
-                     + &value.uint_value.map_or(String::new(), |v| v.to_string())
-                     + &value.sint_value.map_or(String::new(), |v| v.to_string())
-                     + &value.bool_value.map_or(String::new(), |v| v.to_string())
-                    });
                 }
 
                 let paths = geometry_commands_to_paths(
@@ -135,7 +172,6 @@ impl Tile {
                 
                 object_type.map(|ot| objects.push(object::Object::new(
                     selector.clone(),
-                    tags,
                     paths[0].points().iter().cloned().collect(),
                     ot
                 )));

@@ -27,6 +27,7 @@ impl FeatureCollection {
     }
 
     pub fn add_feature(&mut self, mut feature: Feature) -> u32 {
+        dbg!(self.features.len());
         assert!(self.features.len() < self.n_features_max as usize);
         feature.id = self.features.len() as u32;
         self.features.push(feature);

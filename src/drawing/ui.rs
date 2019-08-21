@@ -196,9 +196,9 @@ fn add_color_picker(ui: &Ui, rule: &mut Rule, attribute: &str) {
         .build(&ui);
 
     rule.kvs.insert(attribute.to_string(), CSSValue::Color(Color {
-        r: (color[0] * 255.0) as u8,
-        g: (color[1] * 255.0) as u8,
-        b: (color[2] * 255.0) as u8,
+        r: color[0],
+        g: color[1],
+        b: color[2],
         a: color[3],
     }));
 }

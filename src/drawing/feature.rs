@@ -17,7 +17,7 @@ pub struct DrawableColor {
 impl From<Color> for DrawableColor {
     fn from(value: Color) -> Self {
         Self {
-            r: value.r as f32 / 255.0, g: value.g as f32 / 255.0, b: value.b as f32 / 255.0, a: value.a,
+            r: value.r, g: value.g, b: value.b, a: value.a,
         }
     }
 }
