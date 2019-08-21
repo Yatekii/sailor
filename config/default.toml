@@ -7,6 +7,6 @@ vertex_shader = "config/shader.vert"
 fragment_shader = "config/shader.frag"
 css = "config/style.css"
 max_tiles = 200
-max_features = 1001
+max_features = 10001
 tile_size = 384
 msaa_samples = 1
