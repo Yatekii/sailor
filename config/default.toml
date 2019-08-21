@@ -10,3 +10,4 @@ max_tiles = 200
 max_features = 10001
 tile_size = 384
 msaa_samples = 1
+selection_tags = []

@@ -28,6 +28,7 @@ use lyon::tessellation::{
     FillTessellator,
     FillOptions,
 };
+use crate::config::CONFIG;
 
 use lyon::path::Path;
 
@@ -131,30 +132,38 @@ impl Tile {
                     .with_type("layer".to_string())
                     .with_any("name".to_string(), layer.name.to_string());
                 
+                let mut tags = std::collections::HashMap::new();
+
                 for tag in feature.tags.chunks(2) {
                     let key = layer.keys[tag[0] as usize].to_string();
                     let value = layer.values[tag[1] as usize].clone();
-                    match &key[..] {
-                        "class" => {
-                            selector.classes.push(value.string_value.clone().unwrap().to_string());
-                        },
-                        "subclass" => {
-                            selector = selector.with_any(
-                                key.clone(),
-                                value.string_value.clone().unwrap().to_string()
-                            )
-                        },
-                        _ => {
-                            selector = selector.with_any(key.clone(), {
-                                value.string_value.map_or(String::new(), |v| v.to_string())
-                             + &value.float_value.map_or(String::new(), |v| v.to_string())
-                             + &value.double_value.map_or(String::new(), |v| v.to_string())
-                             + &value.int_value.map_or(String::new(), |v| v.to_string())
-                             + &value.uint_value.map_or(String::new(), |v| v.to_string())
-                             + &value.sint_value.map_or(String::new(), |v| v.to_string())
-                             + &value.bool_value.map_or(String::new(), |v| v.to_string())
-                            });
-                        },
+                    if CONFIG.renderer.selection_tags.contains(&key) {
+                        match &key[..] {
+                            "class" => {
+                                selector.classes.push(value.string_value.clone().unwrap().to_string());
+                            },
+                            _ => {
+                                selector = selector.with_any(key.clone(), {
+                                    value.string_value.map_or(String::new(), |v| v.to_string())
+                                    + &value.float_value.map_or(String::new(), |v| v.to_string())
+                                    + &value.double_value.map_or(String::new(), |v| v.to_string())
+                                    + &value.int_value.map_or(String::new(), |v| v.to_string())
+                                    + &value.uint_value.map_or(String::new(), |v| v.to_string())
+                                    + &value.sint_value.map_or(String::new(), |v| v.to_string())
+                                    + &value.bool_value.map_or(String::new(), |v| v.to_string())
+                                });
+                            },
+                        }
+                    } else {
+                        tags.insert(key.clone(), {
+                            value.string_value.map_or(String::new(), |v| v.to_string())
+                            + &value.float_value.map_or(String::new(), |v| v.to_string())
+                            + &value.double_value.map_or(String::new(), |v| v.to_string())
+                            + &value.int_value.map_or(String::new(), |v| v.to_string())
+                            + &value.uint_value.map_or(String::new(), |v| v.to_string())
+                            + &value.sint_value.map_or(String::new(), |v| v.to_string())
+                            + &value.bool_value.map_or(String::new(), |v| v.to_string())
+                        });
                     }
                 }
 
@@ -173,6 +182,7 @@ impl Tile {
                 object_type.map(|ot| objects.push(object::Object::new(
                     selector.clone(),
                     paths[0].points().iter().cloned().collect(),
+                    tags,
                     ot
                 )));
 

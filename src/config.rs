@@ -12,6 +12,7 @@ pub struct Renderer {
     pub max_features: u64,
     pub tile_size: usize,
     pub msaa_samples: u32,
+    pub selection_tags: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

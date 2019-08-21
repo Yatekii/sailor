@@ -6,6 +6,7 @@ use crate::css::{
     CSSValue,
     Color,
     Rule,
+    Number,
 };
 
 pub struct HUD {
@@ -143,6 +144,9 @@ impl HUD {
                             if show_block {
                                 add_color_picker(&ui, rule, "background-color");
                                 add_color_picker(&ui, rule, "border-color");
+                                add_slider_float(&ui, rule, "border-width");
+                                add_slider_float(&ui, rule, "line-width");
+                                add_display_none(&ui, rule);
                             }
                         }
                     }
@@ -185,9 +189,9 @@ fn add_color_picker(ui: &Ui, rule: &mut Rule, attribute: &str) {
         _ => Color::TRANSPARENT, // This should never happen, but transparent should be a decent fallback
     };
     let mut color = [
-        color.r as f32 / 255.0,
-        color.g as f32 / 255.0, 
-        color.b as f32 / 255.0,
+        color.r,
+        color.g, 
+        color.b,
         color.a
     ];
     let label = im_str!("{}", attribute);
@@ -201,4 +205,56 @@ fn add_color_picker(ui: &Ui, rule: &mut Rule, attribute: &str) {
         b: color[2],
         a: color[3],
     }));
+}
+
+fn add_slider_float(ui: &Ui, rule: &mut Rule, attribute: &str) {
+    let default_number = CSSValue::Number(Number::Px(0.0));
+    let value = if let Some(value) = rule.kvs.get(attribute) {
+        value
+    } else {
+        &default_number
+    };
+    let mut value = match value {
+        CSSValue::Number(number) => {
+            match &number {
+                Number::Px(px) => *px,
+                _ => 0.0,
+            }
+        },
+        _ => 0.0, // This should never happen, but transparent should be a decent fallback
+    };
+
+    let label = im_str!("{}", attribute);
+    let cp = imgui::Slider::new(&label, 0.0..=10.0);
+    cp
+        .build(&ui, &mut value);
+
+    rule.kvs.insert(attribute.to_string(), CSSValue::Number(Number::Px(value)));
+}
+
+fn add_display_none(ui: &Ui, rule: &mut Rule) {
+    let attribute = "display";
+    let default_number = CSSValue::Number(Number::Px(0.0));
+    let mut value = if let Some(value) = rule.kvs.get(attribute) {
+        match value {
+            CSSValue::String(value) => {
+                match &value[..] {
+                    "none" => false,
+                    _ => true,
+                }
+            },
+            _ => true,
+        }
+    } else {
+        true
+    };
+
+    let label = im_str!("{}", attribute);
+    ui.checkbox(&label, &mut value);
+
+    if !value {
+        rule.kvs.insert(attribute.to_string(), CSSValue::String("none".to_string()));
+    } else {
+        rule.kvs.remove(attribute);
+    }
 }
