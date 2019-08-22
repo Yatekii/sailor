@@ -821,7 +821,7 @@ dependencies = [
 [[package]]
 name = "imgui-wgpu"
 version = "0.1.0"
-source = "git+https://github.com/Yatekii/imgui-wgpu-rs#ba92163571b5d320f4bb4818b9df46bab41b88d4"
+source = "git+https://github.com/Yatekii/imgui-wgpu-rs#b7bdd08072578bc8761bcf746ff81961156ef433"
 dependencies = [
  "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",

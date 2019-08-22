@@ -13,6 +13,7 @@ pub struct HUD {
     platform: imgui_winit_support::WinitPlatform,
     imgui: imgui::Context,
     renderer: imgui_wgpu::Renderer,
+    ruda: FontId,
 }
 
 impl HUD {
@@ -40,18 +41,24 @@ impl HUD {
             }
         ]);
 
-        let renderer = imgui_wgpu::Renderer::new(
+        let ruda = imgui.fonts().add_font(&[FontSource::TtfData {
+            data: include_bytes!("../../config/Ruda-Bold.ttf"),
+            size_pixels: font_size,
+            config: None,
+        }]);
+
+        let mut renderer = imgui_wgpu::Renderer::new(
             &mut imgui,
             device,
             wgpu::TextureFormat::Bgra8Unorm,
             None,
-        )
-        .expect("Failed to initialize renderer");
+        );
 
         Self {
             platform,
             imgui,
             renderer,
+            ruda,
         }
     }
 
@@ -69,7 +76,7 @@ impl HUD {
         self.platform.prepare_frame(self.imgui.io_mut(), &window) // step 4
             .expect("Failed to prepare frame");
         let ui = self.imgui.frame();
-
+        let ruda = ui.push_font(self.ruda);
         {
             let window = imgui::Window::new(im_str!("Hello world"));
             window
@@ -151,8 +158,8 @@ impl HUD {
                         }
                     }
                 });
-
-            ui.show_demo_window(&mut false);
+            ruda.pop(&ui);
+            // ui.show_demo_window(&mut false);
         }
 
         self.platform.prepare_render(&ui, &window);
