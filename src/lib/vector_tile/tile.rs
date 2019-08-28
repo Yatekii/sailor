@@ -1,44 +1,30 @@
-use crate::drawing::feature_collection::FeatureCollection;
-use crate::drawing::feature::Feature;
 use std::sync::{
     Arc,
     RwLock,
 };
-use crate::vector_tile::transform::{
-    geometry_commands_to_paths,
-    paths_to_drawable
+use std::collections::HashMap;
+use std::ops::Range;
+use quick_protobuf::{
+    MessageRead,
+    BytesReader
 };
-use crate::vector_tile::math::TileId;
-use crate::drawing::mesh::MeshBuilder;
-use crate::vector_tile::*;
-use quick_protobuf::{MessageRead, BytesReader};
-use crate::vector_tile::mod_Tile::GeomType;
-use crate::vector_tile::object::ObjectType;
-use lyon::tessellation::geometry_builder::{
-    VertexBuffers,
+use vector_tile::mod_Tile::GeomType;
+use lyon::{
+    tessellation::geometry_builder::{
+        VertexBuffers,
+    },
+    path::Path,
 };
-use crate::css::Selector;
-use crate::vector_tile::object::Object;
+use crate::*;
 
-use crate::drawing::vertex::{
-    Vertex,
-    LayerVertexCtor,
-};
-use lyon::tessellation::{
-    FillTessellator,
-    FillOptions,
-};
-use crate::config::CONFIG;
-
-use lyon::path::Path;
 
 pub struct Tile {
     pub tile_id: TileId,
-    pub layers: Vec<crate::vector_tile::transform::Layer>,
     pub mesh: VertexBuffers<Vertex, u32>,
     pub extent: u16,
-    pub objects: Vec<object::Object>,
-    pub collider: crate::interaction::tile_collider::TileCollider,
+    pub objects: Vec<Object>,
+    pub features: Vec<(u32, Range<u32>)>,
+    pub collider: TileCollider,
 }
 
 pub fn layer_num(name: &str) -> u32 {
@@ -65,23 +51,23 @@ pub fn layer_num(name: &str) -> u32 {
 
 impl Tile {
     pub fn from_mbvt(
-        tile_id: &math::TileId,
+        tile_id: &TileId,
         data: &Vec<u8>,
-        feature_collection: Arc<RwLock<FeatureCollection>>
+        feature_collection: Arc<RwLock<FeatureCollection>>,
+        selection_tags: Vec<String>
     ) -> Self {
         // let t = std::time::Instant::now();
 
         // we can build a bytes reader directly out of the bytes
         let mut reader = BytesReader::from_bytes(&data);
 
-        let tile = crate::vector_tile::Tile::from_reader(&mut reader, &data).expect("Cannot read Tile object.");
-        // dbg!(t.elapsed().as_millis());
+        let tile = super::vector_tile::Tile::from_reader(&mut reader, &data).expect("Cannot read Tile object.");
 
-        let mut layers = Vec::with_capacity(tile.layers.len());
         let mut objects = Vec::new();
         let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::with_capacity(100_000, 100_000);
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id, 1.0));
         let extent = tile.layers[0].extent as u16;
+        let mut features = vec![];
 
         // Add a background rectangle to each tile
         // let selector = Selector::new().with_type("background");
@@ -121,14 +107,11 @@ impl Tile {
             let layer_id = layer_num(&layer.name);
             let mut current_feature_id = 0;
 
-            let mut map: std::collections::HashMap<
-                crate::css::Selector,
-                Vec<(vector_tile::mod_Tile::GeomType, Vec<Path>)>
-            > = std::collections::HashMap::new();
+            let mut map: std::collections::HashMap<Selector, Vec<(GeomType, Vec<Path>)>> = HashMap::new();
 
             // Preevaluate the selectors and group features by the selector they belong to.
             for feature in layer.features {
-                let mut selector = crate::css::Selector::new()
+                let mut selector = Selector::new()
                     .with_type("layer".to_string())
                     .with_any("name".to_string(), layer.name.to_string());
                 
@@ -137,7 +120,7 @@ impl Tile {
                 for tag in feature.tags.chunks(2) {
                     let key = layer.keys[tag[0] as usize].to_string();
                     let value = layer.values[tag[1] as usize].clone();
-                    if CONFIG.renderer.selection_tags.contains(&key) {
+                    if selection_tags.contains(&key) {
                         match &key[..] {
                             "class" => {
                                 selector.classes.push(value.string_value.clone().unwrap().to_string());
@@ -179,7 +162,7 @@ impl Tile {
                     _ => None,
                 };
                 
-                object_type.map(|ot| objects.push(object::Object::new(
+                object_type.map(|ot| objects.push(Object::new_with_tags(
                     selector.clone(),
                     paths[0].points().iter().cloned().collect(),
                     tags,
@@ -194,7 +177,7 @@ impl Tile {
             }
 
             // Transform all the features on a per selector basis.
-            let mut features = vec![];
+            let mut inner_features = vec![];
             for (selector, fs) in map {
                 index_start_before = builder.get_current_index();
                 for feature in fs {
@@ -217,19 +200,13 @@ impl Tile {
                     );
                 }
 
-                features.push((current_feature_id, index_start_before..builder.get_current_index()));
+                inner_features.push((current_feature_id, index_start_before..builder.get_current_index()));
             }
 
-            // Add the layer info to the layer set.
-            layers.push(crate::vector_tile::transform::Layer {
-                name: layer.name.to_string(),
-                id: layer_id,
-                indices_range: index_start_before..builder.get_current_index(),
-                features,
-            });
+            features.extend(inner_features);
         }
 
-        let mut collider = crate::interaction::tile_collider::TileCollider::new();
+        let mut collider = TileCollider::new();
 
         for object_id in 0..objects.len() {
             if objects[object_id].points.len() >= 2 {
@@ -240,10 +217,10 @@ impl Tile {
 
         Self {
             tile_id: tile_id.clone(),
-            layers,
             mesh,
             extent,
             objects,
+            features,
             collider,
         }
     }

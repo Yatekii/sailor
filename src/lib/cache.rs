@@ -1,12 +1,8 @@
-use crate::drawing::feature_collection::FeatureCollection;
 use std::sync::{
     Arc,
     RwLock,
 };
-use crate::vector_tile::tile::Tile;
-use crate::vector_tile::math::TileId;
 use std::collections::HashMap;
-use crate::vector_tile::math;
 use std::thread::{
     JoinHandle,
     spawn,
@@ -16,9 +12,10 @@ use std::sync::mpsc::{
     Sender,
     Receiver,
 };
+use super::*;
 
 pub struct TileCache {
-    cache: HashMap<math::TileId, Tile>,
+    cache: HashMap<TileId, Tile>,
     loaders: Vec<(u64, JoinHandle<Option<Tile>>, TileId)>,
     channel: (Sender<u64>, Receiver<u64>),
     id: u64,
@@ -61,7 +58,12 @@ impl TileCache {
         }
     }
 
-    pub fn request_tile(&mut self, tile_id: &math::TileId, feature_collection: Arc<RwLock<FeatureCollection>>) {
+    pub fn request_tile(
+        &mut self,
+        tile_id: &TileId,
+        feature_collection: Arc<RwLock<FeatureCollection>>,
+        selection_tags: Vec<String>
+    ) {
         let id = self.id;
         self.id += 1;
 
@@ -73,8 +75,8 @@ impl TileCache {
             self.loaders.push((
                 id,
                 spawn(move|| {
-                    if let Some(data) = crate::vector_tile::fetch_tile_data(&tile_id_clone) {
-                        let tile = Tile::from_mbvt(&tile_id_clone, &data, feature_collection);
+                    if let Some(data) = fetch_tile_data(&tile_id_clone) {
+                        let tile = Tile::from_mbvt(&tile_id_clone, &data, feature_collection, selection_tags);
                         match tx.send(id) {
                             Err(_) => log::debug!("Could not send the tile load message. This most likely happened because the app was terminated."),
                             _ => (),
@@ -89,7 +91,7 @@ impl TileCache {
         }
     }
 
-    pub fn try_get_tile(&self, tile_id: &math::TileId) -> Option<&Tile> {
+    pub fn try_get_tile(&self, tile_id: &TileId) -> Option<&Tile> {
         self.cache.get(&tile_id)
     }
 }

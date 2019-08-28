@@ -20,7 +20,7 @@ use ncollide2d::{
         Segment,
     },
 };
-use crate::vector_tile::object::Object;
+pub use crate::*;
 
 pub struct TileCollider {
     world: CollisionWorld<f32, usize>,

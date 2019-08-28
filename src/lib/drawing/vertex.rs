@@ -1,7 +1,8 @@
-use crate::vector_tile::math::TileId;
-use lyon::tessellation;
-use lyon::tessellation::geometry_builder::VertexConstructor;
-use crate::vector_tile::math;
+use lyon::tessellation::{
+    self,
+    geometry_builder::VertexConstructor,
+};
+use crate::*;
 
 #[derive(Copy, Clone, Debug)]
 pub enum VertexType {

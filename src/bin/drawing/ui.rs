@@ -1,13 +1,9 @@
-use crate::vector_tile::object::Object;
 use crate::app_state::EditableObject;
 use crate::app_state::AppState;
 use imgui::*;
-use crate::css::{
-    CSSValue,
-    Color,
-    Rule,
-    Number,
-};
+use crate::*;
+
+use crate::config::CONFIG;
 
 pub struct HUD {
     platform: imgui_winit_support::WinitPlatform,
@@ -41,13 +37,20 @@ impl HUD {
             }
         ]);
 
+        use std::io::Read;
+        let mut f = std::fs::File::open(&CONFIG.renderer.ui_font).expect("Could not open the UI font.");
+        let mut data = vec![];
+        f.read_to_end(&mut data).expect("Could not read the UI font.");
+
         let ruda = imgui.fonts().add_font(&[FontSource::TtfData {
-            data: include_bytes!("../../config/Ruda-Bold.ttf"),
+            data: data.as_slice(),
             size_pixels: font_size,
             config: None,
         }]);
 
-        let mut renderer = imgui_wgpu::Renderer::new(
+        let _style = imgui.style_mut();
+
+        let renderer = imgui_wgpu::Renderer::new(
             &mut imgui,
             device,
             wgpu::TextureFormat::Bgra8Unorm,
@@ -78,6 +81,29 @@ impl HUD {
         let ui = self.imgui.frame();
         let ruda = ui.push_font(self.ruda);
         {
+            
+            let mouse_pos = ui.io().mouse_pos;
+            ui.main_menu_bar(|| {
+
+                ui.menu(im_str!("File"), true, || {
+                    imgui::MenuItem::new(im_str!("Quit"))
+                        .shortcut(im_str!("Ctrl + Q"))
+                        .build(&ui);
+                });
+
+                ui.text(&im_str!(
+                    "Mouse Position: ({:.1},{:.1})",
+                    mouse_pos[0],
+                    mouse_pos[1]
+                ));
+
+                ui.text(&im_str!(
+                    "Frametime {:.2} at zoom {:.2}",
+                    app_state.stats.get_average(),
+                    app_state.zoom
+                ));
+            });
+
             let window = imgui::Window::new(im_str!("Hello world"));
             window
                 .size([400.0, 800.0], imgui::Condition::FirstUseEver)
@@ -168,9 +194,10 @@ impl HUD {
             .expect("Rendering failed");
     }
 
-    pub fn interact(&mut self, window: &wgpu::winit::Window, event: &wgpu::winit::Event) -> bool {
+    pub fn interact(&mut self, window: &wgpu::winit::Window, event: &wgpu::winit::Event) -> (bool, bool) {
         self.platform.handle_event(self.imgui.io_mut(), &window, &event);
-        self.imgui.io().want_capture_mouse
+        let io = self.imgui.io();
+        (!io.want_capture_mouse, !io.want_capture_keyboard)
     }
 }
 
@@ -241,7 +268,6 @@ fn add_slider_float(ui: &Ui, rule: &mut Rule, attribute: &str) {
 
 fn add_display_none(ui: &Ui, rule: &mut Rule) {
     let attribute = "display";
-    let default_number = CSSValue::Number(Number::Px(0.0));
     let mut value = if let Some(value) = rule.kvs.get(attribute) {
         match value {
             CSSValue::String(value) => {

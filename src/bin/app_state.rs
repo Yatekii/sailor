@@ -1,18 +1,6 @@
-use crate::stats::Stats;
-use crate::vector_tile::object::Object;
-use crate::interaction::collider::Collider;
 use lyon::math::Point;
-use crate::vector_tile::{
-    math::{
-        TileField,
-        Screen,
-        TileId,
-    },
-    cache::{
-        TileCache,
-    },
-};
-use crate::css::RulesCache;
+use crate::*;
+use stats::Stats;
 
 pub struct AppState {
     pub tile_cache: TileCache,
@@ -37,7 +25,7 @@ impl AppState {
         Self {
             tile_cache: TileCache::new(),
             css_cache: RulesCache::try_load_from_file(style).expect("Unable to load the style file. Please consult the log."),
-            screen: Screen::new(center, width, height, hidpi_factor),
+            screen: Screen::new(center, width, height, CONFIG.renderer.tile_size, hidpi_factor),
             tile_field: TileField::new(TileId::new(8, 0, 0), TileId::new(8, 0, 0)),
             zoom,
             hovered_objects: vec![],
@@ -47,7 +35,7 @@ impl AppState {
     }
 
     pub fn update_hovered_objects(&mut self, point: (f32, f32)) {
-        self.hovered_objects = Collider::get_hovered_objects(self, point)
+        self.hovered_objects = Collider::get_hovered_objects(&self.tile_cache, &self.screen, self.zoom ,point)
             .iter()
             .map(|o| (**o).clone())
             .collect();

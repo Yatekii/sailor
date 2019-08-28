@@ -1,14 +1,11 @@
-use wgpu::RenderPipeline;
 use core::ops::Range;
-use crate::drawing::feature_collection::FeatureCollection;
-use crate::vector_tile::math::TileId;
 use wgpu::{
     RenderPass,
     Buffer,
     Device,
+    RenderPipeline,
 };
-
-use crate::vector_tile::tile::Tile;
+use crate::*;
 
 pub struct DrawableTile {
     pub tile_id: TileId,
@@ -25,10 +22,6 @@ impl DrawableTile {
         tile_id: TileId,
         tile: &Tile,
     ) -> DrawableTile {
-        let mut features = Vec::new();
-        for l in tile.layers.clone() {
-            features.extend(l.features);
-        }
 
         DrawableTile {
             vertex_buffer: device
@@ -38,7 +31,7 @@ impl DrawableTile {
                 .create_buffer_mapped(tile.mesh.indices.len(), wgpu::BufferUsage::INDEX)
                 .fill_from_slice(&tile.mesh.indices),
             index_count: tile.mesh.indices.len() as u32,
-            features,
+            features: tile.features.clone(),
             tile_id,
             extent: tile.extent,
         }

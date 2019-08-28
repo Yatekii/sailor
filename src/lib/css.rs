@@ -1,31 +1,36 @@
 extern crate nom;
 
-use nom::number::complete::float;
-use nom::error::convert_error;
-use nom::error::VerboseError;
-use nom::InputTakeAtPosition;
-use nom::character::complete::multispace0;
-use nom::AsChar;
-use nom::error::ParseError;
-use nom::sequence::delimited;
-use nom::sequence::tuple;
-use nom::sequence::separated_pair;
-use nom::sequence::preceded;
-use nom::multi::many0;
-use nom::branch::alt;
-use nom::character::is_alphanumeric;
-use nom::bytes::complete::{
-    take_while,
-    take_while_m_n,
-    tag,
-};
-use nom::character::complete::char;
-use nom::combinator::map_res;
 use nom::{
+    number::complete::float,
+    error::{
+        convert_error,
+        VerboseError,
+        ParseError,
+    },
+    InputTakeAtPosition,
+    character::complete::multispace0,
+    AsChar,
+    sequence::{
+        delimited,
+        tuple,
+        separated_pair,
+        preceded,
+    },
+    multi::many0,
+    branch::alt,
+    character::{
+        is_alphanumeric,
+        complete::char,
+    },
+    bytes::complete::{
+        take_while,
+        take_while_m_n,
+        tag,
+    },
+    combinator::map_res,
     IResult,
     Err,
 };
-
 use crossbeam_channel::{
     unbounded,
     TryRecvError,
@@ -105,12 +110,10 @@ impl RulesCache {
     /// E.g. `layer` does not match the `layer[zoom=5]` rule selector.
     /// On the contrary, `layer[zoom=5]` matches the `layer` rule selector.
     pub fn get_matching_rules(&self, selector: &Selector) -> Vec<&Rule> {
-
         self.rules.iter().filter(|rule| selector.matches(&rule.selector)).collect()
     }
 
     pub fn get_matching_rules_mut(&mut self, selector: &Selector) -> Vec<&mut Rule> {
-
         self.rules.iter_mut().filter(|rule| selector.matches(&rule.selector)).collect()
     }
 
@@ -445,44 +448,43 @@ pub enum CSSValue {
 /// Parses a single CSS qualified string.
 /// Can contain alphanumeric characters, '-' and spaces.
 fn string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
-  let (input, value) = whitespace(take_while(|c| is_alphanumeric(c as u8) || c == '-' || c == ' '))(input)?;
+    let (input, value) = whitespace(take_while(|c| is_alphanumeric(c as u8) || c == '-' || c == ' '))(input)?;
 
-  Ok((input, CSSValue::String(value.into())))
+    Ok((input, CSSValue::String(value.into())))
 }
 
 /// Parses a single CSS px value.
 fn px_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
-  let (input, (value, _)) = tuple((float, tag("px")))(input)?;
+    let (input, (value, _)) = tuple((float, tag("px")))(input)?;
 
-  Ok((input, CSSValue::Number(Number::Px(value))))
+    Ok((input, CSSValue::Number(Number::Px(value))))
 }
 
 fn world_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
-  let (input, (value, _)) = tuple((float, tag("w")))(input)?;
-    println!("{:?}", value);
-  Ok((input, CSSValue::Number(Number::World(value))))
+    let (input, (value, _)) = tuple((float, tag("w")))(input)?;
+    Ok((input, CSSValue::Number(Number::World(value))))
 }
 
 /// Parses a single CSS unitless value.
 fn unitless_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
-  let (input, value) = float(input)?;
+    let (input, value) = float(input)?;
 
-  Ok((input, CSSValue::Number(Number::Unitless(value))))
+    Ok((input, CSSValue::Number(Number::Unitless(value))))
 }
 
 /// A struct to represent any RGB color.
 #[derive(Debug,PartialEq, Clone)]
 pub struct Color {
-  pub r: f32,
-  pub g: f32,
-  pub b: f32,
-  pub a: f32,
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
 }
 
 impl Color {
     pub const TRANSPARENT: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0, };
     pub const WHITE: Color = Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0, };
-    pub const BLACK: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0, };
+    pub const _BLACK: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0, };
     pub const RED:   Color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0, };
     pub const GREEN: Color = Color { r: 0.0, g: 1.0, b: 0.0, a: 1.0, };
     pub const BLUE:  Color = Color { r: 0.0, g: 0.0, b: 1.0, a: 1.0, };

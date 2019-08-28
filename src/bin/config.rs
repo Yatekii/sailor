@@ -10,9 +10,10 @@ pub struct Renderer {
     pub css: String,
     pub max_tiles: usize,
     pub max_features: u64,
-    pub tile_size: usize,
+    pub tile_size: u32,
     pub msaa_samples: u32,
     pub selection_tags: Vec<String>,
+    pub ui_font: String,
 }
 
 #[derive(Debug, Deserialize)]

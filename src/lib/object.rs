@@ -1,6 +1,6 @@
 use lyon::math::Point;
 use std::collections::HashMap;
-use crate::css::Selector;
+use super::*;
 
 #[derive(Debug, Clone)]
 pub enum ObjectType {
@@ -18,7 +18,7 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn new(
+    pub fn new_with_tags(
         selector: Selector,
         points: Vec<Point>,
         tags: HashMap<String, String>,
@@ -27,7 +27,7 @@ impl Object {
         Self {
             selector,
             points,
-            tags: HashMap::new(),
+            tags,
             object_type
         }
     }

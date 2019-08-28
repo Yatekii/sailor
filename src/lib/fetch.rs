@@ -1,9 +1,12 @@
-use std::fs::File;
-use std::path::Path;
-use std::io::Read;
-use crate::vector_tile::math;
+use std::{
+    fs::File,
+    path::Path,
+    io::Read,
+};
 
-pub fn fetch_tile_data(tile_id: &math::TileId) -> Option<Vec<u8>> {
+use super::*;
+
+pub fn fetch_tile_data(tile_id: &TileId) -> Option<Vec<u8>> {
     let zxy: String = format!("{}", tile_id);
     let pbf = format!("cache/{}.pbf", zxy);
     if !is_in_cache(pbf.clone()) {
@@ -52,7 +55,7 @@ pub fn fetch_tile_data(tile_id: &math::TileId) -> Option<Vec<u8>> {
     }
 }
 
-fn fetch_tile_from_server(tile_id: &math::TileId) -> Option<Vec<u8>> {
+fn fetch_tile_from_server(tile_id: &TileId) -> Option<Vec<u8>> {
     let request_url = format!("https://api.maptiler.com/tiles/v3/{}.pbf?key=t2mP0OQnprAXkW20R6Wd", tile_id);
     match reqwest::get(&request_url) {
         Ok(mut resp) => {
@@ -83,7 +86,7 @@ fn is_in_cache(path: impl Into<String>) -> bool {
     Path::new(&path.into()).exists()
 }
 
-fn ensure_cache_structure(tile_id: &math::TileId) {
+fn ensure_cache_structure(tile_id: &TileId) {
     let dir_path = format!("cache/{}/{}/", tile_id.z, tile_id.x);
     std::fs::create_dir_all(dir_path).expect("Could not create cache directories.");
 }

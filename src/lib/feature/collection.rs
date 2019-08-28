@@ -1,8 +1,4 @@
-use crate::css::RulesCache;
-use crate::drawing::feature::{
-    Feature,
-    FeatureStyle,
-};
+use crate::*;
 
 #[derive(Debug, Clone)]
 pub struct FeatureCollection {

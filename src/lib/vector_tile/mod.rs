@@ -1,17 +1,23 @@
-use crate::vector_tile::line_tesselator::tesselate_line2;
-use core::ops::Range;
-use crate::drawing::mesh::MeshBuilder;
+mod vector_tile;
+mod tile;
+mod tile_id;
 
-use lyon::path::Path;
-use lyon::math::*;
-use lyon::tessellation::{
-    FillTessellator,
-    FillOptions,
+pub use vector_tile::*;
+pub use tile::*;
+pub use tile_id::*;
+
+use core::ops::Range;
+use lyon::{
+    path::Path,
+    math::*,
+    tessellation::{
+        FillTessellator,
+        FillOptions,
+    },
 };
 use varint::ZigZag;
-
-use crate::vector_tile::mod_Tile::GeomType;
-use crate::drawing::vertex::VertexType;
+use vector_tile::mod_Tile::*;
+use super::*;
 
 #[derive(Debug, Clone)]
 pub struct Layer {
@@ -101,10 +107,7 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, cursor: &mut 
     }
 }
 
-pub fn geometry_commands_to_paths(
-    geometry_type: GeomType,
-    geometry: &Vec<u32>,
-) -> Vec<Path> {
+pub fn geometry_commands_to_paths(geometry_type: GeomType, geometry: &Vec<u32>) -> Vec<Path> {
     let mut cursor = 0;
     let mut c = point(0f32, 0f32);
     let mut paths = Vec::new();

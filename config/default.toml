@@ -6,6 +6,7 @@ display_framerate = false
 vertex_shader = "config/shader.vert"
 fragment_shader = "config/shader.frag"
 css = "config/style.css"
+ui_font = "config/Ruda-Bold.ttf"
 max_tiles = 200
 max_features = 10001
 tile_size = 384

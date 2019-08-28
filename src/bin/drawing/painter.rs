@@ -1,10 +1,12 @@
+use std::collections::BTreeMap;
+use std::sync::{
+    Arc,
+    RwLock,
+};
 use nalgebra_glm::{
     vec4,
     vec2,
 };
-use crate::drawing::feature_collection::FeatureCollection;
-use crate::vector_tile::math::Screen;
-use wgpu::TextureView;
 use crossbeam_channel::{
     unbounded,
     TryRecvError,
@@ -18,20 +20,6 @@ use notify::{
         ModifyKind,
     },
 };
-use wgpu::Surface;
-use wgpu::CommandEncoder;
-use crate::vector_tile::math::TileId;
-use crate::drawing::{
-    drawable_tile::DrawableTile,
-};
-use crate::css::{
-            CSSValue,
-            Selector,
-            Color,
-            RulesCache,
-        };
-use std::collections::BTreeMap;
-
 use wgpu::{
     winit::{
         Window,
@@ -43,33 +31,26 @@ use wgpu::{
     ShaderModule,
     SwapChainDescriptor,
     SwapChain,
+    Surface,
     Device,
     Buffer,
     BindGroupLayout,
     BindGroup,
+    CommandEncoder,
     RenderPipeline,
     PresentMode,
     LoadOp,
     StoreOp,
+    TextureView,
     RenderPassDepthStencilAttachmentDescriptor,
     DepthStencilStateDescriptor,
 };
+use osm::*;
 
-use super::{
-    helpers::{
-        ShaderStage,
-        load_glsl,
-    },
-    vertex::{
-        Vertex,
-    },
+use crate::drawing::helpers::{
+    ShaderStage,
+    load_glsl,
 };
-
-use std::sync::{
-    Arc,
-    RwLock,
-};
-
 use crate::app_state::AppState;
 
 use crate::config::CONFIG;
@@ -663,7 +644,7 @@ impl Painter {
         app_state.tile_cache.fetch_tiles();
         for tile_id in tile_field.iter() {
             if !self.loaded_tiles.contains_key(&tile_id) {
-                app_state.tile_cache.request_tile(&tile_id, self.feature_collection.clone());
+                app_state.tile_cache.request_tile(&tile_id, self.feature_collection.clone(), CONFIG.renderer.selection_tags.clone());
                 
                 let tile_cache = &mut app_state.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
@@ -671,7 +652,7 @@ impl Painter {
                     let drawable_tile = DrawableTile::load_from_tile_id(
                         &self.device,
                         tile_id,
-                        &tile,
+                        &tile
                     );
 
                     self.loaded_tiles.insert(

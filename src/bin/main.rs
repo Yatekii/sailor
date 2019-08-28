@@ -1,8 +1,5 @@
-mod vector_tile;
 mod drawing;
 mod app_state;
-mod interaction;
-mod css;
 mod stats;
 mod config;
 
@@ -12,7 +9,7 @@ extern crate nalgebra_glm as glm;
 #[macro_use] extern crate serde_derive;
 
 
-use crate::vector_tile::*;
+use osm::*;
 use lyon::math::{
     vector,
 };
@@ -24,8 +21,8 @@ fn main() {
     pretty_env_logger::init();
 
     let z = 8.0;
-    let tile_coordinate = math::deg2num(47.3769, 8.5417, z as u32);
-    let zurich = math::num_to_global_space(&tile_coordinate);
+    let tile_coordinate = deg2num(47.3769, 8.5417, z as u32);
+    let zurich = num_to_global_space(&tile_coordinate);
 
     let width = 1600;
     let height = 1000;
@@ -45,63 +42,76 @@ fn main() {
     loop {
         use wgpu::winit::{Event, WindowEvent, ElementState, MouseButton, MouseScrollDelta, KeyboardInput, VirtualKeyCode};
         events_loop.poll_events(|event| {
-            let route = hud.interact(&painter.window, &event);
-            if !route {
-                match event.clone() {
-                    Event::WindowEvent {
-                        event: WindowEvent::Resized(size),
-                        ..
-                    } => {
+            let (route_mouse, route_keyboard) = hud.interact(&painter.window, &event);
+            match event.clone() {
+                Event::WindowEvent { event, .. } => match event {
+                    WindowEvent::Destroyed => { status = false }
+                    WindowEvent::Resized(size) => {
                         let physical = size.to_physical(painter.get_hidpi_factor());
                         app_state.screen.width = physical.width.round() as u32;
                         app_state.screen.height = physical.height.round() as u32;
                         painter.resize(physical.width.round() as u32, physical.height.round() as u32);
-                    },
-                    Event::WindowEvent { event, .. } => match event {
-                        WindowEvent::Destroyed => { status = false }
-                        WindowEvent::KeyboardInput {
-                            input: KeyboardInput { virtual_keycode: Some(keycode), .. },
-                            ..
-                        } => {
+                    }
+                    WindowEvent::KeyboardInput {
+                        input: KeyboardInput { virtual_keycode: Some(keycode), .. },
+                        ..
+                    } => {
+                        if route_keyboard {
                             match keycode {
                                 VirtualKeyCode::Escape => status = false,
                                 VirtualKeyCode::Tab => app_state.advance_selected_object(),
                                 _ => {}
                             }
-                        },
-                        WindowEvent::CloseRequested => { status = false },
-                        WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
-                            mouse_down = true;
-                        },
-                        WindowEvent::MouseInput { state: ElementState::Released, button: MouseButton::Left, .. } => {
-                            mouse_down = false;
-                            app_state.update_selected_hover_objects();
-                        },
-                        WindowEvent::MouseWheel { delta, .. } => {
+                        }
+                    },
+                    WindowEvent::CloseRequested => { status = false },
+                    WindowEvent::MouseInput { state, button, .. } => {
+                        if route_mouse {
+                            match button {
+                                MouseButton::Left => {
+                                    match state {
+                                        ElementState::Pressed => {
+                                            mouse_down = true;
+                                        },
+                                        ElementState::Released => {
+                                            mouse_down = false;
+                                            app_state.update_selected_hover_objects();
+                                        }
+                                    }
+                                },
+                                _ => {},
+                            }
+                        }
+                    },
+                    WindowEvent::MouseWheel { delta, .. } => {
+                        if route_mouse {
                             match delta {
                                 MouseScrollDelta::LineDelta(_x, y) => app_state.zoom += 0.1 * y,
                                 _ => ()
                             }
-                        },
-                        WindowEvent::CursorMoved { position, .. } => {
-                            let size = app_state.screen.get_tile_size() as f32;
-                            let mut delta = vector((position.x - last_pos.x) as f32, (position.y - last_pos.y) as f32);
-                            let zoom_x = (app_state.screen.width as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
-                            let zoom_y = (app_state.screen.height as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
-                            delta.x *= zoom_x;
-                            delta.y *= zoom_y;
+                        }
+                    },
+                    WindowEvent::CursorMoved { position, .. } => {
+                        let size = app_state.screen.get_tile_size() as f32;
+                        let mut delta = vector((position.x - last_pos.x) as f32, (position.y - last_pos.y) as f32);
+                        let zoom_x = (app_state.screen.width as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
+                        let zoom_y = (app_state.screen.height as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
+                        delta.x *= zoom_x;
+                        delta.y *= zoom_y;
 
-                            last_pos = position;
+                        last_pos = position;
+
+                        if route_mouse {
                             if mouse_down {
                                 app_state.screen.center -= delta;
                             }
 
                             app_state.update_hovered_objects((position.x as f32, position.y as f32))
                         }
-                        _ => (),
                     }
                     _ => (),
                 }
+                _ => (),
             }
         });
 

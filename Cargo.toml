@@ -13,10 +13,20 @@ categories = []
 keywords = ["sailing", "gfx", "gps"]
 license = "MIT OR Apache-2.0"
 
+autobins = false
+
 [features]
 default = ["vulkan"]
 gl = []
 vulkan = []
+
+[lib]
+name = "osm"
+path = "src/lib/main.rs"
+
+[[bin]]
+name = "sailor"
+path = "src/bin/main.rs"
 
 [profile.release]
 debug = true
@@ -48,6 +58,6 @@ phf = { version = "0.7.24", features = ["macros"] }
 num-traits = "0.2.8"
 imgui = { git = "https://github.com/Yatekii/imgui-rs", rev = "53ebb60d0c8cc6644883f9c6aa6c5efe88333c22" }
 imgui-winit-support = { git = "https://github.com/Yatekii/imgui-rs", rev = "53ebb60d0c8cc6644883f9c6aa6c5efe88333c22" }
-# imgui-wgpu = { path = "../imgui-wgpu-rs" }
-imgui-wgpu = { git = "https://github.com/Yatekii/imgui-wgpu-rs" }
+imgui-wgpu = { path = "../imgui-wgpu-rs" }
+# imgui-wgpu = { git = "https://github.com/Yatekii/imgui-wgpu-rs" }
 ncollide2d = "0.20.1"

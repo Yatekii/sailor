@@ -1,10 +1,13 @@
-use crate::drawing::mesh::MeshBuilder;
-use crate::lyon::lyon_tessellation::GeometryBuilder;
-use lyon::path::Path;
-use lyon::math::*;
-use lyon::tessellation::{
-    FillVertex,
+use lyon::{
+    lyon_tessellation::GeometryBuilder,
+    path::Path,
+    math::*,
+    tessellation::{
+        FillVertex,
+    },
 };
+
+use crate::*;
 
 pub fn get_side(a: &Point, b: &Point, c: &Point) -> i32 {
     num_traits::sign::signum((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) as i32
