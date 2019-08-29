@@ -214,6 +214,8 @@ fn add_color_picker(ui: &Ui, rule: &mut Rule, attribute: &str) {
                 "red" => Color::RED,
                 "green" => Color::GREEN,
                 "blue" => Color::BLUE,
+                "black" => Color::BLACK,
+                "white" => Color::WHITE,
                 _ => Color::TRANSPARENT,
             }
         },

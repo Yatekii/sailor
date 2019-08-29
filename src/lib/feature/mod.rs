@@ -69,6 +69,8 @@ impl Feature {
                         "red" => self.style.background_color = Color::RED.into(),
                         "green" => self.style.background_color = Color::GREEN.into(),
                         "blue" => self.style.background_color = Color::BLUE.into(),
+                        "black" => self.style.background_color = Color::BLACK.into(),
+                        "white" => self.style.background_color = Color::WHITE.into(),
                         // Other CSS colors to come later.
                         color => {
                             log::info!("The color '{}' is currently not supported.", color)
@@ -97,6 +99,8 @@ impl Feature {
                         "red" => self.style.border_color = Color::RED.into(),
                         "blue" => self.style.border_color = Color::GREEN.into(),
                         "green" => self.style.border_color = Color::BLUE.into(),
+                        "black" => self.style.background_color = Color::BLACK.into(),
+                        "white" => self.style.background_color = Color::WHITE.into(),
                         // Other CSS colors to come later.
                         color => {
                             log::info!("The color '{}' is currently not supported.", color)

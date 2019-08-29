@@ -5,7 +5,6 @@ mod math;
 mod fetch;
 mod drawing;
 mod cache;
-pub mod loader;
 mod object;
 mod css;
 mod interaction;

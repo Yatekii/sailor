@@ -10,8 +10,12 @@ use quick_protobuf::{
 };
 use vector_tile::mod_Tile::GeomType;
 use lyon::{
-    tessellation::geometry_builder::{
-        VertexBuffers,
+    tessellation::{
+        geometry_builder::{
+            VertexBuffers,
+        },
+        FillTessellator,
+        FillOptions,
     },
     path::Path,
 };
@@ -68,44 +72,47 @@ impl Tile {
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id, 1.0));
         let extent = tile.layers[0].extent as u16;
         let mut features = vec![];
+        let mut current_feature_id;
 
         // Add a background rectangle to each tile
-        // let selector = Selector::new().with_type("background");
+        let selector = Selector::new().with_type("background");
 
-        // let mut path_builder = Path::builder();
-        // path_builder.move_to((-10.0, -10.0).into());
-        // path_builder.line_to((-10.0, extent as f32 + 10.0).into());
-        // path_builder.line_to((extent as f32 + 10.0, extent as f32 + 10.0).into());
-        // path_builder.line_to((extent as f32 + 10.0, -10.0).into());
-        // path_builder.close();
-        // let path = path_builder.build();
+        let mut path_builder = Path::builder();
+        path_builder.move_to((-10.0, -10.0).into());
+        path_builder.line_to((-10.0, extent as f32 + 10.0).into());
+        path_builder.line_to((extent as f32 + 10.0, extent as f32 + 10.0).into());
+        path_builder.line_to((extent as f32 + 10.0, -10.0).into());
+        path_builder.close();
+        let path = path_builder.build();
+        let index_start_before = builder.get_current_index();
+        {
+            let mut feature_collection = feature_collection.write().unwrap();
+            current_feature_id = if let Some(feature_id) = feature_collection.get_feature_id(&selector) {
+                feature_id
+            } else {
+                feature_collection.add_feature(Feature::new(selector.clone(), 0))
+            };
+            builder.set_current_feature_id(current_feature_id);
+        }
 
-        // {
-        //     let mut feature_collection = feature_collection.write().unwrap();
-        //     let current_feature_id = if let Some(feature_id) = feature_collection.get_feature_id(&selector) {
-        //         feature_id
-        //     } else {
-        //         feature_collection.add_feature(Feature::new(selector.clone(), 0))
-        //     };
-        //     builder.set_current_feature_id(current_feature_id);
-        // }
+        FillTessellator::new().tessellate_path(
+            &path,
+            &FillOptions::tolerance(0.0001).with_normals(true),
+            &mut builder,
+        ).expect("This is a bug. Please report it.");
 
-        // FillTessellator::new().tessellate_path(
-        //     &path,
-        //     &FillOptions::tolerance(0.0001).with_normals(true),
-        //     &mut builder,
-        // ).expect("This is a bug. Please report it.");
+        features.push((current_feature_id, index_start_before..builder.get_current_index()));
 
-        // objects.push(Object::new(
-        //     selector,
-        //     path.points().iter().cloned().collect(),
-        //     ObjectType::Polygon
-        // ));
+        objects.push(Object::new(
+            selector,
+            path.points().iter().cloned().collect(),
+            ObjectType::Polygon
+        ));
+
+        // Transform all features of the tile.
 
         for layer in tile.layers {
-            let mut index_start_before = builder.get_current_index();
             let layer_id = layer_num(&layer.name);
-            let mut current_feature_id = 0;
 
             let mut map: std::collections::HashMap<Selector, Vec<(GeomType, Vec<Path>)>> = HashMap::new();
 
@@ -179,7 +186,7 @@ impl Tile {
             // Transform all the features on a per selector basis.
             let mut inner_features = vec![];
             for (selector, fs) in map {
-                index_start_before = builder.get_current_index();
+                let index_start_before = builder.get_current_index();
                 for feature in fs {
                     {
                         let mut feature_collection = feature_collection.write().unwrap();

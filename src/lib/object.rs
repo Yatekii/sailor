@@ -18,6 +18,19 @@ pub struct Object {
 }
 
 impl Object {
+    pub fn new(
+        selector: Selector,
+        points: Vec<Point>,
+        object_type: ObjectType
+    ) -> Self {
+        Self {
+            selector,
+            points,
+            tags: HashMap::new(),
+            object_type
+        }
+    }
+
     pub fn new_with_tags(
         selector: Selector,
         points: Vec<Point>,

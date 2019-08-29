@@ -719,6 +719,8 @@ impl Painter {
                         "red" => Color::RED,
                         "green" => Color::GREEN,
                         "blue" => Color::BLUE,
+                        "black" => Color::BLACK,
+                        "white" => Color::WHITE,
                         // Other CSS colors to come later.
                         color => {
                             log::info!("The color '{}' is currently not supported.", color);
@@ -763,7 +765,7 @@ impl Painter {
                         resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
-                        clear_color: wgpu::Color { r: c.r, g: c.g, b: c.b, a: c.a },
+                        clear_color: wgpu::Color::TRANSPARENT,
                     }],
                     depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
                         attachment: &self.stencil,
