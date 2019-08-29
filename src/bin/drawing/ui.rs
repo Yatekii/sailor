@@ -81,10 +81,10 @@ impl HUD {
         let ui = self.imgui.frame();
         let ruda = ui.push_font(self.ruda);
         {
-            
             let mouse_pos = ui.io().mouse_pos;
-            ui.main_menu_bar(|| {
 
+            // Draw menubar.
+            ui.main_menu_bar(|| {
                 ui.menu(im_str!("File"), true, || {
                     imgui::MenuItem::new(im_str!("Quit"))
                         .shortcut(im_str!("Ctrl + Q"))
@@ -104,35 +104,25 @@ impl HUD {
                 ));
             });
 
-            let window = imgui::Window::new(im_str!("Hello world"));
+            let window = imgui::Window::new(im_str!("Main"));
             window
                 .size([400.0, 800.0], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
-                    let objects = app_state.hovered_objects
-                        .iter()
-                        .map(|o| o.selector.to_string())
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    ui.text(im_str!("{}", objects));
-                    ui.separator();
-                    let mouse_pos = ui.io().mouse_pos;
-                    ui.text(im_str!(
-                        "Mouse Position: ({:.1},{:.1})",
-                        mouse_pos[0],
-                        mouse_pos[1]
-                    ));
-                    ui.text(im_str!(
-                        "Frametime {:.2} at zoom {:.2}",
-                        app_state.stats.get_average(),
-                        app_state.zoom
-                    ));
-                });
+                    let mut size = ui.window_size();
+                    size[1] = 100.0;
+                    let window = imgui::ChildWindow::new("Hovered objects")
+                        .size(size);
+                    window.build(&ui, || {
+                        let objects = app_state.hovered_objects
+                            .iter()
+                            .map(|o| o.selector.to_string())
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        ui.text(im_str!("{}", objects));
+                    });
 
-            let window = imgui::Window::new(im_str!("Hello too"));
-            window
-                .size([400.0, 800.0], Condition::FirstUseEver)
-                .position([520.0, 60.0], Condition::FirstUseEver)
-                .build(&ui, || {
+                    add_header_separator(&ui, im_str!("Selected objects"));
+
                     let mut item: i32 = 0;
                     for i in 0..app_state.selected_objects.len() {
                         if app_state.selected_objects[i].selected {
@@ -140,40 +130,47 @@ impl HUD {
                             item = i as i32;
                         }
                     }
-                    let items = app_state.selected_objects.iter().map(|o| im_str!("{}", o.object.selector)).collect::<Vec<_>>();
+                    let items = app_state.selected_objects
+                        .iter()
+                        .map(|o| im_str!("{}", o.object.selector))
+                        .collect::<Vec<_>>();
                     let mut item_refs = vec![];
                     for item in &items {
                         item_refs.push(item);
                     }
-                    ui.text(im_str!("Hello world!"));
+                    
                     ui.list_box(
-                        im_str!("hello top"),
+                        im_str!("Selected objects"),
                         &mut item,
                         &item_refs,
                         5
                     );
+
+                    add_header_separator(&ui, im_str!("Selected Object"));
+
                     if item >= 0 && items.len() > 0 {
                         app_state.selected_objects[item as usize].selected = true;
                     }
-                });
 
-            let window = imgui::Window::new(im_str!("Edit Feature"));
-            window
-                .size([400.0, 800.0], Condition::FirstUseEver)
-                .position([980.0, 60.0], Condition::FirstUseEver)
-                .build(&ui, || {
                     let objects = &mut app_state.selected_objects;
 
                     if let Some(EditableObject {
-                        object: Object {
-                            selector,
-                            ..
-                        },
+                        object,
                         ..
                     }) = objects.iter_mut().find(|object| object.selected) {
-                        let mut rules = app_state.css_cache.get_matching_rules_mut(&selector);
+                        ui.separator();
+                        ui.text(im_str!("Tags"));
+                        ui.separator();
+
+                        ui.text(im_str!("{:#?}", object.tags));
+
+                        ui.separator();
+                        ui.text(im_str!("Applying rules"));
+                        ui.separator();
+
+                        let mut rules = app_state.css_cache.get_matching_rules_mut(&object.selector);
                         for rule in rules.iter_mut() {
-                            let show_block = CollapsingHeader::new(&ui, &im_str!("{}", rule.selector)).build();
+                            let show_block = add_header_separator(&ui, im_str!("{}", rule.selector));
                             if show_block {
                                 add_color_picker(&ui, rule, "background-color");
                                 add_color_picker(&ui, rule, "border-color");
@@ -182,6 +179,10 @@ impl HUD {
                                 add_display_none(&ui, rule);
                             }
                         }
+                    } else {
+                        ui.separator();
+                        ui.text(im_str!("No Object selected"));
+                        ui.separator();
                     }
                 });
             ruda.pop(&ui);
@@ -292,4 +293,17 @@ fn add_display_none(ui: &Ui, rule: &mut Rule) {
     } else {
         rule.kvs.remove(attribute);
     }
+}
+
+fn add_header_separator(ui: &Ui, title: impl Into<ImString>) -> bool {
+    CollapsingHeader::new(&ui, &title.into())
+        .flags(
+            ImGuiTreeNodeFlags::Bullet
+            | ImGuiTreeNodeFlags::Leaf
+            | ImGuiTreeNodeFlags::Framed
+            | ImGuiTreeNodeFlags::Selected
+            | ImGuiTreeNodeFlags::NoTreePushOnOpen
+            | ImGuiTreeNodeFlags::DefaultOpen
+        )
+        .build()
 }

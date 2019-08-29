@@ -701,43 +701,6 @@ impl Painter {
         feature_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
     }
 
-    pub fn load_background_color(&self, app_state: &AppState) -> Color {
-        let rules = app_state.css_cache.get_matching_rules(
-            &Selector::new().with_type("background".to_string()).with_any("zoom".to_string(), (app_state.zoom.floor() as u32).to_string())
-        );
-
-        let background_color = rules
-            .iter()
-            .filter_map(|r| r.kvs.get("background-color"))
-            .last();
-
-        if let Some(color) = background_color {
-            match color {
-                CSSValue::Color(bg) => bg.clone(),
-                CSSValue::String(string) => {
-                    match &string[..] {
-                        "red" => Color::RED,
-                        "green" => Color::GREEN,
-                        "blue" => Color::BLUE,
-                        "black" => Color::BLACK,
-                        "white" => Color::WHITE,
-                        // Other CSS colors to come later.
-                        color => {
-                            log::info!("The color '{}' is currently not supported.", color);
-                            Color::WHITE
-                        },
-                    }
-                },
-                value => {
-                    log::info!("The value '{:?}' is currently not supported for 'background-color'.", value);
-                    Color::WHITE
-                },
-            }
-        } else {
-            Color::WHITE
-        }
-    }
-
     pub fn paint(&mut self, hud: &mut super::ui::HUD, app_state: &mut AppState) {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         self.load_tiles(app_state);
@@ -756,7 +719,6 @@ impl Painter {
         let num_tiles = self.loaded_tiles.len();
         let features = feature_collection.get_features();
         if features.len() > 0 && num_tiles > 0 {
-            let c = self.load_background_color(app_state);
             let frame = self.swap_chain.get_next_texture();
             {
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -779,7 +741,10 @@ impl Painter {
                 });
                 render_pass.set_bind_group(0, &self.bind_group, &[]);
                 let vec = vec4(0.0, 0.0, 0.0, 1.0);
-                let screen_dimensions = vec2(app_state.screen.width as f32, app_state.screen.height as f32) / 2.0;
+                let screen_dimensions = vec2(
+                    app_state.screen.width as f32,
+                    app_state.screen.height as f32
+                ) / 2.0;
                 for (i, dt) in self.loaded_tiles.values_mut().enumerate() {
                     let matrix = app_state.screen.tile_to_global_space(
                         app_state.zoom,
