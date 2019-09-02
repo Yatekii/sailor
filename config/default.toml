@@ -8,7 +8,11 @@ fragment_shader = "config/shader.frag"
 css = "config/style.css"
 ui_font = "config/Ruda-Bold.ttf"
 max_tiles = 200
-max_features = 10001
+max_features = 1000
 tile_size = 384
 msaa_samples = 1
 selection_tags = []
+
+[renderer.temperature]
+vertex_shader = "config/temperature/shader.vert"
+fragment_shader = "config/temperature/shader.frag"

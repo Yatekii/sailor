@@ -14,6 +14,13 @@ pub struct Renderer {
     pub msaa_samples: u32,
     pub selection_tags: Vec<String>,
     pub ui_font: String,
+    pub temperature: Temperature,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Temperature {
+    pub vertex_shader: String,
+    pub fragment_shader: String,
 }
 
 #[derive(Debug, Deserialize)]

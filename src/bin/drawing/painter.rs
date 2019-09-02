@@ -75,6 +75,7 @@ pub struct Painter {
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
     feature_collection: Arc<RwLock<FeatureCollection>>,
+    temperature: crate::drawing::weather::Temperature,
 }
 
 impl Painter {
@@ -161,6 +162,7 @@ impl Painter {
             &device, &CONFIG.renderer.vertex_shader,
             &CONFIG.renderer.fragment_shader
         ).expect("Fatal Error. Unable to load shaders.");
+
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
                 wgpu::BindGroupLayoutBinding {
@@ -241,8 +243,12 @@ impl Painter {
             &tile_transform_buffer
         );
 
+        let mut temperature = crate::drawing::weather::Temperature::init(&mut device);
+
         let init_command_buf = init_encoder.finish();
         device.get_queue().submit(&[init_command_buf]);
+
+        temperature.generate_texture(&mut device, width, height);
 
         Self {
             #[cfg(feature = "vulkan")]
@@ -264,6 +270,7 @@ impl Painter {
             _watcher: watcher,
             rx,
             feature_collection,
+            temperature,
         }
     }
 
@@ -477,6 +484,7 @@ impl Painter {
 
     /// Reloads the shader if the file watcher has detected any change to the shader files.
     pub fn update_shader(&mut self) -> bool {
+        self.temperature.update_shader(&self.device);
         match self.rx.try_recv() {
             Ok(Ok(notify::event::Event {
                 kind: EventKind::Modify(ModifyKind::Data(_)),
@@ -780,6 +788,9 @@ impl Painter {
                     dt.paint(&mut render_pass, &self.blend_pipeline, &self.noblend_pipeline, &feature_collection, i as u32);
                 }
             }
+
+            self.temperature.paint(&mut encoder, &frame.view);
+
             hud.paint(
                 app_state,
                 &self.window,
