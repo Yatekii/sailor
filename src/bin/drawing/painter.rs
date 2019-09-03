@@ -56,7 +56,6 @@ use crate::app_state::AppState;
 use crate::config::CONFIG;
 
 pub struct Painter {
-    #[cfg(feature = "vulkan")]
     pub window: Window,
     hidpi_factor: f64,
     pub device: Device,
@@ -81,7 +80,6 @@ pub struct Painter {
 impl Painter {
     /// Initializes the entire draw machinery.
     pub fn init(events_loop: &EventsLoop, width: u32, height: u32, app_state: &AppState) -> Self {
-        #[cfg(feature = "vulkan")]
         let (window, instance, size, surface, factor) = {
             let instance = wgpu::Instance::new();
 
@@ -96,26 +94,6 @@ impl Painter {
             let surface = instance.create_surface(&window);
 
             (window, instance, size, surface, factor)
-        };
-
-        #[cfg(feature = "gl")]
-        let (instance, size, surface, factor) = {
-            let wb = wgpu::winit::WindowBuilder::new()
-                .with_dimensions(LogicalSize { width: width as f64, height: height as f64 });
-            let cb = wgpu::glutin::ContextBuilder::new().with_vsync(true);
-            let context = wgpu::glutin::WindowedContext::new_windowed(wb, cb, &events_loop).unwrap();
-
-            let factor = context.window().get_hidpi_factor();
-            let size = context
-                .window()
-                .get_inner_size()
-                .unwrap()
-                .to_physical(factor);
-
-            let instance = wgpu::Instance::new(context);
-            let surface = instance.get_surface();
-
-            (instance, size, surface, factor)
         };
 
         let adapter = instance.get_adapter(&wgpu::AdapterDescriptor {
@@ -254,7 +232,6 @@ impl Painter {
         temperature.generate_texture(&mut device, width, height);
 
         Self {
-            #[cfg(feature = "vulkan")]
             window: window,
             hidpi_factor: factor,
             device,

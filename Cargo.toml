@@ -15,11 +15,6 @@ license = "MIT OR Apache-2.0"
 
 autobins = false
 
-[features]
-default = ["vulkan"]
-gl = []
-vulkan = []
-
 [lib]
 name = "osm"
 path = "src/lib/main.rs"

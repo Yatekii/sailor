@@ -322,7 +322,7 @@ impl Temperature {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: view,
                 resolve_target: None,
-                load_op: wgpu::LoadOp::Clear,
+                load_op: wgpu::LoadOp::Load,
                 store_op: wgpu::StoreOp::Store,
                 clear_color: wgpu::Color {
                     r: 0.1,
