@@ -248,6 +248,9 @@ impl Painter {
         let init_command_buf = init_encoder.finish();
         device.get_queue().submit(&[init_command_buf]);
 
+        let width = 64 * 8;
+        let height = 64 * 8;
+
         temperature.generate_texture(&mut device, width, height);
 
         Self {
