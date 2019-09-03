@@ -38,7 +38,8 @@ nom = "5.0.0-beta2"
 notify = "5.0.0-pre.0"
 crossbeam-channel = "0.3.8"
 take_mut = "0.2.2"
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", features = ["vulkan"], rev="ce382f37355195f7ea6c204a22aa77e5280a236c" }
+wgpu = { version = "0.3.0", features = ["vulkan"] }
+winit = "0.20.0-alpha3"
 # wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs" }
 # wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs", branch = "stencil" }
 # wgpu = { package = "wgpu", features = ["vulkan"], path = "../wgpu-rs" }
@@ -51,8 +52,9 @@ log = { version = "0.4.7", features = ["serde"] }
 glsl-to-spirv = "0.1"
 phf = { version = "0.7.24", features = ["macros"] }
 num-traits = "0.2.8"
-imgui = { git = "https://github.com/Yatekii/imgui-rs", rev = "53ebb60d0c8cc6644883f9c6aa6c5efe88333c22" }
-imgui-winit-support = { git = "https://github.com/Yatekii/imgui-rs", rev = "53ebb60d0c8cc6644883f9c6aa6c5efe88333c22" }
-imgui-wgpu = { path = "../imgui-wgpu-rs" }
-# imgui-wgpu = { git = "https://github.com/Yatekii/imgui-wgpu-rs" }
+imgui = { git = "https://github.com/Yatekii/imgui-rs", rev = "e577870e7f1fd1c2863ab013ed70c75f079f4dd1" }
+imgui-winit-support = { git = "https://github.com/Yatekii/imgui-rs", rev = "e577870e7f1fd1c2863ab013ed70c75f079f4dd1" }
+# imgui-wgpu = { path = "../imgui-wgpu-rs" }
+imgui-wgpu = { git = "https://github.com/Yatekii/imgui-wgpu-rs" }
 ncollide2d = "0.20.1"
+raw-window-handle = "0.1"

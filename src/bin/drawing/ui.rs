@@ -14,10 +14,10 @@ pub struct HUD {
 
 impl HUD {
     pub fn new(
-        window: &wgpu::winit::Window,
+        window: &winit::window::Window,
         device: &mut wgpu::Device,
     ) -> Self {
-        let hidpi_factor = window.get_hidpi_factor();
+        let hidpi_factor = window.hidpi_factor();
         let mut imgui = imgui::Context::create();
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
         platform.attach_window(imgui.io_mut(), &window, imgui_winit_support::HiDpiMode::Default);
@@ -68,7 +68,7 @@ impl HUD {
     pub fn paint(
         &mut self,
         app_state: &mut AppState,
-        window: &wgpu::winit::Window,
+        window: &winit::window::Window,
         width: f64,
         height: f64,
         hidpi_factor: f64,
@@ -195,8 +195,8 @@ impl HUD {
             .expect("Rendering failed");
     }
 
-    pub fn interact(&mut self, window: &wgpu::winit::Window, event: &wgpu::winit::Event) -> (bool, bool) {
-        self.platform.handle_event(self.imgui.io_mut(), &window, &event);
+    pub fn interact(&mut self, window: &winit::window::Window, event: &winit::event::Event<()>) -> (bool, bool) {
+        self.platform.handle_event(self.imgui.io_mut(), window, &event);
         let io = self.imgui.io();
         (!io.want_capture_mouse, !io.want_capture_keyboard)
     }

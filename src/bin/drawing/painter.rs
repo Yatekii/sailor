@@ -20,14 +20,14 @@ use notify::{
         ModifyKind,
     },
 };
-use wgpu::{
-    winit::{
-        Window,
-        EventsLoop,
-        dpi::{
-            LogicalSize,
-        },
+use winit::{
+    window::Window,
+    event_loop::EventLoop,
+    dpi::{
+        LogicalSize,
     },
+};
+use wgpu::{
     ShaderModule,
     SwapChainDescriptor,
     SwapChain,
@@ -79,24 +79,25 @@ pub struct Painter {
 
 impl Painter {
     /// Initializes the entire draw machinery.
-    pub fn init(events_loop: &EventsLoop, width: u32, height: u32, app_state: &AppState) -> Self {
+    pub fn init(event_loop: &EventLoop<()>, width: u32, height: u32, app_state: &AppState) -> Self {
         let (window, instance, size, surface, factor) = {
+            use raw_window_handle::HasRawWindowHandle as _;
+
             let instance = wgpu::Instance::new();
 
-            let window = Window::new(&events_loop).unwrap();
+            let window = Window::new(&event_loop).unwrap();
             window.set_inner_size(LogicalSize { width: width as f64, height: height as f64 });
-            let factor = window.get_hidpi_factor();
+            let factor = window.hidpi_factor();
             let size = window
-                .get_inner_size()
-                .unwrap()
+                .inner_size()
                 .to_physical(factor);
 
-            let surface = instance.create_surface(&window);
+            let surface = instance.create_surface(window.raw_window_handle());
 
             (window, instance, size, surface, factor)
         };
 
-        let adapter = instance.get_adapter(&wgpu::AdapterDescriptor {
+        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::LowPower,
         });
 
@@ -146,12 +147,16 @@ impl Painter {
                 wgpu::BindGroupLayoutBinding {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer,
+                    ty: wgpu::BindingType::UniformBuffer {
+                        dynamic: false,
+                    },
                 },
                 wgpu::BindGroupLayoutBinding {
                     binding: 1,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer,
+                    ty: wgpu::BindingType::UniformBuffer {
+                        dynamic: false,
+                    },
                 },
             ]
         });
@@ -269,21 +274,21 @@ impl Painter {
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &pipeline_layout,
-            vertex_stage: wgpu::PipelineStageDescriptor {
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",
             },
-            fragment_stage: Some(wgpu::PipelineStageDescriptor {
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
                 module: &fs_module,
                 entry_point: "main",
             }),
-            rasterization_state: wgpu::RasterizationStateDescriptor {
+            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: wgpu::CullMode::None,
                 depth_bias: 0,
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
-            },
+            }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
                 format: wgpu::TextureFormat::Bgra8Unorm,
@@ -292,7 +297,7 @@ impl Painter {
                 write_mask: wgpu::ColorWrite::ALL,
             }],
             depth_stencil_state: Some(DepthStencilStateDescriptor {
-                format: wgpu::TextureFormat::D24UnormS8Uint,
+                format: wgpu::TextureFormat::Depth24PlusStencil8,
                 depth_write_enabled,
                 depth_compare: wgpu::CompareFunction::Greater,
                 stencil_front: wgpu::StencilStateFaceDescriptor {
@@ -333,6 +338,8 @@ impl Painter {
                 ],
             }],
             sample_count: CONFIG.renderer.msaa_samples,
+            sample_mask: !0,
+            alpha_to_coverage_enabled: false,
         })
     }
 
@@ -342,7 +349,7 @@ impl Painter {
         let canvas_size_buffer = device
             .create_buffer_mapped(
                 canvas_size_len / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
             )
             .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
 
@@ -351,7 +358,7 @@ impl Painter {
         let layer_data_buffer = device
             .create_buffer_mapped(
                 layer_data_len / 12 / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_SRC,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
             )
             .fill_from_slice(&buffer.as_slice());
 
@@ -366,7 +373,7 @@ impl Painter {
         device
             .create_buffer_mapped::<u8>(
                 Self::uniform_buffer_size() as usize,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
             )
             .fill_from_slice(&data)
     }
@@ -400,7 +407,7 @@ impl Painter {
             device
             .create_buffer_mapped::<f32>(
                 tile_data_buffer_byte_size,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
             )
             .fill_from_slice(data.as_slice()),
             tile_data_buffer_byte_size as u64
@@ -604,7 +611,7 @@ impl Painter {
             mip_level_count: 1,
             sample_count: CONFIG.renderer.msaa_samples,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::D24UnormS8Uint,
+            format: wgpu::TextureFormat::Depth24PlusStencil8,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         };
 
@@ -769,7 +776,7 @@ impl Painter {
                 }
             }
 
-            self.temperature.paint(&mut encoder, &frame.view);
+            // self.temperature.paint(&mut encoder, &frame.view);
 
             hud.paint(
                 app_state,

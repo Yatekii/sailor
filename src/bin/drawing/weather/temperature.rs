@@ -80,7 +80,10 @@ impl Temperature {
                 wgpu::BindGroupLayoutBinding {
                     binding: 0,
                     visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::SampledTexture,
+                    ty: wgpu::BindingType::SampledTexture {
+                        multisampled: false,
+                        dimension: wgpu::TextureViewDimension::D2,
+                    },
                 },
                 wgpu::BindGroupLayoutBinding {
                     binding: 1,
@@ -121,7 +124,9 @@ impl Temperature {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R32Float,
-            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::TRANSFER_DST,
+            usage: wgpu::TextureUsage::SAMPLED
+                 | wgpu::TextureUsage::OUTPUT_ATTACHMENT
+                 | wgpu::TextureUsage::COPY_DST,
         });
 
         let bind_group = Self::create_bind_group(
@@ -157,21 +162,21 @@ impl Temperature {
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &pipeline_layout,
-            vertex_stage: wgpu::PipelineStageDescriptor {
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",
             },
-            fragment_stage: Some(wgpu::PipelineStageDescriptor {
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
                 module: &fs_module,
                 entry_point: "main",
             }),
-            rasterization_state: wgpu::RasterizationStateDescriptor {
+            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: wgpu::CullMode::None,
                 depth_bias: 0,
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
-            },
+            }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
                 format: wgpu::TextureFormat::Bgra8Unorm,
@@ -191,6 +196,8 @@ impl Temperature {
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[],
             sample_count: CONFIG.renderer.msaa_samples,
+            sample_mask: !0,
+            alpha_to_coverage_enabled: false,
         })
     }
 
@@ -232,7 +239,7 @@ impl Temperature {
         // Place in wgpu buffer
         let buffer = device.create_buffer_mapped(
             (width * height) as usize,
-            wgpu::BufferUsage::TRANSFER_SRC,
+            wgpu::BufferUsage::COPY_SRC,
         )
         .fill_from_slice(data.as_slice());
 

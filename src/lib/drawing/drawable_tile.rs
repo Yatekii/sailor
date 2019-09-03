@@ -46,7 +46,7 @@ impl DrawableTile {
         tile_id: u32
     ) {
         render_pass.set_index_buffer(&self.index_buffer, 0);
-        render_pass.set_vertex_buffers(&[(&self.vertex_buffer, 0)]);
+        render_pass.set_vertex_buffers(0, &[(&self.vertex_buffer, 0)]);
 
         let mut alpha_set = vec![];
         let mut opaque_set = vec![];
