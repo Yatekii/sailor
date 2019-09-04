@@ -7,8 +7,8 @@ pub struct Collider {
 }
 
 impl Collider {
-    pub fn get_hovered_objects<'a>(cache: &'a TileCache, screen: &Screen, zoom: f32, point: (f32, f32)) -> Vec<&'a Object> {
-        let mut objects = vec![];
+    pub fn get_hovered_objects<'a>(cache: &'a TileCache, screen: &Screen, zoom: f32, point: (f32, f32)) -> Vec<Object> {
+        let mut return_objects = vec![];
         let tile_field = screen.get_tile_boundaries_for_zoom_level(zoom, 1);
 
         for tile_id in tile_field.iter() {
@@ -27,17 +27,21 @@ impl Collider {
 
                 if tile_point.x >= 0.0 && tile_point.x <= tile.extent as f32
                 && tile_point.y >= 0.0 && tile_point.y <= tile.extent as f32 {
-                    let object_ids = tile.collider.get_hovered_objects(&tile_point);
-                    for object_id in object_ids {
-                        objects.push(&tile.objects[object_id])
+                    if let Ok(collider) = tile.collider.try_read() {
+                        if let Ok(objects) = tile.objects.try_read() {
+                            let object_ids = collider.get_hovered_objects(&tile_point);
+                            for object_id in object_ids {
+                                return_objects.push(objects[object_id].clone())
+                            }
+                        }
                     }
-                    return objects
+                    return return_objects
                 }
             } else {
                 log::trace!("[Intersection pass] Could not read tile {} from cache.", tile_id);
             }
         }
 
-        objects
+        return_objects
     }
 }

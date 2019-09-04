@@ -35,10 +35,7 @@ impl AppState {
     }
 
     pub fn update_hovered_objects(&mut self, point: (f32, f32)) {
-        self.hovered_objects = Collider::get_hovered_objects(&self.tile_cache, &self.screen, self.zoom ,point)
-            .iter()
-            .map(|o| (**o).clone())
-            .collect();
+        self.hovered_objects = Collider::get_hovered_objects(&self.tile_cache, &self.screen, self.zoom ,point);
     }
 
     pub fn update_selected_hover_objects(&mut self) {

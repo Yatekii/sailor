@@ -62,12 +62,13 @@ impl TileCache {
         &mut self,
         tile_id: &TileId,
         feature_collection: Arc<RwLock<FeatureCollection>>,
-        selection_tags: Vec<String>
+        selection_tags: &Vec<String>
     ) {
         let id = self.id;
         self.id += 1;
 
         let loader = self.loaders.iter().filter(|l| l.2 == *tile_id).next();
+        let selection_tags = selection_tags.clone();
         
         if !self.cache.contains_key(&tile_id) && loader.is_none() {
             let tile_id_clone = tile_id.clone();

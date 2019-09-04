@@ -18,15 +18,23 @@ impl FeatureCollection {
         &self.features
     }
 
-    pub fn get_feature_id(&mut self, selector: &crate::css::Selector) -> Option<u32> {
+    fn get_feature_id(&mut self, selector: &crate::css::Selector) -> Option<u32> {
         self.features.iter_mut().enumerate().find(|(_, feature)| &feature.selector == selector).map(|(i, _)| i as u32)
     }
 
-    pub fn add_feature(&mut self, mut feature: Feature) -> u32 {
+    fn add_feature(&mut self, mut feature: Feature) -> u32 {
         assert!(self.features.len() < self.n_features_max as usize);
         feature.id = self.features.len() as u32;
         self.features.push(feature);
         self.features.len() as u32 - 1
+    }
+
+    pub fn ensure_feature(&mut self, selector: &Selector) -> u32 {
+        if let Some(feature_id) = self.get_feature_id(selector) {
+            feature_id
+        } else {
+            self.add_feature(Feature::new(selector.clone(), 0))
+        }
     }
 
     pub fn is_visible(&self, feature_id: u32) -> bool {
