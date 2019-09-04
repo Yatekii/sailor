@@ -24,14 +24,61 @@ use lyon::{
 };
 use crate::*;
 
+fn format_size(value: usize) -> String {
+    format!("{:.10}B", size_format::SizeFormatterSI::new(value as u64))
+}
+
+#[derive(Debug, Clone, Copy, Derivative)]
+pub struct TileStats {
+    pub objects: usize,
+    pub features: usize,
+    pub vertices: usize,
+    pub indices: usize,
+    #[derivative(Debug(format_with="::format_size"))]
+    pub size: usize,
+}
+
+impl TileStats {
+    pub fn new() -> Self {
+        Self {
+            objects: 0,
+            features: 0,
+            vertices: 0,
+            indices: 0,
+            size: 0,
+        }
+    }
+}
+
+impl std::ops::Add for TileStats {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        Self {
+            objects: self.objects + rhs.objects,
+            features: self.features + rhs.features,
+            vertices: self.vertices + rhs.vertices,
+            indices: self.indices + rhs.indices,
+            size: self.size + rhs.size,
+        }
+    }
+}
+
+
+impl std::ops::AddAssign for TileStats {
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
+}
 
 pub struct Tile {
-    pub tile_id: TileId,
-    pub mesh: VertexBuffers<Vertex, u32>,
-    pub extent: u16,
-    pub objects: Arc<RwLock<Vec<Object>>>,
-    pub features: Vec<(u32, Range<u32>)>,
-    pub collider: Arc<RwLock<TileCollider>>,
+    tile_id: TileId,
+    mesh: VertexBuffers<Vertex, u32>,
+    extent: u16,
+    objects: Arc<RwLock<Vec<Object>>>,
+    features: Vec<(u32, Range<u32>)>,
+    collider: Arc<RwLock<TileCollider>>,
+    stats: TileStats,
 }
 
 pub fn layer_num(name: &str) -> u32 {
@@ -57,6 +104,10 @@ pub fn layer_num(name: &str) -> u32 {
 }
 
 impl Tile {
+    /// Create a new tile form a MBVT pbf file.
+    /// 
+    /// Creates all the data necessecary to render the MBVT.
+    /// This includes vertex and index buffers.
     pub fn from_mbvt(
         tile_id: &TileId,
         pbf_data: &Vec<u8>,
@@ -157,12 +208,34 @@ impl Tile {
         let objects = Arc::new(RwLock::new(objects));
         let objects_keep = objects.clone();
 
+        let stats = {
+            let objects = objects
+                .read()
+                .expect("Failed to read initial objects. This is a bug. Please report it.");
+
+            let feature_size = std::mem::size_of::<(u32, std::ops::Range<u32>)>();
+            let vertex_size = std::mem::size_of::<Vertex>();
+            let index_size = std::mem::size_of::<u32>();
+
+            TileStats {
+                objects: objects.len(),
+                features: features.len(),
+                vertices: mesh.vertices.len(),
+                indices: mesh.indices.len(),
+                size:
+                    objects.iter().map(|o| o.size()).sum::<usize>()
+                  + features.len() * feature_size
+                  + mesh.vertices.len() * vertex_size
+                  + mesh.indices.len() * index_size,
+            }
+        };
+
         spawn(move|| {
             if let Ok(objects) = objects_keep.read() {
                 match collider_keep.write() {
                     Ok(mut collider) => {
                         for object_id in 0..objects.len() {
-                            if objects[object_id].points.len() >= 2 {
+                            if objects[object_id].points().len() >= 2 {
                                 collider.add_object(object_id, &objects[object_id]);
                             }
                         }
@@ -180,10 +253,36 @@ impl Tile {
             objects,
             features,
             collider,
+            stats,
         }
     }
 
+    pub fn extent(&self) -> u16 {
+        self.extent
+    }
+
+    pub fn collider(&self) -> Arc<RwLock<TileCollider>> {
+        self.collider.clone()
+    }
+
+    pub fn objects(&self) -> Arc<RwLock<Vec<Object>>> {
+        self.objects.clone()
+    }
+
+    pub fn mesh(&self) -> &VertexBuffers<Vertex, u32> {
+        &self.mesh
+    }
+
+    pub fn features(&self) -> &Vec<(u32, Range<u32>)> {
+        &self.features
+    }
+
+    pub fn stats(&self) -> &TileStats {
+        &self.stats
+    }
+
     /// Creates a rectangle the size of a tile to be used as the background of a tile.
+    /// 
     /// Could also display a texture in the future (speak swisstopo).
     fn create_background_feature<'l>(
         builder: &mut MeshBuilder<'l>,

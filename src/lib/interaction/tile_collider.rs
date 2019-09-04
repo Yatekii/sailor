@@ -35,7 +35,7 @@ impl TileCollider {
 
     pub fn add_object(&mut self, id: usize, object: &Object) {
         let polygon = Polyline::new(
-            object.points
+            object.points()
                 .iter()
                 .map(|p| Point::new(p.x, p.y))
                 .collect::<Vec<Point<f32>>>(),

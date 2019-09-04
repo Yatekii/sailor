@@ -25,15 +25,15 @@ impl DrawableTile {
 
         DrawableTile {
             vertex_buffer: device
-                .create_buffer_mapped(tile.mesh.vertices.len(), wgpu::BufferUsage::VERTEX)
-                .fill_from_slice(&tile.mesh.vertices),
+                .create_buffer_mapped(tile.mesh().vertices.len(), wgpu::BufferUsage::VERTEX)
+                .fill_from_slice(&tile.mesh().vertices),
             index_buffer: device
-                .create_buffer_mapped(tile.mesh.indices.len(), wgpu::BufferUsage::INDEX)
-                .fill_from_slice(&tile.mesh.indices),
-            index_count: tile.mesh.indices.len() as u32,
-            features: tile.features.clone(),
+                .create_buffer_mapped(tile.mesh().indices.len(), wgpu::BufferUsage::INDEX)
+                .fill_from_slice(&tile.mesh().indices),
+            index_count: tile.mesh().indices.len() as u32,
+            features: tile.features().clone(),
             tile_id,
-            extent: tile.extent,
+            extent: tile.extent(),
         }
     }
 

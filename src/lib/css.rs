@@ -185,7 +185,7 @@ pub struct Rule {
 }
 
 /// A single CSS selector.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, MallocSizeOf)]
 pub struct Selector {
     /// The type a selector matches.
     /// E.g. `"layer"`.
@@ -305,6 +305,30 @@ impl Selector {
         true
     }
 }
+
+// impl wr_malloc_size_of::MallocSizeOf for Selector {
+//     /// Returns the memory size of the selector.
+//     fn size_of(&self, ops: &mut wr_malloc_size_of::MallocSizeOfOps) -> usize {
+//         let size_any =
+//             self.any.len() * (
+//               std::mem::size_of::<String>()
+//             + std::mem::size_of::<String>()
+//             + std::mem::size_of::<usize>()
+//             )
+//           + self.any.iter().map(|(k, v)| k.len() + v.len()).sum();
+
+//         let size_classes =
+//             self.classes.len() * std::mem::size_of::<String>()
+//           + self.classes.iter().map(|v| v.len()).sum();
+
+//         let base_len =
+//             2 * std::mem::size_of::<Option<String>>()
+//           + self.typ.map_or(0, |v| v.len())
+//           + self.id.map_or(0, |v| v.len());
+
+//         size_any + size_classes + base_len
+//     }
+// }
 
 /// A single part of a selector.
 /// Used for parsing only.

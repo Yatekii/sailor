@@ -23,12 +23,12 @@ impl Collider {
                     point.1 / (screen.height / 2) as f32 - 1.0
                 );
                 let global_point = matrix * Vector4::new(screen_point.x, screen_point.y, 0.0, 1.0);
-                let tile_point = Point::new(global_point.x, global_point.y) * tile.extent as f32;
+                let tile_point = Point::new(global_point.x, global_point.y) * tile.extent() as f32;
 
-                if tile_point.x >= 0.0 && tile_point.x <= tile.extent as f32
-                && tile_point.y >= 0.0 && tile_point.y <= tile.extent as f32 {
-                    if let Ok(collider) = tile.collider.try_read() {
-                        if let Ok(objects) = tile.objects.try_read() {
+                if tile_point.x >= 0.0 && tile_point.x <= tile.extent() as f32
+                && tile_point.y >= 0.0 && tile_point.y <= tile.extent() as f32 {
+                    if let Ok(collider) = tile.collider().try_read() {
+                        if let Ok(objects) = tile.objects().try_read() {
                             let object_ids = collider.get_hovered_objects(&tile_point);
                             for object_id in object_ids {
                                 return_objects.push(objects[object_id].clone())

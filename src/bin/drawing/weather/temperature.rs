@@ -115,8 +115,6 @@ impl Temperature {
         let width = 64 * 8;
         let height = 64 * 8;
 
-        dbg!(width * height);
-
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d { width, height, depth: 1 },
             array_layer_count: 1,

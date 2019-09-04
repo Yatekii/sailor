@@ -41,7 +41,6 @@ take_mut = "0.2.2"
 wgpu = { version = "0.3.0", features = ["vulkan"] }
 winit = "0.20.0-alpha3"
 # wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs" }
-# wgpu = { package = "wgpu", features = ["vulkan"], git = "https://github.com/Yatekii/wgpu-rs", branch = "stencil" }
 # wgpu = { package = "wgpu", features = ["vulkan"], path = "../wgpu-rs" }
 serde = "1.0.99"
 serde_derive = "1.0.99"
@@ -52,9 +51,17 @@ log = { version = "0.4.7", features = ["serde"] }
 glsl-to-spirv = "0.1"
 phf = { version = "0.7.24", features = ["macros"] }
 num-traits = "0.2.8"
-imgui = { git = "https://github.com/Yatekii/imgui-rs", rev = "cf1ca210a9298a7a01e0431bc7c8d059a4f4794c" }
-imgui-winit-support = { git = "https://github.com/Yatekii/imgui-rs", rev = "cf1ca210a9298a7a01e0431bc7c8d059a4f4794c" }
+imgui = { git = "https://github.com/Gekkio/imgui-rs" }
 # imgui-wgpu = { path = "../imgui-wgpu-rs" }
 imgui-wgpu = { git = "https://github.com/Yatekii/imgui-wgpu-rs" }
 ncollide2d = "0.20.1"
 raw-window-handle = "0.1"
+parity-util-mem = "0.2.0"
+malloc_size_of_derive = "0.1.0"
+size_format = "1.0.2"
+derivative = "1.0.3"
+
+[dependencies.imgui-winit-support]
+git = "https://github.com/Gekkio/imgui-rs"
+default-features = false
+features = ["winit-20"]

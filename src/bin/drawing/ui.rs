@@ -104,9 +104,10 @@ impl HUD {
                 ));
             });
 
+            // Draw main window.
             let window = imgui::Window::new(im_str!("Main"));
             window
-                .size([400.0, 800.0], imgui::Condition::FirstUseEver)
+                .size([400.0, 600.0], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
                     let mut size = ui.window_size();
                     size[1] = 100.0;
@@ -115,7 +116,7 @@ impl HUD {
                     window.build(&ui, || {
                         let objects = app_state.hovered_objects
                             .iter()
-                            .map(|o| o.selector.to_string())
+                            .map(|o| o.selector().to_string())
                             .collect::<Vec<_>>()
                             .join("\n");
                         ui.text(im_str!("{}", objects));
@@ -132,7 +133,7 @@ impl HUD {
                     }
                     let items = app_state.selected_objects
                         .iter()
-                        .map(|o| im_str!("{}", o.object.selector))
+                        .map(|o| im_str!("{}", o.object.selector()))
                         .collect::<Vec<_>>();
                     let mut item_refs = vec![];
                     for item in &items {
@@ -162,13 +163,13 @@ impl HUD {
                         ui.text(im_str!("Tags"));
                         ui.separator();
 
-                        ui.text(im_str!("{:#?}", object.tags));
+                        ui.text(im_str!("{:#?}", object.tags()));
 
                         ui.separator();
                         ui.text(im_str!("Applying rules"));
                         ui.separator();
 
-                        let mut rules = app_state.css_cache.get_matching_rules_mut(&object.selector);
+                        let mut rules = app_state.css_cache.get_matching_rules_mut(&object.selector());
                         for rule in rules.iter_mut() {
                             let show_block = add_header_separator(&ui, im_str!("{}", rule.selector));
                             if show_block {
@@ -185,6 +186,20 @@ impl HUD {
                         ui.separator();
                     }
                 });
+
+                let window = imgui::Window::new(im_str!("Stats"));
+                window
+                    .position([60.0, 720.0], imgui::Condition::FirstUseEver)
+                    .size([400.0, 250.0], imgui::Condition::FirstUseEver)
+                    .build(&ui, || {
+                        // Show cache stats
+                        let head = CollapsingHeader::new(&ui, im_str!("Cache Stats"))
+                            .default_open(true)
+                            .build();
+                        if head {
+                            ui.text(im_str!("{:#?}", app_state.tile_cache.get_stats()));
+                        }
+                    });
             ruda.pop(&ui);
             // ui.show_demo_window(&mut false);
         }
