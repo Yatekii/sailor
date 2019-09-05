@@ -1,10 +1,12 @@
 mod vector_tile;
 mod tile;
 mod tile_id;
+mod visible_tile;
 
 pub use vector_tile::*;
 pub use tile::*;
 pub use tile_id::*;
+pub use visible_tile::*;
 
 use core::ops::Range;
 use lyon::{

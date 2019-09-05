@@ -134,7 +134,7 @@ fn main() {
             },
             Event::EventsCleared => {
                 painter.update_shader();
-                painter.update_styles(app_state.zoom.max(14.0), &mut app_state.css_cache);
+                app_state.load_tiles();
                 painter.paint(&mut hud, &mut app_state);
 
                 app_state.stats.capture_frame();

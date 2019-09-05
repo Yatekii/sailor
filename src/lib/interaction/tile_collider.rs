@@ -1,3 +1,10 @@
+use std::{
+    sync::{
+        Arc,
+        RwLock,
+    },
+    thread::spawn,
+};
 use ncollide2d::{
     world::{
         CollisionWorld,
@@ -87,5 +94,32 @@ impl TileCollider {
         }
 
         object_ids
+    }
+}
+
+pub trait TileColliderLoader {
+    fn load(&mut self, tile: Arc<RwLock<Tile>>);
+}
+
+impl TileColliderLoader for Arc<RwLock<TileCollider>> {
+    fn load(&mut self, tile: Arc<RwLock<Tile>>) {
+        let collider_clone = self.clone();
+        spawn(move || {
+            if let Ok(tile) = tile.read() {
+                if let Ok(objects) = tile.objects().read() {
+                    match collider_clone.write() {
+                        Ok(mut collider) => {
+                            for object_id in 0..objects.len() {
+                                if objects[object_id].points().len() >= 2 {
+                                    collider.add_object(object_id, &objects[object_id]);
+                                }
+                            }
+                            collider.update();
+                        },
+                        Err(_e) => log::error!("Could not aquire collider lock. Not loading the objects of this tile."),
+                    }
+                }
+            }
+        });
     }
 }
