@@ -24,17 +24,18 @@ use lyon::{
 };
 use crate::*;
 
-fn format_size(value: usize) -> String {
-    format!("{:.10}B", size_format::SizeFormatterSI::new(value as u64))
+fn format_size(value: &usize, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    write!(f, "{:.1}B", size_format::SizeFormatterSI::new(*value as u64))  
 }
 
-#[derive(Debug, Clone, Copy, Derivative)]
+#[derive(Clone, Copy, Derivative)]
+#[derivative(Debug)]
 pub struct TileStats {
     pub objects: usize,
     pub features: usize,
     pub vertices: usize,
     pub indices: usize,
-    #[derivative(Debug(format_with="::format_size"))]
+    #[derivative(Debug(format_with="format_size"))]
     pub size: usize,
 }
 
@@ -217,17 +218,17 @@ impl Tile {
             let vertex_size = std::mem::size_of::<Vertex>();
             let index_size = std::mem::size_of::<u32>();
 
-            TileStats {
+            dbg!(TileStats {
                 objects: objects.len(),
                 features: features.len(),
                 vertices: mesh.vertices.len(),
                 indices: mesh.indices.len(),
                 size:
                     objects.iter().map(|o| o.size()).sum::<usize>()
-                  + features.len() * feature_size
-                  + mesh.vertices.len() * vertex_size
-                  + mesh.indices.len() * index_size,
-            }
+                  + features.capacity() * feature_size
+                  + mesh.vertices.capacity() * vertex_size
+                  + mesh.indices.capacity() * index_size,
+            })
         };
 
         spawn(move|| {

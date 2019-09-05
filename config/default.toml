@@ -10,7 +10,7 @@ ui_font = "config/Ruda-Bold.ttf"
 max_tiles = 200
 max_features = 1000
 tile_size = 384
-msaa_samples = 1
+msaa_samples = 4
 selection_tags = []
 
 [renderer.temperature]

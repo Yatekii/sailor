@@ -304,6 +304,11 @@ impl Selector {
 
         true
     }
+
+    pub fn size(&self) -> usize {
+        use parity_util_mem::MallocSizeOfExt;
+        std::mem::size_of::<Selector>() + self.malloc_size_of()
+    }
 }
 
 // impl wr_malloc_size_of::MallocSizeOf for Selector {
@@ -576,4 +581,10 @@ fn rgb_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSS
     ))(input)?;
     let (input, _) = tag(")")(input)?;
     Ok((input, CSSValue::Color(Color { r: r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a: 1.0 })))
+}
+
+#[test]
+fn selector_size() {
+    let selector = super::Selector::default();
+    assert_eq!(selector.size(), 42);
 }

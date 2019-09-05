@@ -69,9 +69,6 @@ impl HUD {
         &mut self,
         app_state: &mut AppState,
         window: &winit::window::Window,
-        width: f64,
-        height: f64,
-        hidpi_factor: f64,
         device: &mut wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
@@ -206,7 +203,7 @@ impl HUD {
 
         self.platform.prepare_render(&ui, &window);
         self.renderer
-            .render(ui, width, height, hidpi_factor, device, encoder, &view)
+            .render(ui, device, encoder, &view)
             .expect("Rendering failed");
     }
 
