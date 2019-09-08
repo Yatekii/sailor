@@ -218,7 +218,7 @@ impl Tile {
             let vertex_size = std::mem::size_of::<Vertex>();
             let index_size = std::mem::size_of::<u32>();
 
-            dbg!(TileStats {
+            TileStats {
                 objects: objects.len(),
                 features: features.len(),
                 vertices: mesh.vertices.len(),
@@ -228,24 +228,24 @@ impl Tile {
                   + features.capacity() * feature_size
                   + mesh.vertices.capacity() * vertex_size
                   + mesh.indices.capacity() * index_size,
-            })
+            }
         };
 
-        spawn(move|| {
-            if let Ok(objects) = objects_keep.read() {
-                match collider_keep.write() {
-                    Ok(mut collider) => {
-                        for object_id in 0..objects.len() {
-                            if objects[object_id].points().len() >= 2 {
-                                collider.add_object(object_id, &objects[object_id]);
-                            }
-                        }
-                        collider.update();
-                    },
-                    Err(_e) => log::error!("Could not aquire collider lock. Not loading the objects of this tile."),
-                }
-            }
-        });
+        // spawn(move|| {
+        //     if let Ok(objects) = objects_keep.read() {
+        //         match collider_keep.write() {
+        //             Ok(mut collider) => {
+        //                 for object_id in 0..objects.len() {
+        //                     if objects[object_id].points().len() >= 2 {
+        //                         collider.add_object(object_id, &objects[object_id]);
+        //                     }
+        //                 }
+        //                 collider.update();
+        //             },
+        //             Err(_e) => log::error!("Could not aquire collider lock. Not loading the objects of this tile."),
+        //         }
+        //     }
+        // });
 
         Self {
             tile_id: tile_id.clone(),
@@ -280,6 +280,10 @@ impl Tile {
 
     pub fn stats(&self) -> &TileStats {
         &self.stats
+    }
+
+    pub fn tile_id(&self) -> TileId {
+        self.tile_id
     }
 
     /// Creates a rectangle the size of a tile to be used as the background of a tile.

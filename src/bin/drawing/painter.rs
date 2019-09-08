@@ -68,12 +68,10 @@ pub struct Painter {
     stencil: TextureView,
     uniform_buffer: Buffer,
     tile_transform_buffer: (Buffer, u64),
-    loaded_tiles: BTreeMap<TileId, DrawableTile>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
-    feature_collection: Arc<RwLock<FeatureCollection>>,
     temperature: crate::drawing::weather::Temperature,
 }
 
@@ -161,8 +159,6 @@ impl Painter {
             ]
         });
 
-        let feature_collection = Arc::new(RwLock::new(FeatureCollection::new(CONFIG.renderer.max_features as u32)));
-
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
             format: wgpu::TextureFormat::Bgra8Unorm,
@@ -183,7 +179,7 @@ impl Painter {
             &device,
             &app_state.screen,
             app_state.zoom,
-            std::iter::empty::<&DrawableTile>()
+            std::iter::empty::<&VisibleTile>()
         );
 
         let blend_pipeline = Self::create_layer_render_pipeline(
@@ -249,12 +245,10 @@ impl Painter {
             uniform_buffer,
             stencil,
             tile_transform_buffer,
-            loaded_tiles: BTreeMap::new(),
             bind_group_layout,
             bind_group,
             _watcher: watcher,
             rx,
-            feature_collection,
             temperature,
         }
     }
@@ -385,21 +379,22 @@ impl Painter {
         device: &Device,
         screen: &Screen,
         z: f32,
-        drawable_tiles: impl Iterator<Item=&'a DrawableTile>
+        visible_tiles: impl Iterator<Item=&'a VisibleTile>
     ) -> (Buffer, u64) {
         const TILE_DATA_SIZE: usize = 20;
         let tile_data_buffer_byte_size = TILE_DATA_SIZE * 4 * CONFIG.renderer.max_tiles;
         let mut data = vec![0f32; tile_data_buffer_byte_size];
 
         let mut i = 0;
-        for dt in drawable_tiles {
-            let matrix = screen.tile_to_global_space(z, &dt.tile_id);
+        for vt in visible_tiles {
+            let extent = vt.extent() as f32;
+            let matrix = screen.tile_to_global_space(z, &vt.tile_id());
             for float in matrix.as_slice() {
                 data[i] = *float;
                 i += 1;
             }
             for _ in 0..4 {
-                data[i] = dt.extent as f32;
+                data[i] = extent;
                 i += 1;
             }
         }
@@ -529,13 +524,6 @@ impl Painter {
         }
     }
 
-    pub fn update_styles(&mut self, zoom: f32, css_cache: &mut RulesCache) {
-        if css_cache.update() {
-            let mut feature_collection = self.feature_collection.write().unwrap();
-            feature_collection.load_styles(zoom, css_cache);
-        }
-    }
-
     pub fn get_hidpi_factor(&self) -> f64 {
         self.hidpi_factor
     }
@@ -572,7 +560,7 @@ impl Painter {
             &self.device,
             &app_state.screen,
             app_state.zoom,
-            self.loaded_tiles.values()
+            app_state.visible_tiles().values()
         );
     }
 
@@ -618,92 +606,10 @@ impl Painter {
         device.create_texture(frame_descriptor).create_default_view()
     }
 
-    fn load_tiles(&mut self, app_state: &mut AppState) {
-        let tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom, 1);
-
-        // Remove old bigger tiles which are not in the FOV anymore.
-        let old_tile_field = app_state.screen.get_tile_boundaries_for_zoom_level(app_state.zoom - 1.0, 2);
-        let key_iter: Vec<_> = self.loaded_tiles.keys().copied().collect();
-        for key in key_iter {
-            if key.z == (app_state.zoom - 1.0) as u32 {
-                if !old_tile_field.contains(&key) {
-                    self.loaded_tiles.remove(&key);
-                }
-            } else {
-                if !tile_field.contains(&key) {
-                    self.loaded_tiles.remove(&key);
-                }
-            }
-        }
-
-        app_state.tile_cache.finalize_loaded_tiles();
-        for tile_id in tile_field.iter() {
-            if !self.loaded_tiles.contains_key(&tile_id) {
-                app_state.tile_cache.request_tile(&tile_id, self.feature_collection.clone(), &CONFIG.renderer.selection_tags.clone());
-                
-                let tile_cache = &mut app_state.tile_cache;
-                if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
-
-                    let drawable_tile = DrawableTile::load_from_tile_id(
-                        &self.device,
-                        tile_id,
-                        &tile
-                    );
-
-                    self.loaded_tiles.insert(
-                        tile_id.clone(),
-                        drawable_tile
-                    );
-
-                    // Remove old bigger tile when all 4 smaller tiles are loaded.
-                    let mut count = 0;
-                    let num_x = (tile_id.x / 2) * 2;
-                    let num_y = (tile_id.y / 2) * 2;
-                    for tile_id in &[
-                        TileId::new(tile_id.z, num_x, num_y),
-                        TileId::new(tile_id.z, num_x + 1, num_y),
-                        TileId::new(tile_id.z, num_x + 1, num_y + 1),
-                        TileId::new(tile_id.z, num_x, num_y + 1),
-                    ] {
-                        if !tile_field.contains(tile_id) {
-                            count += 1;
-                            continue;
-                        }
-                        if self.loaded_tiles.contains_key(tile_id) {
-                            count += 1;
-                        }
-                    }
-                    if count == 4 {
-                        self.loaded_tiles.remove(&TileId::new(tile_id.z - 1, num_x / 2, num_y / 2));
-                    }
-
-                    // Remove old smaller tiles when all 4 smaller tiles are loaded.
-                    for tile_id in &[
-                        TileId::new(tile_id.z + 1, tile_id.x * 2, tile_id.y * 2),
-                        TileId::new(tile_id.z + 1, tile_id.x * 2 + 1, tile_id.y * 2),
-                        TileId::new(tile_id.z + 1, tile_id.x * 2 + 1, tile_id.y * 2 + 1),
-                        TileId::new(tile_id.z + 1, tile_id.x * 2, tile_id.y * 2 + 1),
-                    ] {
-                        self.loaded_tiles.remove(tile_id);
-                    }
-                } else {
-                    log::trace!("Could not read tile {} from cache.", tile_id);
-                }
-            }
-        }
-
-        let mut feature_collection = self.feature_collection.write().unwrap();
-        feature_collection.load_styles(app_state.zoom, &mut app_state.css_cache);
-    }
-
     pub fn paint(&mut self, hud: &mut super::ui::HUD, app_state: &mut AppState) {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-        self.load_tiles(app_state);
-        let feature_collection = {
-            let lock = self.feature_collection.clone();
-            let feature_collection = lock.read().unwrap();
-            (*feature_collection).clone()
-        };
+
+        let feature_collection = app_state.feature_collection().read().unwrap().clone();
         self.update_uniforms(&mut encoder, &app_state, &feature_collection);
         self.bind_group = Self::create_blend_bind_group(
             &self.device,
@@ -711,7 +617,7 @@ impl Painter {
             &self.uniform_buffer,
             &self.tile_transform_buffer
         );
-        let num_tiles = self.loaded_tiles.len();
+        let num_tiles = app_state.visible_tiles().len();
         let features = feature_collection.get_features();
         if features.len() > 0 && num_tiles > 0 {
             let frame = self.swap_chain.get_next_texture();
@@ -740,10 +646,14 @@ impl Painter {
                     app_state.screen.width as f32,
                     app_state.screen.height as f32
                 ) / 2.0;
-                for (i, dt) in self.loaded_tiles.values_mut().enumerate() {
+                for (i, vt) in app_state.visible_tiles().values().enumerate() {
+                    if !vt.is_loaded_to_gpu() {
+                        vt.load_to_gpu(&self.device);
+                    }
+                    let tile_id = vt.tile_id();
                     let matrix = app_state.screen.tile_to_global_space(
                         app_state.zoom,
-                        &dt.tile_id
+                        &tile_id
                     );
                     let start = (matrix * &vec).xy() + &vec2(1.0, 1.0);
                     let s = vec2({
@@ -755,7 +665,7 @@ impl Painter {
                     });
                     let matrix = app_state.screen.tile_to_global_space(
                         app_state.zoom,
-                        &(dt.tile_id + TileId::new(dt.tile_id.z, 1, 1))
+                        &(tile_id + TileId::new(tile_id.z, 1, 1))
                     );
                     let end = (matrix * &vec).xy() + &vec2(1.0, 1.0);
                     let e = vec2({
@@ -772,7 +682,8 @@ impl Painter {
                         (e.x - s.x) as u32,
                         (e.y - s.y) as u32
                     );
-                    dt.paint(&mut render_pass, &self.blend_pipeline, &self.noblend_pipeline, &feature_collection, i as u32);
+
+                    vt.paint(&mut render_pass, &self.blend_pipeline, &feature_collection, i as u32);
                 }
             }
 

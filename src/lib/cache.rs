@@ -26,7 +26,7 @@ pub struct CacheStats {
 
 /// A cache structure to hold all loaded `Tile`s.
 pub struct TileCache {
-    cache: HashMap<TileId, Tile>,
+    cache: HashMap<TileId, Arc<RwLock<Tile>>>,
     loaders: Vec<(u64, JoinHandle<Option<Tile>>, TileId)>,
     channel: (Sender<u64>, Receiver<u64>),
     id: u64,
@@ -58,7 +58,7 @@ impl TileCache {
                 match loader.1.join() {
                     Ok(tile) => {
                         if let Some(tile) = tile {
-                            self.cache.insert(loader.2, tile);
+                            self.cache.insert(loader.2, Arc::new(RwLock::new(tile)));
                         }
                     },
                     Err(e) => {
@@ -119,14 +119,15 @@ impl TileCache {
     /// 
     /// Returns `None` if the tile is not in the cache.
     /// The user has to request the loading of the `Tile` on their own.
-    pub fn try_get_tile(&self, tile_id: &TileId) -> Option<&Tile> {
-        self.cache.get(&tile_id)
+    pub fn try_get_tile(&self, tile_id: &TileId) -> Option<Arc<RwLock<Tile>>> {
+        self.cache.get(&tile_id).cloned()
     }
 
     pub fn get_stats(&self) -> CacheStats {
         let mut total_stats = TileStats::new();
         for tile in &self.cache {
-            total_stats = total_stats + *tile.1.stats();
+            let read_tile = tile.1.read().unwrap();
+            total_stats = total_stats + *read_tile.stats();
         }
         CacheStats {
             cached_tiles: self.cache.len(),

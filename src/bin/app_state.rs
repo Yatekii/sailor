@@ -1,3 +1,8 @@
+use std::collections::BTreeMap;
+use std::sync::{
+    Arc,
+    RwLock,
+};
 use lyon::math::Point;
 use crate::*;
 use stats::Stats;
@@ -11,6 +16,8 @@ pub struct AppState {
     pub hovered_objects: Vec<Object>,
     pub selected_objects: Vec<EditableObject>,
     pub stats: Stats,
+    visible_tiles: BTreeMap<TileId, VisibleTile>,
+    feature_collection: Arc<RwLock<FeatureCollection>>,
 }
 
 impl AppState {
@@ -31,6 +38,93 @@ impl AppState {
             hovered_objects: vec![],
             selected_objects: vec![],
             stats: Stats::new(),
+            visible_tiles: BTreeMap::new(),
+            feature_collection: Arc::new(RwLock::new(FeatureCollection::new(CONFIG.renderer.max_features as u32))),
+        }
+    }
+
+    pub fn visible_tiles(&self) -> &BTreeMap<TileId, VisibleTile> {
+        &self.visible_tiles
+    }
+
+    pub fn feature_collection(&self) -> Arc<RwLock<FeatureCollection>> {
+        self.feature_collection.clone()
+    }
+
+    pub fn load_tiles(&mut self) {
+        let tile_field = self.screen.get_tile_boundaries_for_zoom_level(self.zoom, 1);
+
+        // Remove old bigger tiles which are not in the FOV anymore.
+        let old_tile_field = self.screen.get_tile_boundaries_for_zoom_level(self.zoom - 1.0, 2);
+        let key_iter: Vec<_> = self.visible_tiles.keys().copied().collect();
+        for key in key_iter {
+            if key.z == (self.zoom - 1.0) as u32 {
+                if !old_tile_field.contains(&key) {
+                    self.visible_tiles.remove(&key);
+                }
+            } else {
+                if !tile_field.contains(&key) {
+                    self.visible_tiles.remove(&key);
+                }
+            }
+        }
+
+        self.tile_cache.finalize_loaded_tiles();
+        for tile_id in tile_field.iter() {
+            if !self.visible_tiles.contains_key(&tile_id) {
+                self.tile_cache.request_tile(&tile_id, self.feature_collection.clone(), &CONFIG.renderer.selection_tags.clone());
+                
+                let tile_cache = &mut self.tile_cache;
+                if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
+
+                    let mut visible_tile = VisibleTile::new(tile);
+
+                    visible_tile.load_collider();
+
+                    self.visible_tiles.insert(
+                        tile_id.clone(),
+                        visible_tile
+                    );
+
+                    // Remove old bigger tile when all 4 smaller tiles are loaded.
+                    let mut count = 0;
+                    let num_x = (tile_id.x / 2) * 2;
+                    let num_y = (tile_id.y / 2) * 2;
+                    for tile_id in &[
+                        TileId::new(tile_id.z, num_x, num_y),
+                        TileId::new(tile_id.z, num_x + 1, num_y),
+                        TileId::new(tile_id.z, num_x + 1, num_y + 1),
+                        TileId::new(tile_id.z, num_x, num_y + 1),
+                    ] {
+                        if !tile_field.contains(tile_id) {
+                            count += 1;
+                            continue;
+                        }
+                        if self.visible_tiles.contains_key(tile_id) {
+                            count += 1;
+                        }
+                    }
+                    if count == 4 {
+                        self.visible_tiles.remove(&TileId::new(tile_id.z - 1, num_x / 2, num_y / 2));
+                    }
+
+                    // Remove old smaller tiles when all 4 smaller tiles are loaded.
+                    for tile_id in &[
+                        TileId::new(tile_id.z + 1, tile_id.x * 2, tile_id.y * 2),
+                        TileId::new(tile_id.z + 1, tile_id.x * 2 + 1, tile_id.y * 2),
+                        TileId::new(tile_id.z + 1, tile_id.x * 2 + 1, tile_id.y * 2 + 1),
+                        TileId::new(tile_id.z + 1, tile_id.x * 2, tile_id.y * 2 + 1),
+                    ] {
+                        self.visible_tiles.remove(tile_id);
+                    }
+                } else {
+                    log::trace!("Could not read tile {} from cache.", tile_id);
+                }
+            }
+        }
+
+        if let Ok(mut feature_collection) = self.feature_collection.try_write() {
+            feature_collection.load_styles(self.zoom, &mut self.css_cache);
         }
     }
 
