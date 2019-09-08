@@ -2,4 +2,4 @@
 
 A sailing navigation application.
 
-![screenshot](doc/img/main.jpg)
+![screenshot](doc/img/screenshot.png)

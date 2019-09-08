@@ -5,11 +5,22 @@ on: [push]
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        rust: [stable, nightly]
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+    - uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: ${{ matrix.rust }}
+    - uses: actions/checkout@master
+    - name: Build lib
+      run: cargo build --verbose --lib
+    - name: Build bin
+      run: cargo build --verbose --bin sailor
+    - name: Run tests lib
+      run: cargo test --verbose --lib
+    - name: Run tests bin
+      run: cargo test --verbose --bin sailor
