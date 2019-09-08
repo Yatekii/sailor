@@ -9,7 +9,7 @@ documentation = "https://docs.rs/sailor/"
 homepage = "https://github.com/Yatekii/sailor"
 repository = "https://github.com/Yatekii/sailor"
 readme = "README.md"
-categories = ["gui", "graphics", "rendering", "rendering::graphics-api", "rendering::data-formats", "visualization", "science"]
+categories = ["gui", "graphics", "rendering", "visualization", "science"]
 keywords = ["sailing", "osm", "gps", "wgpu", "maps"]
 license = "MIT OR Apache-2.0"
 
