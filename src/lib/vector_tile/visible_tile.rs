@@ -4,6 +4,10 @@ use std::sync::{
 };
 
 use wgpu::*;
+use wgpu_glyph::{
+    Section,
+    GlyphBrush,
+};
 
 use crate::*;
 
@@ -29,6 +33,10 @@ impl VisibleTile {
     pub fn extent(&self) -> u16 {
         self.tile.read().unwrap().extent()
     }
+
+    pub fn objects(&self) -> Arc<RwLock<Vec<Object>>> {
+        self.tile.read().unwrap().objects()
+    }
     
     pub fn load_to_gpu(&self, device: &Device) {
         let read_tile = self.tile.read().unwrap();
@@ -47,6 +55,10 @@ impl VisibleTile {
 
     pub fn load_collider(&mut self) {
         self.tile_collider.load(self.tile.clone());
+    }
+
+    pub fn collider(&self) -> Arc<RwLock<TileCollider>> {
+        self.tile_collider.clone()
     }
 
     pub fn paint(
@@ -87,6 +99,30 @@ impl VisibleTile {
                     }
                 }
             }
+        }
+    }
+
+    pub fn queue_text(
+        &self,
+        glyph_brush: &mut GlyphBrush<'static, ()>,
+        screen: &Screen,
+        z: f32
+    ) {
+        let read_tile = self.tile.read().unwrap();
+        let matrix = screen.tile_to_global_space(z, &read_tile.tile_id());
+        for text in read_tile.text() {
+            let position = matrix * glm::vec4((text.0).0, (text.0).1, 0.0, 1.0);
+            // dbg!(&position);
+            let section = Section {
+                text: &text.1,
+                screen_position: (
+                    (position.x + 1.0) * screen.width as f32 / 2.0,
+                    (position.y + 1.0) * screen.height as f32 / 2.0
+                ),
+                ..Section::default() // color, position, etc
+            };
+
+            glyph_brush.queue(section);
         }
     }
 }

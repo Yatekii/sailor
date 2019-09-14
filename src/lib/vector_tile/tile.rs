@@ -79,6 +79,7 @@ pub struct Tile {
     objects: Arc<RwLock<Vec<Object>>>,
     features: Vec<(u32, Range<u32>)>,
     collider: Arc<RwLock<TileCollider>>,
+    text: Vec<((f32, f32), String)>,
     stats: TileStats,
 }
 
@@ -124,6 +125,7 @@ impl Tile {
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id, 1.0));
         let extent = tile.layers[0].extent as u16;
         let mut features = vec![];
+        let mut text = vec![];
 
         // Add a background feature to the tile data.
         let (
@@ -150,6 +152,11 @@ impl Tile {
                     feature.type_pb,
                     &feature.geometry
                 );
+
+                if let Some(tag) = tags.get("name:en") {
+                    let point = paths[0].points()[0];
+                    text.push(((point.x / extent as f32, point.y / extent as f32), tag.clone()));
+                }
 
                 // If we have a valid object at hand, insert it into the object list
 
@@ -254,6 +261,7 @@ impl Tile {
             objects,
             features,
             collider,
+            text,
             stats,
         }
     }
@@ -276,6 +284,10 @@ impl Tile {
 
     pub fn features(&self) -> &Vec<(u32, Range<u32>)> {
         &self.features
+    }
+
+    pub fn text(&self) -> &Vec<((f32, f32), String)> {
+        &self.text
     }
 
     pub fn stats(&self) -> &TileStats {

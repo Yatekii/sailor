@@ -54,6 +54,7 @@ parity-util-mem = "0.2.0"
 malloc_size_of_derive = "0.1.0"
 size_format = "1.0.2"
 derivative = "1.0.3"
+wgpu_glyph = "0.4.0"
 
 [dependencies.imgui-winit-support]
 version = "0.2.0"

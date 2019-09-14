@@ -45,6 +45,11 @@ use wgpu::{
     RenderPassDepthStencilAttachmentDescriptor,
     DepthStencilStateDescriptor,
 };
+use wgpu_glyph::{
+    Section,
+    GlyphBrushBuilder,
+    GlyphBrush,
+};
 use osm::*;
 
 use crate::drawing::helpers::{
@@ -72,6 +77,7 @@ pub struct Painter {
     bind_group: BindGroup,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
+    glyph_brush: GlyphBrush<'static, ()>,
     temperature: crate::drawing::weather::Temperature,
 }
 
@@ -222,6 +228,10 @@ impl Painter {
             &tile_transform_buffer
         );
 
+        let font: &[u8] = include_bytes!("../../../config/Ruda-Bold.ttf");
+        let mut glyph_brush = GlyphBrushBuilder::using_font_bytes(font)
+            .build(&mut device, wgpu::TextureFormat::Bgra8Unorm);
+
         let mut temperature = crate::drawing::weather::Temperature::init(&mut device);
 
         let init_command_buf = init_encoder.finish();
@@ -249,6 +259,7 @@ impl Painter {
             bind_group,
             _watcher: watcher,
             rx,
+            glyph_brush,
             temperature,
         }
     }
@@ -686,6 +697,22 @@ impl Painter {
                     vt.paint(&mut render_pass, &self.blend_pipeline, &feature_collection, i as u32);
                 }
             }
+
+            for (i, vt) in app_state.visible_tiles().values().enumerate() {
+                vt.queue_text(
+                    &mut self.glyph_brush,
+                    &app_state.screen,
+                    app_state.zoom
+                );
+            }
+
+            let _ = self.glyph_brush.draw_queued(
+                &mut self.device,
+                &mut encoder,
+                &frame.view,
+                app_state.screen.width,
+                app_state.screen.height,
+            );
 
             // self.temperature.paint(&mut encoder, &frame.view);
 
