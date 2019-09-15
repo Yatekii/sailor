@@ -23,9 +23,6 @@ path = "src/lib/main.rs"
 name = "sailor"
 path = "src/bin/main.rs"
 
-[profile.release]
-debug = true
-
 [dependencies]
 quick-protobuf = "0.6.3"
 lyon = "0.13.2"
