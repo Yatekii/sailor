@@ -8,7 +8,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest] #macOS-latest
         rust: [stable, nightly]
 
     steps:
@@ -20,7 +20,7 @@ jobs:
       run: cargo build --verbose --lib
     - name: Build bin
       run: cargo build --verbose --bin sailor
-    - name: Run tests lib
-      run: cargo test --verbose --lib
-    - name: Run tests bin
-      run: cargo test --verbose --bin sailor
+    # - name: Run tests lib
+    #   run: cargo test --verbose --lib
+    # - name: Run tests bin
+    #   run: cargo test --verbose --bin sailor
