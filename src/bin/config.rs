@@ -27,6 +27,7 @@ pub struct Temperature {
 pub struct General {
     pub log_level: log::Level,
     pub display_framerate: bool,
+    pub data_root: String,
 }
 
 #[derive(Debug, Deserialize)]

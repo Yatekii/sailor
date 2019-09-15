@@ -30,7 +30,7 @@ impl AppState {
         hidpi_factor: f64,
     ) -> Self {
         Self {
-            tile_cache: TileCache::new(),
+            tile_cache: TileCache::new(CONFIG.general.data_root.clone()),
             css_cache: RulesCache::try_load_from_file(style).expect("Unable to load the style file. Please consult the log."),
             screen: Screen::new(center, width, height, CONFIG.renderer.tile_size, hidpi_factor),
             tile_field: TileField::new(TileId::new(8, 0, 0), TileId::new(8, 0, 0)),

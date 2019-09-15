@@ -6,12 +6,15 @@ use std::{
 
 use super::*;
 
-pub fn fetch_tile_data(tile_id: &TileId) -> Option<Vec<u8>> {
+pub fn fetch_tile_data(
+    cache_location: impl AsRef<Path>,
+    tile_id: &TileId
+) -> Option<Vec<u8>> {
     let zxy: String = format!("{}", tile_id);
     let pbf = format!("cache/{}.pbf", zxy);
     if !is_in_cache(pbf.clone()) {
         if let Some(data) = fetch_tile_from_server(tile_id) {
-            ensure_cache_structure(tile_id);
+            ensure_cache_structure(cache_location, tile_id);
             match File::create(&pbf) {
                 Ok(mut file) => {
                     use std::io::Write;
@@ -86,7 +89,15 @@ fn is_in_cache(path: impl Into<String>) -> bool {
     Path::new(&path.into()).exists()
 }
 
-fn ensure_cache_structure(tile_id: &TileId) {
-    let dir_path = format!("cache/{}/{}/", tile_id.z, tile_id.x);
+fn ensure_cache_structure(root: impl AsRef<Path>, tile_id: &TileId) {
+    let dir_path = root.as_ref().join(&format!("cache/{}/{}/", tile_id.z, tile_id.x));
     std::fs::create_dir_all(dir_path).expect("Could not create cache directories.");
+}
+
+#[test]
+fn test_ensure_cache_structure() {
+    ensure_cache_structure("/tmp/sailor-test", &crate::TileId::new(8, 42, 42));
+    let md = std::fs::metadata("/tmp/sailor-test/cache/8/42");
+    assert!(md.is_ok());
+    assert!(md.unwrap().is_dir());
 }

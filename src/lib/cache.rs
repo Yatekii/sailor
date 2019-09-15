@@ -2,6 +2,7 @@ use std::sync::{
     Arc,
     RwLock,
 };
+use std::path::Path;
 use std::collections::HashMap;
 use std::thread::{
     JoinHandle,
@@ -29,16 +30,18 @@ pub struct TileCache {
     cache: HashMap<TileId, Arc<RwLock<Tile>>>,
     loaders: Vec<(u64, JoinHandle<Option<Tile>>, TileId)>,
     channel: (Sender<u64>, Receiver<u64>),
+    cache_location: String,
     id: u64,
 }
 
 impl TileCache {
     /// Create a new `TileCache`.
-    pub fn new() -> Self {
+    pub fn new(cache_location: String) -> Self {
         Self {
             cache: HashMap::new(),
             loaders: vec![],
             channel: channel(),
+            cache_location: cache_location,
             id: 0,
         }
     }
@@ -90,6 +93,7 @@ impl TileCache {
 
             // Make sure we load all tags we want to include.
             let selection_tags = selection_tags.clone();
+            let cache_location = self.cache_location.clone();
 
             // Store a new loader.
             self.loaders.push((
@@ -97,7 +101,7 @@ impl TileCache {
                 // Spawn a new loader.
                 spawn(move|| {
                     // Try fetch and work the tile data.
-                    if let Some(data) = fetch_tile_data(&tile_id_clone) {
+                    if let Some(data) = fetch_tile_data(cache_location, &tile_id_clone) {
                         // Create a new Tile from the fetched data.
                         let tile = Tile::from_mbvt(&tile_id_clone, &data, feature_collection, selection_tags);
                         // Signalize that the end of the tile loading process could not be signalized.

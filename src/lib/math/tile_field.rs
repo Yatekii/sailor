@@ -76,5 +76,5 @@ fn get_tile_boundaries_for_8_zoom() {
     let tile_field = bb.get_tile_boundaries_for_zoom_level(8.0, 1);
     let tiles = tile_field.iter().collect::<Vec<_>>();
 
-    assert_eq!(tiles.len(), 25);
+    assert_eq!(tiles.len(), 20);
 }

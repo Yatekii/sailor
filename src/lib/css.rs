@@ -586,5 +586,5 @@ fn rgb_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSS
 #[test]
 fn selector_size() {
     let selector = super::Selector::default();
-    assert_eq!(selector.size(), 42);
+    assert_eq!(selector.size(), 96);
 }
