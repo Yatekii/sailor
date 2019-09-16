@@ -31,11 +31,10 @@ use crate::config::CONFIG;
 pub struct Temperature {
     pipeline: RenderPipeline,
     bind_group_layout: BindGroupLayout,
-    bind_group: BindGroup,
+    _bind_group: BindGroup,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
     texture: Texture,
-    sampler: Sampler,
 }
 
 impl Temperature {
@@ -139,11 +138,10 @@ impl Temperature {
 
         Self {
             bind_group_layout,
-            bind_group,
+            _bind_group: bind_group,
             _watcher: watcher,
             rx,
             pipeline,
-            sampler,
             texture,
         }
     }
@@ -322,7 +320,7 @@ impl Temperature {
         }
     }
 
-    pub fn paint(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
+    pub fn _paint(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: view,
@@ -339,7 +337,7 @@ impl Temperature {
             depth_stencil_attachment: None,
         });
         rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, &self.bind_group, &[]);
+        rpass.set_bind_group(0, &self._bind_group, &[]);
         rpass.draw(0 .. 6, 0 .. 1);
     }
 }

@@ -1,8 +1,3 @@
-use std::collections::BTreeMap;
-use std::sync::{
-    Arc,
-    RwLock,
-};
 use nalgebra_glm::{
     vec4,
     vec2,
@@ -27,26 +22,8 @@ use winit::{
         LogicalSize,
     },
 };
-use wgpu::{
-    ShaderModule,
-    SwapChainDescriptor,
-    SwapChain,
-    Surface,
-    Device,
-    Buffer,
-    BindGroupLayout,
-    BindGroup,
-    CommandEncoder,
-    RenderPipeline,
-    PresentMode,
-    LoadOp,
-    StoreOp,
-    TextureView,
-    RenderPassDepthStencilAttachmentDescriptor,
-    DepthStencilStateDescriptor,
-};
+use wgpu::*;
 use wgpu_glyph::{
-    Section,
     GlyphBrushBuilder,
     GlyphBrush,
 };
@@ -87,7 +64,7 @@ impl Painter {
         let (window, instance, size, surface, factor) = {
             use raw_window_handle::HasRawWindowHandle as _;
 
-            let instance = wgpu::Instance::new();
+            let instance = Instance::new();
 
             let window = Window::new(&event_loop).unwrap();
             window.set_inner_size(LogicalSize { width: width as f64, height: height as f64 });
@@ -101,18 +78,18 @@ impl Painter {
             (window, instance, size, surface, factor)
         };
 
-        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::LowPower,
+        let adapter = instance.request_adapter(&RequestAdapterOptions {
+            power_preference: PowerPreference::LowPower,
         });
 
-        let mut device = adapter.request_device(&wgpu::DeviceDescriptor {
-            extensions: wgpu::Extensions {
+        let mut device = adapter.request_device(&DeviceDescriptor {
+            extensions: Extensions {
                 anisotropic_filtering: false,
             },
-            limits: wgpu::Limits::default(),
+            limits: Limits::default(),
         });
 
-        let init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        let init_encoder = device.create_command_encoder(&CommandEncoderDescriptor { todo: 0 });
 
         let (tx, rx) = unbounded();
         
@@ -146,28 +123,28 @@ impl Painter {
             &CONFIG.renderer.fragment_shader
         ).expect("Fatal Error. Unable to load shaders.");
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             bindings: &[
-                wgpu::BindGroupLayoutBinding {
+                BindGroupLayoutBinding {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer {
+                    ty: BindingType::UniformBuffer {
                         dynamic: false,
                     },
                 },
-                wgpu::BindGroupLayoutBinding {
+                BindGroupLayoutBinding {
                     binding: 1,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer {
+                    ty: BindingType::UniformBuffer {
                         dynamic: false,
                     },
                 },
             ]
         });
 
-        let swap_chain_descriptor = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8Unorm,
+        let swap_chain_descriptor = SwapChainDescriptor {
+            usage: TextureUsage::OUTPUT_ATTACHMENT,
+            format: TextureFormat::Bgra8Unorm,
             width: size.width.round() as u32,
             height: size.height.round() as u32,
             present_mode: PresentMode::NoVsync,
@@ -193,15 +170,15 @@ impl Painter {
             &bind_group_layout,
             &layer_vs_module,
             &layer_fs_module,
-            wgpu::BlendDescriptor {
-                src_factor: wgpu::BlendFactor::SrcAlpha,
-                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                operation: wgpu::BlendOperation::Add,
+            BlendDescriptor {
+                src_factor: BlendFactor::SrcAlpha,
+                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                operation: BlendOperation::Add,
             },
-            wgpu::BlendDescriptor {
-                src_factor: wgpu::BlendFactor::One,
-                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                operation: wgpu::BlendOperation::Add,
+            BlendDescriptor {
+                src_factor: BlendFactor::One,
+                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                operation: BlendOperation::Add,
             },
             false
         );
@@ -211,8 +188,8 @@ impl Painter {
             &bind_group_layout,
             &layer_vs_module,
             &layer_fs_module,
-            wgpu::BlendDescriptor::REPLACE,
-            wgpu::BlendDescriptor::REPLACE,
+            BlendDescriptor::REPLACE,
+            BlendDescriptor::REPLACE,
             true
         );
 
@@ -229,8 +206,8 @@ impl Painter {
         );
 
         let font: &[u8] = include_bytes!("../../../config/Ruda-Bold.ttf");
-        let mut glyph_brush = GlyphBrushBuilder::using_font_bytes(font)
-            .build(&mut device, wgpu::TextureFormat::Bgra8Unorm);
+        let glyph_brush = GlyphBrushBuilder::using_font_bytes(font)
+            .build(&mut device, TextureFormat::Bgra8Unorm);
 
         let mut temperature = crate::drawing::weather::Temperature::init(&mut device);
 
@@ -269,74 +246,74 @@ impl Painter {
         bind_group_layout: &BindGroupLayout,
         vs_module: &ShaderModule,
         fs_module: &ShaderModule,
-        color_blend: wgpu::BlendDescriptor,
-        alpha_blend: wgpu::BlendDescriptor,
+        color_blend: BlendDescriptor,
+        alpha_blend: BlendDescriptor,
         depth_write_enabled: bool,
     ) -> RenderPipeline {
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
         });
 
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&RenderPipelineDescriptor {
             layout: &pipeline_layout,
-            vertex_stage: wgpu::ProgrammableStageDescriptor {
+            vertex_stage: ProgrammableStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",
             },
-            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+            fragment_stage: Some(ProgrammableStageDescriptor {
                 module: &fs_module,
                 entry_point: "main",
             }),
-            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::None,
+            rasterization_state: Some(RasterizationStateDescriptor {
+                front_face: FrontFace::Ccw,
+                cull_mode: CullMode::None,
                 depth_bias: 0,
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
             }),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[wgpu::ColorStateDescriptor {
-                format: wgpu::TextureFormat::Bgra8Unorm,
+            primitive_topology: PrimitiveTopology::TriangleList,
+            color_states: &[ColorStateDescriptor {
+                format: TextureFormat::Bgra8Unorm,
                 color_blend,
                 alpha_blend,
-                write_mask: wgpu::ColorWrite::ALL,
+                write_mask: ColorWrite::ALL,
             }],
             depth_stencil_state: Some(DepthStencilStateDescriptor {
-                format: wgpu::TextureFormat::Depth24PlusStencil8,
+                format: TextureFormat::Depth24PlusStencil8,
                 depth_write_enabled,
-                depth_compare: wgpu::CompareFunction::Greater,
-                stencil_front: wgpu::StencilStateFaceDescriptor {
-                    compare: wgpu::CompareFunction::NotEqual,
-                    fail_op: wgpu::StencilOperation::Keep,
-                    depth_fail_op: wgpu::StencilOperation::Replace,
-                    pass_op: wgpu::StencilOperation::Replace,
+                depth_compare: CompareFunction::Greater,
+                stencil_front: StencilStateFaceDescriptor {
+                    compare: CompareFunction::NotEqual,
+                    fail_op: StencilOperation::Keep,
+                    depth_fail_op: StencilOperation::Replace,
+                    pass_op: StencilOperation::Replace,
                 },
-                stencil_back: wgpu::StencilStateFaceDescriptor {
-                    compare: wgpu::CompareFunction::NotEqual,
-                    fail_op: wgpu::StencilOperation::Keep,
-                    depth_fail_op: wgpu::StencilOperation::Replace,
-                    pass_op: wgpu::StencilOperation::Replace,
+                stencil_back: StencilStateFaceDescriptor {
+                    compare: CompareFunction::NotEqual,
+                    fail_op: StencilOperation::Keep,
+                    depth_fail_op: StencilOperation::Replace,
+                    pass_op: StencilOperation::Replace,
                 },
                 stencil_read_mask: std::u32::MAX,
                 stencil_write_mask: std::u32::MAX,
             }),
-            index_format: wgpu::IndexFormat::Uint32,
-            vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-                step_mode: wgpu::InputStepMode::Vertex,
+            index_format: IndexFormat::Uint32,
+            vertex_buffers: &[VertexBufferDescriptor {
+                stride: std::mem::size_of::<Vertex>() as BufferAddress,
+                step_mode: InputStepMode::Vertex,
                 attributes: &[
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Short2,
+                    VertexAttributeDescriptor {
+                        format: VertexFormat::Short2,
                         offset: 0,
                         shader_location: 0,
                     },
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Short2,
+                    VertexAttributeDescriptor {
+                        format: VertexFormat::Short2,
                         offset: 4,
                         shader_location: 1,
                     },
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Uint,
+                    VertexAttributeDescriptor {
+                        format: VertexFormat::Uint,
                         offset: 8,
                         shader_location: 2,
                     },
@@ -354,7 +331,7 @@ impl Painter {
         let canvas_size_buffer = device
             .create_buffer_mapped(
                 canvas_size_len / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+                BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
             )
             .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
 
@@ -363,7 +340,7 @@ impl Painter {
         let layer_data_buffer = device
             .create_buffer_mapped(
                 layer_data_len / 12 / 4,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_SRC,
+                BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
             )
             .fill_from_slice(&buffer.as_slice());
 
@@ -378,7 +355,7 @@ impl Painter {
         device
             .create_buffer_mapped::<u8>(
                 Self::uniform_buffer_size() as usize,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+                BufferUsage::UNIFORM | BufferUsage::COPY_DST,
             )
             .fill_from_slice(&data)
     }
@@ -413,7 +390,7 @@ impl Painter {
             device
             .create_buffer_mapped::<f32>(
                 tile_data_buffer_byte_size,
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+                BufferUsage::UNIFORM | BufferUsage::COPY_DST,
             )
             .fill_from_slice(data.as_slice()),
             tile_data_buffer_byte_size as u64
@@ -445,19 +422,19 @@ impl Painter {
         uniform_buffer: &Buffer,
         tile_transform_buffer: &(Buffer, u64)
     ) -> BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.create_bind_group(&BindGroupDescriptor {
             layout: bind_group_layout,
             bindings: &[
-                wgpu::Binding {
+                Binding {
                     binding: 0,
-                    resource: wgpu::BindingResource::Buffer {
+                    resource: BindingResource::Buffer {
                         buffer: uniform_buffer,
                         range: 0 .. Self::uniform_buffer_size(),
                     },
                 },
-                wgpu::Binding {
+                Binding {
                     binding: 1,
-                    resource: wgpu::BindingResource::Buffer {
+                    resource: BindingResource::Buffer {
                         buffer: &tile_transform_buffer.0,
                         range: 0 .. tile_transform_buffer.1,
                     },
@@ -493,15 +470,15 @@ impl Painter {
                         &self.bind_group_layout,
                         &vs_module,
                         &fs_module,
-                        wgpu::BlendDescriptor {
-                            src_factor: wgpu::BlendFactor::SrcAlpha,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
+                        BlendDescriptor {
+                            src_factor: BlendFactor::SrcAlpha,
+                            dst_factor: BlendFactor::OneMinusSrcAlpha,
+                            operation: BlendOperation::Add,
                         },
-                        wgpu::BlendDescriptor {
-                            src_factor: wgpu::BlendFactor::One,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
+                        BlendDescriptor {
+                            src_factor: BlendFactor::One,
+                            dst_factor: BlendFactor::OneMinusSrcAlpha,
+                            operation: BlendOperation::Add,
                         },
                         false
                     );
@@ -511,8 +488,8 @@ impl Painter {
                         &self.bind_group_layout,
                         &vs_module,
                         &fs_module,
-                        wgpu::BlendDescriptor::REPLACE,
-                        wgpu::BlendDescriptor::REPLACE,
+                        BlendDescriptor::REPLACE,
+                        BlendDescriptor::REPLACE,
                         true
                     );
                     true
@@ -579,46 +556,46 @@ impl Painter {
         device: &Device,
         swap_chain_descriptor: &SwapChainDescriptor,
         sample_count: u32
-    ) -> wgpu::TextureView {
-        let multisampled_texture_extent = wgpu::Extent3d {
+    ) -> TextureView {
+        let multisampled_texture_extent = Extent3d {
             width: swap_chain_descriptor.width,
             height: swap_chain_descriptor.height,
             depth: 1,
         };
-        let multisampled_frame_descriptor = &wgpu::TextureDescriptor {
+        let multisampled_frame_descriptor = &TextureDescriptor {
             size: multisampled_texture_extent,
             array_layer_count: 1,
             mip_level_count: 1,
             sample_count: sample_count,
-            dimension: wgpu::TextureDimension::D2,
+            dimension: TextureDimension::D2,
             format: swap_chain_descriptor.format,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
         };
 
         device.create_texture(multisampled_frame_descriptor).create_default_view()
     }
 
-    fn create_stencil(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> wgpu::TextureView {
-        let texture_extent = wgpu::Extent3d {
+    fn create_stencil(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> TextureView {
+        let texture_extent = Extent3d {
             width: swap_chain_descriptor.width,
             height: swap_chain_descriptor.height,
             depth: 1,
         };
-        let frame_descriptor = &wgpu::TextureDescriptor {
+        let frame_descriptor = &TextureDescriptor {
             size: texture_extent,
             array_layer_count: 1,
             mip_level_count: 1,
             sample_count: CONFIG.renderer.msaa_samples,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth24PlusStencil8,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Depth24PlusStencil8,
+            usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
         };
 
         device.create_texture(frame_descriptor).create_default_view()
     }
 
     pub fn paint(&mut self, hud: &mut super::ui::HUD, app_state: &mut AppState) {
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor { todo: 0 });
 
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
         self.update_uniforms(&mut encoder, &app_state, &feature_collection);
@@ -633,12 +610,12 @@ impl Painter {
         if features.len() > 0 && num_tiles > 0 {
             let frame = self.swap_chain.get_next_texture();
             {
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                    color_attachments: &[RenderPassColorAttachmentDescriptor {
                         attachment: if CONFIG.renderer.msaa_samples > 1 { &self.multisampled_framebuffer } else { &frame.view },
                         resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
-                        load_op: wgpu::LoadOp::Clear,
-                        store_op: wgpu::StoreOp::Store,
+                        load_op: LoadOp::Clear,
+                        store_op: StoreOp::Store,
                         clear_color: wgpu::Color::TRANSPARENT,
                     }],
                     depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
@@ -698,7 +675,7 @@ impl Painter {
                 }
             }
 
-            for (i, vt) in app_state.visible_tiles().values().enumerate() {
+            for (_i, vt) in app_state.visible_tiles().values().enumerate() {
                 vt.queue_text(
                     &mut self.glyph_brush,
                     &app_state.screen,
