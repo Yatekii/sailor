@@ -5,6 +5,7 @@ use std::sync::{
 };
 use lyon::math::Point;
 use crate::*;
+use crate::drawing::ui::*;
 use stats::Stats;
 
 pub struct AppState {
@@ -16,6 +17,7 @@ pub struct AppState {
     pub hovered_objects: Vec<Object>,
     pub selected_objects: Vec<EditableObject>,
     pub stats: Stats,
+    pub ui: UIState,
     visible_tiles: BTreeMap<TileId, VisibleTile>,
     feature_collection: Arc<RwLock<FeatureCollection>>,
 }
@@ -38,6 +40,7 @@ impl AppState {
             hovered_objects: vec![],
             selected_objects: vec![],
             stats: Stats::new(),
+            ui: UIState::new(),
             visible_tiles: BTreeMap::new(),
             feature_collection: Arc::new(RwLock::new(FeatureCollection::new(CONFIG.renderer.max_features as u32))),
         }
@@ -148,6 +151,11 @@ impl AppState {
                 self.selected_objects[i].selected = true;
             }
         }
+    }
+
+    pub fn set_center(&mut self, center: (f32, f32)) {
+        let tile_coordinate = deg2num(center.0, center.1, self.zoom as u32);
+        self.screen.center = num_to_global_space(&tile_coordinate);
     }
 }
 

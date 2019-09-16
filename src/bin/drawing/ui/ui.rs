@@ -197,6 +197,31 @@ impl HUD {
                             ui.text(im_str!("{:#?}", app_state.tile_cache.get_stats()));
                         }
                     });
+
+            let window = imgui::Window::new(im_str!("Location Finder"));
+            window
+                .position([520.0, 60.0], imgui::Condition::FirstUseEver)
+                .size([400.0, 250.0], imgui::Condition::FirstUseEver)
+                .build(&ui, || {
+                    // Show cache stats
+                    let mut value = ImString::with_capacity(200);
+                    value.push_str(&app_state.ui.loaction_finder.input);
+                    imgui::InputText::new(&ui, im_str!("Center Coordinates"), &mut value)
+                        .build();
+                    app_state.ui.loaction_finder.input = value.to_string();
+
+                    if ui.button(im_str!("Find"), [100.0, 25.0]) {
+                        let split: Result<Vec<f32>, _> = app_state.ui.loaction_finder.input
+                            .split(" ")
+                            .map(|s| s.parse::<f32>())
+                            .collect();
+                        if let Ok(split) = split {
+                            if split.len() == 2 {
+                                app_state.set_center((split[0], split[1]));
+                            }
+                        }
+                    }
+                });
             ruda.pop(&ui);
             // ui.show_demo_window(&mut false);
         }
