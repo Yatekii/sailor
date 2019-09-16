@@ -75,6 +75,7 @@ impl HUD {
     ) {
         self.platform.prepare_frame(self.imgui.io_mut(), &window) // step 4
             .expect("Failed to prepare frame");
+        self.imgui.io_mut().delta_time = app_state.stats.get_last_delta();
         let ui = self.imgui.frame();
         let ruda = ui.push_font(self.ruda);
         {
@@ -201,7 +202,7 @@ impl HUD {
             let window = imgui::Window::new(im_str!("Location Finder"));
             window
                 .position([520.0, 60.0], imgui::Condition::FirstUseEver)
-                .size([400.0, 250.0], imgui::Condition::FirstUseEver)
+                .size([400.0, 100.0], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
                     // Show cache stats
                     let mut value = ImString::with_capacity(200);
