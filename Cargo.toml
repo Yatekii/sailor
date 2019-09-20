@@ -31,7 +31,7 @@ reqwest = "0.9.18"
 nalgebra = "0.18.0"
 nalgebra-glm = "0.4.0"
 nom = "5.0.0-beta2"
-notify = "5.0.0-pre.0"
+notify = "5.0.0-pre.1"
 crossbeam-channel = "0.3.8"
 wgpu = { version = "0.3.0", features = ["vulkan"] }
 winit = "0.20.0-alpha3"

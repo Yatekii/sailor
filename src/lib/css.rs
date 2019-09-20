@@ -77,8 +77,7 @@ impl RulesCache {
             .expect("Something went wrong reading the file");
 
         let (tx, rx) = unbounded();
-        
-        let mut watcher: RecommendedWatcher = match Watcher::new_immediate(tx) {
+        let mut watcher: RecommendedWatcher = match Watcher::new(tx, std::time::Duration::from_secs(2)) {
             Ok(watcher) => watcher,
             Err(err) => {
                 log::info!("Failed to create a watcher for the stylesheet:");
