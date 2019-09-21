@@ -3,12 +3,11 @@ name: Rust
 on: [push]
 
 jobs:
-  build:
-
+  build-vulkan:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu-latest, windows-latest]
         rust: [stable, nightly]
 
     steps:
@@ -24,3 +23,24 @@ jobs:
     #   run: cargo test --verbose --lib
     # - name: Run tests bin
     #   run: cargo test --verbose --bin sailor
+  build-metal:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macOS-latest]
+        rust: [stable, nightly]
+
+    steps:
+    - uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: ${{ matrix.rust }}
+    - uses: actions/checkout@master
+    - name: Build lib
+      run: cargo build --verbose --lib --no-default-features --features metal
+    - name: Build bin
+      run: cargo build --verbose --bin sailor --no-default-features --features metal
+    # - name: Run tests lib
+    #   run: cargo test --verbose --lib
+    # - name: Run tests bin
+    #   run: cargo test --verbose --bin sailor
+
