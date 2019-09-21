@@ -38,7 +38,7 @@ nalgebra-glm = "0.4.0"
 nom = "5.0.0-beta2"
 notify = "5.0.0-pre.1"
 crossbeam-channel = "0.3.8"
-wgpu = { version = "0.3.0", features = ["vulkan"] }
+wgpu = { version = "0.3.0" }
 winit = "0.20.0-alpha3"
 serde = "1.0.99"
 serde_derive = "1.0.99"
@@ -49,7 +49,7 @@ log = { version = "0.4.7", features = ["serde"] }
 glsl-to-spirv = "0.1"
 num-traits = "0.2.8"
 imgui = "0.2.0"
-imgui-wgpu = { version = "0.1.0", features = ["vulkan"] }
+imgui-wgpu = { version = "0.1.0" }
 ncollide2d = "0.20.1"
 raw-window-handle = "0.1"
 parity-util-mem = "0.2.0"
