@@ -23,6 +23,7 @@ jobs:
     #   run: cargo test --verbose --lib
     # - name: Run tests bin
     #   run: cargo test --verbose --bin sailor
+    
   build-metal:
     runs-on: ${{ matrix.os }}
     strategy:
