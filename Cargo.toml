@@ -23,11 +23,6 @@ path = "src/lib/main.rs"
 name = "sailor"
 path = "src/bin/main.rs"
 
-[features]
-default = ["vulkan"]
-vulkan = ["wgpu/vulkan", "imgui-wgpu/vulkan"]
-metal = ["wgpu/metal", "imgui-wgpu/metal"]
-
 [dependencies]
 quick-protobuf = "0.6.3"
 lyon = "0.13.2"
