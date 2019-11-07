@@ -41,6 +41,7 @@ pub struct Painter {
     pub window: Window,
     hidpi_factor: f64,
     pub device: Device,
+    pub queue: Queue,
     surface: Surface,
     swap_chain_descriptor: SwapChainDescriptor,
     swap_chain: SwapChain,
@@ -61,10 +62,8 @@ pub struct Painter {
 impl Painter {
     /// Initializes the entire draw machinery.
     pub fn init(event_loop: &EventLoop<()>, width: u32, height: u32, app_state: &AppState) -> Self {
-        let (window, instance, size, surface, factor) = {
+        let (window, size, surface, factor) = {
             use raw_window_handle::HasRawWindowHandle as _;
-
-            let instance = Instance::new();
 
             let window = Window::new(&event_loop).unwrap();
             window.set_inner_size(LogicalSize { width: width as f64, height: height as f64 });
@@ -73,16 +72,17 @@ impl Painter {
                 .inner_size()
                 .to_physical(factor);
 
-            let surface = instance.create_surface(window.raw_window_handle());
+            let surface = wgpu::Surface::create(&window);
 
-            (window, instance, size, surface, factor)
+            (window, size, surface, factor)
         };
 
-        let adapter = instance.request_adapter(&RequestAdapterOptions {
+        let adapter = wgpu::Adapter::request(&RequestAdapterOptions {
             power_preference: PowerPreference::LowPower,
-        });
+            backends: wgpu::BackendBit::PRIMARY,
+        }).unwrap();
 
-        let mut device = adapter.request_device(&DeviceDescriptor {
+        let (mut device, mut queue) = adapter.request_device(&DeviceDescriptor {
             extensions: Extensions {
                 anisotropic_filtering: false,
             },
@@ -209,20 +209,21 @@ impl Painter {
         let glyph_brush = GlyphBrushBuilder::using_font_bytes(font)
             .build(&mut device, TextureFormat::Bgra8Unorm);
 
-        let mut temperature = crate::drawing::weather::Temperature::init(&mut device);
+        let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
         let init_command_buf = init_encoder.finish();
-        device.get_queue().submit(&[init_command_buf]);
+        queue.submit(&[init_command_buf]);
 
         let width = 64 * 8;
         let height = 64 * 8;
 
-        temperature.generate_texture(&mut device, width, height);
+        temperature.generate_texture(&mut device, &mut queue, width, height);
 
         Self {
             window: window,
             hidpi_factor: factor,
             device,
+            queue,
             surface,
             swap_chain_descriptor,
             swap_chain,
@@ -700,7 +701,7 @@ impl Painter {
                 &mut encoder,
                 &frame.view,
             );
-            self.device.get_queue().submit(&[encoder.finish()]);
+            self.queue.submit(&[encoder.finish()]);
         }
     }
 }

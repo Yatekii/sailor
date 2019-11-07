@@ -38,7 +38,7 @@ pub struct Temperature {
 }
 
 impl Temperature {
-    pub fn init(device: &mut wgpu::Device) -> Self {
+    pub fn init(device: &mut wgpu::Device, queue: &mut wgpu::Queue) -> Self {
 
         let init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
@@ -134,7 +134,7 @@ impl Temperature {
         );
 
         let init_command_buf = init_encoder.finish();
-        device.get_queue().submit(&[init_command_buf]);
+        queue.submit(&[init_command_buf]);
 
         Self {
             bind_group_layout,
@@ -221,6 +221,7 @@ impl Temperature {
     pub fn generate_texture(
         &mut self,
         device: &mut wgpu::Device,
+        queue: &mut wgpu::Queue,
         width: u32,
         height: u32
     ) {
@@ -268,9 +269,7 @@ impl Temperature {
             },
         );
 
-        device
-            .get_queue()
-            .submit(&[encoder.finish()]);
+        queue.submit(&[encoder.finish()]);
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.

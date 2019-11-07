@@ -16,6 +16,7 @@ impl HUD {
     pub fn new(
         window: &winit::window::Window,
         device: &mut wgpu::Device,
+        queue: &mut wgpu::Queue,
     ) -> Self {
         let hidpi_factor = window.hidpi_factor();
         let mut imgui = imgui::Context::create();
@@ -53,6 +54,7 @@ impl HUD {
         let renderer = imgui_wgpu::Renderer::new(
             &mut imgui,
             device,
+            queue,
             wgpu::TextureFormat::Bgra8Unorm,
             None,
         );

@@ -46,7 +46,7 @@ fn main() {
     let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), width, height, z, hdpi_factor);
 
     let mut painter = drawing::Painter::init(&event_loop, width, height, &app_state);
-    let mut hud = drawing::ui::HUD::new(&painter.window, &mut painter.device);
+    let mut hud = drawing::ui::HUD::new(&painter.window, &mut painter.device, &mut painter.queue);
 
     let mut mouse_down = false;
     let mut last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
