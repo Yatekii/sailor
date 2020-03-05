@@ -1,7 +1,7 @@
-use crate::app_state::EditableObject;
 use crate::app_state::AppState;
-use imgui::*;
+use crate::app_state::EditableObject;
 use crate::*;
+use imgui::*;
 
 use crate::config::CONFIG;
 
@@ -18,30 +18,36 @@ impl HUD {
         device: &mut wgpu::Device,
         queue: &mut wgpu::Queue,
     ) -> Self {
-        let hidpi_factor = window.hidpi_factor();
+        let hidpi_factor = window.scale_factor();
         let mut imgui = imgui::Context::create();
         let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
-        platform.attach_window(imgui.io_mut(), &window, imgui_winit_support::HiDpiMode::Default);
+        platform.attach_window(
+            imgui.io_mut(),
+            window,
+            imgui_winit_support::HiDpiMode::Default,
+        );
         imgui.set_ini_filename(None);
 
         let font_size = (13.0 * hidpi_factor) as f32;
         imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
 
-        imgui.fonts().add_font(&[
-            imgui::FontSource::DefaultFontData {
+        imgui
+            .fonts()
+            .add_font(&[imgui::FontSource::DefaultFontData {
                 config: Some(imgui::FontConfig {
                     oversample_h: 1,
                     pixel_snap_h: true,
                     size_pixels: font_size,
                     ..Default::default()
-                })
-            }
-        ]);
+                }),
+            }]);
 
         use std::io::Read;
-        let mut f = std::fs::File::open(&CONFIG.renderer.ui_font).expect("Could not open the UI font.");
+        let mut f =
+            std::fs::File::open(&CONFIG.renderer.ui_font).expect("Could not open the UI font.");
         let mut data = vec![];
-        f.read_to_end(&mut data).expect("Could not read the UI font.");
+        f.read_to_end(&mut data)
+            .expect("Could not read the UI font.");
 
         let ruda = imgui.fonts().add_font(&[FontSource::TtfData {
             data: data.as_slice(),
@@ -75,7 +81,8 @@ impl HUD {
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
     ) {
-        self.platform.prepare_frame(self.imgui.io_mut(), &window) // step 4
+        self.platform
+            .prepare_frame(self.imgui.io_mut(), window) // step 4
             .expect("Failed to prepare frame");
         self.imgui.io_mut().delta_time = app_state.stats.get_last_delta();
         let ui = self.imgui.frame();
@@ -111,10 +118,10 @@ impl HUD {
                 .build(&ui, || {
                     let mut size = ui.window_size();
                     size[1] = 100.0;
-                    let window = imgui::ChildWindow::new("Hovered objects")
-                        .size(size);
+                    let window = imgui::ChildWindow::new("Hovered objects").size(size);
                     window.build(&ui, || {
-                        let objects = app_state.hovered_objects
+                        let objects = app_state
+                            .hovered_objects
                             .iter()
                             .map(|o| o.selector().to_string())
                             .collect::<Vec<_>>()
@@ -131,7 +138,8 @@ impl HUD {
                             item = i as i32;
                         }
                     }
-                    let items = app_state.selected_objects
+                    let items = app_state
+                        .selected_objects
                         .iter()
                         .map(|o| im_str!("{}", o.object.selector()))
                         .collect::<Vec<_>>();
@@ -139,13 +147,8 @@ impl HUD {
                     for item in &items {
                         item_refs.push(item);
                     }
-                    
-                    ui.list_box(
-                        im_str!("Selected objects"),
-                        &mut item,
-                        &item_refs,
-                        5
-                    );
+
+                    ui.list_box(im_str!("Selected objects"), &mut item, &item_refs, 5);
 
                     add_header_separator(&ui, im_str!("Selected Object"));
 
@@ -155,10 +158,9 @@ impl HUD {
 
                     let objects = &mut app_state.selected_objects;
 
-                    if let Some(EditableObject {
-                        object,
-                        ..
-                    }) = objects.iter_mut().find(|object| object.selected) {
+                    if let Some(EditableObject { object, .. }) =
+                        objects.iter_mut().find(|object| object.selected)
+                    {
                         ui.separator();
                         ui.text(im_str!("Tags"));
                         ui.separator();
@@ -169,9 +171,12 @@ impl HUD {
                         ui.text(im_str!("Applying rules"));
                         ui.separator();
 
-                        let mut rules = app_state.css_cache.get_matching_rules_mut(&object.selector());
+                        let mut rules = app_state
+                            .css_cache
+                            .get_matching_rules_mut(&object.selector());
                         for rule in rules.iter_mut() {
-                            let show_block = add_header_separator(&ui, im_str!("{}", rule.selector));
+                            let show_block =
+                                add_header_separator(&ui, im_str!("{}", rule.selector));
                             if show_block {
                                 add_color_picker(&ui, rule, "background-color");
                                 add_color_picker(&ui, rule, "border-color");
@@ -187,19 +192,19 @@ impl HUD {
                     }
                 });
 
-                let window = imgui::Window::new(im_str!("Stats"));
-                window
-                    .position([60.0, 720.0], imgui::Condition::FirstUseEver)
-                    .size([400.0, 250.0], imgui::Condition::FirstUseEver)
-                    .build(&ui, || {
-                        // Show cache stats
-                        let head = CollapsingHeader::new(&ui, im_str!("Cache Stats"))
-                            .default_open(true)
-                            .build();
-                        if head {
-                            ui.text(im_str!("{:#?}", app_state.tile_cache.get_stats()));
-                        }
-                    });
+            let window = imgui::Window::new(im_str!("Stats"));
+            window
+                .position([60.0, 720.0], imgui::Condition::FirstUseEver)
+                .size([400.0, 250.0], imgui::Condition::FirstUseEver)
+                .build(&ui, || {
+                    // Show cache stats
+                    let head = CollapsingHeader::new(&ui, im_str!("Cache Stats"))
+                        .default_open(true)
+                        .build();
+                    if head {
+                        ui.text(im_str!("{:#?}", app_state.tile_cache.get_stats()));
+                    }
+                });
 
             let window = imgui::Window::new(im_str!("Location Finder"));
             window
@@ -209,12 +214,14 @@ impl HUD {
                     // Show cache stats
                     let mut value = ImString::with_capacity(200);
                     value.push_str(&app_state.ui.loaction_finder.input);
-                    imgui::InputText::new(&ui, im_str!("Center Coordinates"), &mut value)
-                        .build();
+                    imgui::InputText::new(&ui, im_str!("Center Coordinates"), &mut value).build();
                     app_state.ui.loaction_finder.input = value.to_string();
 
                     if ui.button(im_str!("Find"), [100.0, 25.0]) {
-                        let split: Result<Vec<f32>, _> = app_state.ui.loaction_finder.input
+                        let split: Result<Vec<f32>, _> = app_state
+                            .ui
+                            .loaction_finder
+                            .input
                             .split(" ")
                             .map(|s| s.parse::<f32>())
                             .collect();
@@ -229,14 +236,19 @@ impl HUD {
             // ui.show_demo_window(&mut false);
         }
 
-        self.platform.prepare_render(&ui, &window);
+        self.platform.prepare_render(&ui, window);
         self.renderer
-            .render(ui, device, encoder, &view)
+            .render(ui.render(), device, encoder, &view)
             .expect("Rendering failed");
     }
 
-    pub fn interact(&mut self, window: &winit::window::Window, event: &winit::event::Event<()>) -> (bool, bool) {
-        self.platform.handle_event(self.imgui.io_mut(), window, &event);
+    pub fn interact(
+        &mut self,
+        window: &winit::window::Window,
+        event: &winit::event::Event<()>,
+    ) -> (bool, bool) {
+        self.platform
+            .handle_event(self.imgui.io_mut(), window, &event);
         let io = self.imgui.io();
         (!io.want_capture_mouse, !io.want_capture_keyboard)
     }
@@ -250,38 +262,31 @@ fn add_color_picker(ui: &Ui, rule: &mut Rule, attribute: &str) {
         &default_color
     };
     let color = match color {
-        CSSValue::String(string) => {
-            match &string[..] {
-                "red" => Color::RED,
-                "green" => Color::GREEN,
-                "blue" => Color::BLUE,
-                "black" => Color::BLACK,
-                "white" => Color::WHITE,
-                _ => Color::TRANSPARENT,
-            }
+        CSSValue::String(string) => match &string[..] {
+            "red" => Color::RED,
+            "green" => Color::GREEN,
+            "blue" => Color::BLUE,
+            "black" => Color::BLACK,
+            "white" => Color::WHITE,
+            _ => Color::TRANSPARENT,
         },
-        CSSValue::Color(color) => {
-            color.clone()
-        },
+        CSSValue::Color(color) => color.clone(),
         _ => Color::TRANSPARENT, // This should never happen, but transparent should be a decent fallback
     };
-    let mut color = [
-        color.r,
-        color.g, 
-        color.b,
-        color.a
-    ];
+    let mut color = [color.r, color.g, color.b, color.a];
     let label = im_str!("{}", attribute);
     let cp = ColorEdit::new(&label, EditableColor::Float4(&mut color));
-    cp
-        .build(&ui);
+    cp.build(&ui);
 
-    rule.kvs.insert(attribute.to_string(), CSSValue::Color(Color {
-        r: color[0],
-        g: color[1],
-        b: color[2],
-        a: color[3],
-    }));
+    rule.kvs.insert(
+        attribute.to_string(),
+        CSSValue::Color(Color {
+            r: color[0],
+            g: color[1],
+            b: color[2],
+            a: color[3],
+        }),
+    );
 }
 
 fn add_slider_float(ui: &Ui, rule: &mut Rule, attribute: &str) {
@@ -292,32 +297,28 @@ fn add_slider_float(ui: &Ui, rule: &mut Rule, attribute: &str) {
         &default_number
     };
     let mut value = match value {
-        CSSValue::Number(number) => {
-            match &number {
-                Number::Px(px) => *px,
-                _ => 0.0,
-            }
+        CSSValue::Number(number) => match &number {
+            Number::Px(px) => *px,
+            _ => 0.0,
         },
         _ => 0.0, // This should never happen, but transparent should be a decent fallback
     };
 
     let label = im_str!("{}", attribute);
     let cp = imgui::Slider::new(&label, 0.0..=10.0);
-    cp
-        .build(&ui, &mut value);
+    cp.build(&ui, &mut value);
 
-    rule.kvs.insert(attribute.to_string(), CSSValue::Number(Number::Px(value)));
+    rule.kvs
+        .insert(attribute.to_string(), CSSValue::Number(Number::Px(value)));
 }
 
 fn add_display_none(ui: &Ui, rule: &mut Rule) {
     let attribute = "display";
     let mut value = if let Some(value) = rule.kvs.get(attribute) {
         match value {
-            CSSValue::String(value) => {
-                match &value[..] {
-                    "none" => false,
-                    _ => true,
-                }
+            CSSValue::String(value) => match &value[..] {
+                "none" => false,
+                _ => true,
             },
             _ => true,
         }
@@ -329,7 +330,8 @@ fn add_display_none(ui: &Ui, rule: &mut Rule) {
     ui.checkbox(&label, &mut value);
 
     if !value {
-        rule.kvs.insert(attribute.to_string(), CSSValue::String("none".to_string()));
+        rule.kvs
+            .insert(attribute.to_string(), CSSValue::String("none".to_string()));
     } else {
         rule.kvs.remove(attribute);
     }
@@ -339,11 +341,11 @@ fn add_header_separator(ui: &Ui, title: impl Into<ImString>) -> bool {
     CollapsingHeader::new(&ui, &title.into())
         .flags(
             ImGuiTreeNodeFlags::Bullet
-            | ImGuiTreeNodeFlags::Leaf
-            | ImGuiTreeNodeFlags::Framed
-            | ImGuiTreeNodeFlags::Selected
-            | ImGuiTreeNodeFlags::NoTreePushOnOpen
-            | ImGuiTreeNodeFlags::DefaultOpen
+                | ImGuiTreeNodeFlags::Leaf
+                | ImGuiTreeNodeFlags::Framed
+                | ImGuiTreeNodeFlags::Selected
+                | ImGuiTreeNodeFlags::NoTreePushOnOpen
+                | ImGuiTreeNodeFlags::DefaultOpen,
         )
         .build()
 }

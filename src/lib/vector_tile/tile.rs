@@ -1,31 +1,20 @@
-use std::sync::{
-    Arc,
-    RwLock,
+use crate::*;
+use lyon::{
+    path::Path,
+    tessellation::{geometry_builder::VertexBuffers, FillOptions, FillTessellator},
 };
-use std::thread::{
-    spawn,
-};
+use quick_protobuf::{BytesReader, MessageRead};
 use std::collections::HashMap;
 use std::ops::Range;
-use quick_protobuf::{
-    MessageRead,
-    BytesReader
-};
+use std::sync::{Arc, RwLock};
 use vector_tile::mod_Tile::GeomType;
-use lyon::{
-    tessellation::{
-        geometry_builder::{
-            VertexBuffers,
-        },
-        FillTessellator,
-        FillOptions,
-    },
-    path::Path,
-};
-use crate::*;
 
 fn format_size(value: &usize, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "{:.1}B", size_format::SizeFormatterSI::new(*value as u64))  
+    write!(
+        f,
+        "{:.1}B",
+        size_format::SizeFormatterSI::new(*value as u64)
+    )
 }
 
 #[derive(Clone, Copy, Derivative)]
@@ -35,7 +24,7 @@ pub struct TileStats {
     pub features: usize,
     pub vertices: usize,
     pub indices: usize,
-    #[derivative(Debug(format_with="format_size"))]
+    #[derivative(Debug(format_with = "format_size"))]
     pub size: usize,
 }
 
@@ -64,7 +53,6 @@ impl std::ops::Add for TileStats {
         }
     }
 }
-
 
 impl std::ops::AddAssign for TileStats {
     fn add_assign(&mut self, other: Self) {
@@ -107,18 +95,19 @@ pub fn layer_num(name: &str) -> u32 {
 
 impl Tile {
     /// Create a new tile form a MBVT pbf file.
-    /// 
+    ///
     /// Creates all the data necessecary to render the MBVT.
     /// This includes vertex and index buffers.
     pub fn from_mbvt(
         tile_id: &TileId,
         pbf_data: &Vec<u8>,
         feature_collection: Arc<RwLock<FeatureCollection>>,
-        selection_tags: Vec<String>
+        selection_tags: Vec<String>,
     ) -> Self {
         // Read tile data from the pbf data.
         let mut reader = BytesReader::from_bytes(&pbf_data);
-        let tile = super::vector_tile::Tile::from_reader(&mut reader, &pbf_data).expect("Cannot read Tile object.");
+        let tile = super::vector_tile::Tile::from_reader(&mut reader, &pbf_data)
+            .expect("Cannot read Tile object.");
 
         let mut objects = Vec::new();
         let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::with_capacity(10_000, 10_000);
@@ -128,34 +117,28 @@ impl Tile {
         let mut text = vec![];
 
         // Add a background feature to the tile data.
-        let (
-            mut current_feature_id,
-            object,
-            range
-        ) = Self::create_background_feature(
-            &mut builder,
-            feature_collection.clone(),
-            extent
-        );
+        let (mut current_feature_id, object, range) =
+            Self::create_background_feature(&mut builder, feature_collection.clone(), extent);
         features.push((current_feature_id, range));
         objects.push(object);
 
         // Transform all features of the tile.
         for layer in tile.layers {
-            let mut map: std::collections::HashMap<Selector, Vec<(GeomType, Vec<Path>)>> = HashMap::new();
+            let mut map: std::collections::HashMap<Selector, Vec<(GeomType, Vec<Path>)>> =
+                HashMap::new();
 
             // Preevaluate the selectors and group features by the selector they belong to.
             for feature in &layer.features {
                 let (selector, tags) = Self::classify(&layer, &feature, &selection_tags);
 
-                let paths = geometry_commands_to_paths(
-                    feature.type_pb,
-                    &feature.geometry
-                );
+                let paths = geometry_commands_to_paths(feature.type_pb, &feature.geometry);
 
                 if let Some(tag) = tags.get("name:en") {
                     let point = paths[0].points()[0];
-                    text.push(((point.x / extent as f32, point.y / extent as f32), tag.clone()));
+                    text.push((
+                        (point.x / extent as f32, point.y / extent as f32),
+                        tag.clone(),
+                    ));
                 }
 
                 // If we have a valid object at hand, insert it into the object list
@@ -166,13 +149,13 @@ impl Tile {
                     GeomType::POINT => Some(ObjectType::Point),
                     _ => None,
                 };
-                
+
                 if let Some(ot) = object_type {
                     objects.push(Object::new_with_tags(
                         selector.clone(),
                         paths[0].points().iter().cloned().collect(),
                         tags,
-                        ot
+                        ot,
                     ));
                 }
 
@@ -201,11 +184,14 @@ impl Tile {
                         feature.0,
                         &feature.1,
                         layer.extent as f32,
-                        tile_id.z
+                        tile_id.z,
                     );
                 }
 
-                inner_features.push((current_feature_id, index_start_before..builder.get_current_index()));
+                inner_features.push((
+                    current_feature_id,
+                    index_start_before..builder.get_current_index(),
+                ));
             }
 
             features.extend(inner_features);
@@ -230,11 +216,10 @@ impl Tile {
                 features: features.len(),
                 vertices: mesh.vertices.len(),
                 indices: mesh.indices.len(),
-                size:
-                    objects.iter().map(|o| o.size()).sum::<usize>()
-                  + features.capacity() * feature_size
-                  + mesh.vertices.capacity() * vertex_size
-                  + mesh.indices.capacity() * index_size,
+                size: objects.iter().map(|o| o.size()).sum::<usize>()
+                    + features.capacity() * feature_size
+                    + mesh.vertices.capacity() * vertex_size
+                    + mesh.indices.capacity() * index_size,
             }
         };
 
@@ -299,12 +284,12 @@ impl Tile {
     }
 
     /// Creates a rectangle the size of a tile to be used as the background of a tile.
-    /// 
+    ///
     /// Could also display a texture in the future (speak swisstopo).
     fn create_background_feature<'l>(
         builder: &mut MeshBuilder<'l>,
         feature_collection: Arc<RwLock<FeatureCollection>>,
-        extent: u16
+        extent: u16,
     ) -> (u32, Object, Range<u32>) {
         // Create a new background type selector.
         let selector = Selector::new().with_type("background");
@@ -330,31 +315,37 @@ impl Tile {
         let index_start_before = builder.get_current_index();
 
         // Tesselate path.
-        FillTessellator::new().tessellate_path(
-            &path,
-            &FillOptions::tolerance(0.0001).with_normals(true),
-            builder,
-        ).expect("This is a bug. Please report it.");
+        FillTessellator::new()
+            .tessellate_path(
+                &path,
+                &FillOptions::tolerance(0.0001).with_normals(true),
+                builder,
+            )
+            .expect("This is a bug. Please report it.");
 
         let object = Object::new(
             selector,
             path.points().iter().cloned().collect(),
-            ObjectType::Polygon
+            ObjectType::Polygon,
         );
 
-        (current_feature_id, object, index_start_before..builder.get_current_index())
+        (
+            current_feature_id,
+            object,
+            index_start_before..builder.get_current_index(),
+        )
     }
 
     /// Create a selector and a list of tags form MBVT information.
     fn classify(
         layer: &vector_tile::mod_Tile::Layer,
         feature: &vector_tile::mod_Tile::Feature,
-        selection_tags: &Vec<String>
+        selection_tags: &Vec<String>,
     ) -> (Selector, HashMap<String, String>) {
         let mut selector = Selector::new()
             .with_type("layer".to_string())
             .with_any("name".to_string(), layer.name.to_string());
-        
+
         let mut tags = HashMap::new();
 
         for tag in feature.tags.chunks(2) {
@@ -362,15 +353,17 @@ impl Tile {
             let value = layer.values[tag[1] as usize].clone();
             match &key[..] {
                 "class" => {
-                    selector.classes.push(value.string_value.clone().unwrap().to_string());
-                },
+                    selector
+                        .classes
+                        .push(value.string_value.clone().unwrap().to_string());
+                }
                 _ => {
                     if selection_tags.contains(&key) {
                         selector = selector.with_any(key.clone(), value.to_string());
                     } else {
                         tags.insert(key.clone(), value.to_string());
                     }
-                },
+                }
             }
         }
 
@@ -382,12 +375,14 @@ impl<'a> std::string::ToString for vector_tile::mod_Tile::Value<'a> {
     fn to_string(&self) -> String {
         // We can make the safe assumption that only ever one property is Some(_).
         // So we just unwrap all the strings and concat it into one.
-        self.string_value.clone().map_or(String::new(), |v| v.to_string())
-     + &self.float_value.map_or(String::new(), |v| v.to_string())
-     + &self.double_value.map_or(String::new(), |v| v.to_string())
-     + &self.int_value.map_or(String::new(), |v| v.to_string())
-     + &self.uint_value.map_or(String::new(), |v| v.to_string())
-     + &self.sint_value.map_or(String::new(), |v| v.to_string())
-     + &self.bool_value.map_or(String::new(), |v| v.to_string())
+        self.string_value
+            .clone()
+            .map_or(String::new(), |v| v.to_string())
+            + &self.float_value.map_or(String::new(), |v| v.to_string())
+            + &self.double_value.map_or(String::new(), |v| v.to_string())
+            + &self.int_value.map_or(String::new(), |v| v.to_string())
+            + &self.uint_value.map_or(String::new(), |v| v.to_string())
+            + &self.sint_value.map_or(String::new(), |v| v.to_string())
+            + &self.bool_value.map_or(String::new(), |v| v.to_string())
     }
 }

@@ -1,19 +1,8 @@
-use std::sync::{
-    Arc,
-    RwLock,
-};
-use std::path::Path;
-use std::collections::HashMap;
-use std::thread::{
-    JoinHandle,
-    spawn,
-};
-use std::sync::mpsc::{
-    channel,
-    Sender,
-    Receiver,
-};
 use super::*;
+use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, RwLock};
+use std::thread::{spawn, JoinHandle};
 
 #[derive(Debug, Clone)]
 pub struct CacheStats {
@@ -50,10 +39,7 @@ impl TileCache {
     pub fn finalize_loaded_tiles(&mut self) {
         // Get all pending messages and work them.
         for id in self.channel.1.try_iter() {
-            let potential_loader = self.loaders
-                .iter()
-                .enumerate()
-                .find(|(_, l)| l.0 == id);
+            let potential_loader = self.loaders.iter().enumerate().find(|(_, l)| l.0 == id);
 
             // Try finalizing the complete loader.
             if let Some((i, _)) = potential_loader {
@@ -63,9 +49,13 @@ impl TileCache {
                         if let Some(tile) = tile {
                             self.cache.insert(loader.2, Arc::new(RwLock::new(tile)));
                         }
-                    },
+                    }
                     Err(e) => {
-                        log::error!("Failed to join tile loader thread for {}. Reason:\r\n{:?}", loader.2, e);
+                        log::error!(
+                            "Failed to join tile loader thread for {}. Reason:\r\n{:?}",
+                            loader.2,
+                            e
+                        );
                     }
                 }
             }
@@ -77,14 +67,14 @@ impl TileCache {
         &mut self,
         tile_id: &TileId,
         feature_collection: Arc<RwLock<FeatureCollection>>,
-        selection_tags: &Vec<String>
+        selection_tags: &Vec<String>,
     ) {
         let id = self.id;
         self.id += 1;
 
         // Find the corresponding loader to the requested tile if there is any.
         let loader = self.loaders.iter().find(|l| l.2 == *tile_id);
-        
+
         // Check if tile is not in the cache yet and is not currently being loaded.
         if !self.cache.contains_key(&tile_id) && loader.is_none() {
             // Clone values to be moved into the thread.
@@ -120,7 +110,7 @@ impl TileCache {
     }
 
     /// Get a `Tile` from the `TileCache`.
-    /// 
+    ///
     /// Returns `None` if the tile is not in the cache.
     /// The user has to request the loading of the `Tile` on their own.
     pub fn try_get_tile(&self, tile_id: &TileId) -> Option<Arc<RwLock<Tile>>> {

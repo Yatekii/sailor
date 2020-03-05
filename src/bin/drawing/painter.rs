@@ -1,39 +1,13 @@
-use nalgebra_glm::{
-    vec4,
-    vec2,
-};
-use crossbeam_channel::{
-    unbounded,
-    TryRecvError,
-};
-use notify::{
-    RecursiveMode,
-    RecommendedWatcher,
-    Watcher,
-    EventKind,
-    event::{
-        ModifyKind,
-    },
-};
-use winit::{
-    window::Window,
-    event_loop::EventLoop,
-    dpi::{
-        LogicalSize,
-    },
-};
-use wgpu::*;
-use wgpu_glyph::{
-    GlyphBrushBuilder,
-    GlyphBrush,
-};
+use crossbeam_channel::{unbounded, TryRecvError};
+use nalgebra_glm::{vec2, vec4};
+use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use osm::*;
+use wgpu::*;
+use wgpu_glyph::{GlyphBrush, GlyphBrushBuilder};
+use winit::{dpi::LogicalSize, event_loop::EventLoop, window::Window};
 
-use crate::drawing::helpers::{
-    ShaderStage,
-    load_glsl,
-};
 use crate::app_state::AppState;
+use crate::drawing::helpers::{load_glsl, ShaderStage};
 
 use crate::config::CONFIG;
 
@@ -63,14 +37,13 @@ impl Painter {
     /// Initializes the entire draw machinery.
     pub fn init(event_loop: &EventLoop<()>, width: u32, height: u32, app_state: &AppState) -> Self {
         let (window, size, surface, factor) = {
-            use raw_window_handle::HasRawWindowHandle as _;
-
             let window = Window::new(&event_loop).unwrap();
-            window.set_inner_size(LogicalSize { width: width as f64, height: height as f64 });
-            let factor = window.hidpi_factor();
-            let size = window
-                .inner_size()
-                .to_physical(factor);
+            window.set_inner_size(LogicalSize {
+                width: width as f64,
+                height: height as f64,
+            });
+            let factor = window.scale_factor();
+            let size = window.inner_size();
 
             let surface = wgpu::Surface::create(&window);
 
@@ -80,7 +53,8 @@ impl Painter {
         let adapter = wgpu::Adapter::request(&RequestAdapterOptions {
             power_preference: PowerPreference::LowPower,
             backends: wgpu::BackendBit::PRIMARY,
-        }).unwrap();
+        })
+        .unwrap();
 
         let (mut device, mut queue) = adapter.request_device(&DeviceDescriptor {
             extensions: Extensions {
@@ -92,68 +66,73 @@ impl Painter {
         let init_encoder = device.create_command_encoder(&CommandEncoderDescriptor { todo: 0 });
 
         let (tx, rx) = unbounded();
-        
-        let mut watcher: RecommendedWatcher = match Watcher::new(tx, std::time::Duration::from_secs(2)) {
-            Ok(watcher) => watcher,
-            Err(err) => {
-                log::info!("Failed to create a watcher for the vertex shader:");
-                log::info!("{}", err);
-                panic!("Unable to load a vertex shader.");
-            },
-        };
+
+        let mut watcher: RecommendedWatcher =
+            match Watcher::new(tx, std::time::Duration::from_secs(2)) {
+                Ok(watcher) => watcher,
+                Err(err) => {
+                    log::info!("Failed to create a watcher for the vertex shader:");
+                    log::info!("{}", err);
+                    panic!("Unable to load a vertex shader.");
+                }
+            };
 
         match watcher.watch(&CONFIG.renderer.vertex_shader, RecursiveMode::Recursive) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(err) => {
-                log::info!("Failed to start watching {}:", &CONFIG.renderer.vertex_shader);
+                log::info!(
+                    "Failed to start watching {}:",
+                    &CONFIG.renderer.vertex_shader
+                );
                 log::info!("{}", err);
-            },
+            }
         };
 
         match watcher.watch(&CONFIG.renderer.fragment_shader, RecursiveMode::Recursive) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(err) => {
-                log::info!("Failed to start watching {}:", &CONFIG.renderer.fragment_shader);
+                log::info!(
+                    "Failed to start watching {}:",
+                    &CONFIG.renderer.fragment_shader
+                );
                 log::info!("{}", err);
-            },
+            }
         };
 
         let (layer_vs_module, layer_fs_module) = Self::load_shader(
-            &device, &CONFIG.renderer.vertex_shader,
-            &CONFIG.renderer.fragment_shader
-        ).expect("Fatal Error. Unable to load shaders.");
+            &device,
+            &CONFIG.renderer.vertex_shader,
+            &CONFIG.renderer.fragment_shader,
+        )
+        .expect("Fatal Error. Unable to load shaders.");
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             bindings: &[
                 BindGroupLayoutBinding {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: BindingType::UniformBuffer {
-                        dynamic: false,
-                    },
+                    ty: BindingType::UniformBuffer { dynamic: false },
                 },
                 BindGroupLayoutBinding {
                     binding: 1,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: BindingType::UniformBuffer {
-                        dynamic: false,
-                    },
+                    ty: BindingType::UniformBuffer { dynamic: false },
                 },
-            ]
+            ],
         });
 
         let swap_chain_descriptor = SwapChainDescriptor {
             usage: TextureUsage::OUTPUT_ATTACHMENT,
             format: TextureFormat::Bgra8Unorm,
-            width: size.width.round() as u32,
-            height: size.height.round() as u32,
+            width: size.width,
+            height: size.height,
             present_mode: PresentMode::NoVsync,
         };
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(
             &device,
             &swap_chain_descriptor,
-            CONFIG.renderer.msaa_samples
+            CONFIG.renderer.msaa_samples,
         );
         let stencil = Self::create_stencil(&device, &swap_chain_descriptor);
 
@@ -162,7 +141,7 @@ impl Painter {
             &device,
             &app_state.screen,
             app_state.zoom,
-            std::iter::empty::<&VisibleTile>()
+            std::iter::empty::<&VisibleTile>(),
         );
 
         let blend_pipeline = Self::create_layer_render_pipeline(
@@ -180,7 +159,7 @@ impl Painter {
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
                 operation: BlendOperation::Add,
             },
-            false
+            false,
         );
 
         let noblend_pipeline = Self::create_layer_render_pipeline(
@@ -190,24 +169,21 @@ impl Painter {
             &layer_fs_module,
             BlendDescriptor::REPLACE,
             BlendDescriptor::REPLACE,
-            true
+            true,
         );
 
-        let swap_chain = device.create_swap_chain(
-            &surface,
-            &swap_chain_descriptor,
-        );
+        let swap_chain = device.create_swap_chain(&surface, &swap_chain_descriptor);
 
         let bind_group = Self::create_blend_bind_group(
             &device,
             &bind_group_layout,
             &uniform_buffer,
-            &tile_transform_buffer
+            &tile_transform_buffer,
         );
 
         let font: &[u8] = include_bytes!("../../../config/Ruda-Bold.ttf");
-        let glyph_brush = GlyphBrushBuilder::using_font_bytes(font)
-            .build(&mut device, TextureFormat::Bgra8Unorm);
+        let glyph_brush =
+            GlyphBrushBuilder::using_font_bytes(font).build(&mut device, TextureFormat::Bgra8Unorm);
 
         let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
@@ -327,7 +303,11 @@ impl Painter {
     }
 
     /// Creates a new bind group containing all the relevant uniform buffers.
-    fn create_uniform_buffers(device: &Device, screen: &Screen, feature_collection: &FeatureCollection) -> Vec<(Buffer, usize)> {
+    fn create_uniform_buffers(
+        device: &Device,
+        screen: &Screen,
+        feature_collection: &FeatureCollection,
+    ) -> Vec<(Buffer, usize)> {
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device
             .create_buffer_mapped(
@@ -347,7 +327,7 @@ impl Painter {
 
         vec![
             (canvas_size_buffer, canvas_size_len),
-            (layer_data_buffer, layer_data_len)
+            (layer_data_buffer, layer_data_len),
         ]
     }
 
@@ -362,13 +342,13 @@ impl Painter {
     }
 
     /// Creates a new transform buffer from the tile transforms.
-    /// 
+    ///
     /// Ensures that the buffer has the size configured in the config, to match the size configured in the shader.
     fn create_tile_transform_buffer<'a>(
         device: &Device,
         screen: &Screen,
         z: f32,
-        visible_tiles: impl Iterator<Item=&'a VisibleTile>
+        visible_tiles: impl Iterator<Item = &'a VisibleTile>,
     ) -> (Buffer, u64) {
         const TILE_DATA_SIZE: usize = 20;
         let tile_data_buffer_byte_size = TILE_DATA_SIZE * 4 * CONFIG.renderer.max_tiles;
@@ -389,39 +369,36 @@ impl Painter {
         }
         (
             device
-            .create_buffer_mapped::<f32>(
-                tile_data_buffer_byte_size,
-                BufferUsage::UNIFORM | BufferUsage::COPY_DST,
-            )
-            .fill_from_slice(data.as_slice()),
-            tile_data_buffer_byte_size as u64
+                .create_buffer_mapped::<f32>(
+                    tile_data_buffer_byte_size,
+                    BufferUsage::UNIFORM | BufferUsage::COPY_DST,
+                )
+                .fill_from_slice(data.as_slice()),
+            tile_data_buffer_byte_size as u64,
         )
     }
 
-    fn copy_uniform_buffers(encoder: &mut CommandEncoder, source: &Vec<(Buffer, usize)>, destination: &Buffer) {
+    fn copy_uniform_buffers(
+        encoder: &mut CommandEncoder,
+        source: &Vec<(Buffer, usize)>,
+        destination: &Buffer,
+    ) {
         let mut total_bytes = 0;
         for (buffer, len) in source {
-            encoder.copy_buffer_to_buffer(
-                &buffer,
-                0,
-                &destination,
-                total_bytes,
-                *len as u64
-            );
+            encoder.copy_buffer_to_buffer(&buffer, 0, &destination, total_bytes, *len as u64);
             total_bytes += *len as u64;
         }
     }
 
     fn uniform_buffer_size() -> u64 {
-        4 * 4
-      + 12 * 4 * CONFIG.renderer.max_features
+        4 * 4 + 12 * 4 * CONFIG.renderer.max_features
     }
 
     pub fn create_blend_bind_group(
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         uniform_buffer: &Buffer,
-        tile_transform_buffer: &(Buffer, u64)
+        tile_transform_buffer: &(Buffer, u64),
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             layout: bind_group_layout,
@@ -430,14 +407,14 @@ impl Painter {
                     binding: 0,
                     resource: BindingResource::Buffer {
                         buffer: uniform_buffer,
-                        range: 0 .. Self::uniform_buffer_size(),
+                        range: 0..Self::uniform_buffer_size(),
                     },
                 },
                 Binding {
                     binding: 1,
                     resource: BindingResource::Buffer {
                         buffer: &tile_transform_buffer.0,
-                        range: 0 .. tile_transform_buffer.1,
+                        range: 0..tile_transform_buffer.1,
                     },
                 },
             ],
@@ -445,10 +422,20 @@ impl Painter {
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.
-    fn load_shader(device: &Device, vertex_shader: &str, fragment_shader: &str) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
-        let vs_bytes = load_glsl(&std::fs::read_to_string(vertex_shader)?, ShaderStage::Vertex);
+    fn load_shader(
+        device: &Device,
+        vertex_shader: &str,
+        fragment_shader: &str,
+    ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
+        let vs_bytes = load_glsl(
+            &std::fs::read_to_string(vertex_shader)?,
+            ShaderStage::Vertex,
+        );
         let vs_module = device.create_shader_module(vs_bytes.as_slice());
-        let fs_bytes = load_glsl(&std::fs::read_to_string(fragment_shader)?, ShaderStage::Fragment);
+        let fs_bytes = load_glsl(
+            &std::fs::read_to_string(fragment_shader)?,
+            ShaderStage::Fragment,
+        );
         let fs_module = device.create_shader_module(fs_bytes.as_slice());
         Ok((vs_module, fs_module))
     }
@@ -464,7 +451,7 @@ impl Painter {
                 if let Ok((vs_module, fs_module)) = Self::load_shader(
                     &self.device,
                     &CONFIG.renderer.vertex_shader,
-                    &CONFIG.renderer.fragment_shader
+                    &CONFIG.renderer.fragment_shader,
                 ) {
                     self.blend_pipeline = Self::create_layer_render_pipeline(
                         &self.device,
@@ -481,7 +468,7 @@ impl Painter {
                             dst_factor: BlendFactor::OneMinusSrcAlpha,
                             operation: BlendOperation::Add,
                         },
-                        false
+                        false,
                     );
 
                     self.noblend_pipeline = Self::create_layer_render_pipeline(
@@ -491,25 +478,31 @@ impl Painter {
                         &fs_module,
                         BlendDescriptor::REPLACE,
                         BlendDescriptor::REPLACE,
-                        true
+                        true,
                     );
                     true
                 } else {
                     false
                 }
-            },
+            }
             // Everything is alright but file wasn't actually changed.
-            Ok(Ok(_)) => { false },
+            Ok(Ok(_)) => false,
             // This happens all the time when there is no new message.
             Err(TryRecvError::Empty) => false,
             Ok(Err(err)) => {
-                log::info!("Something went wrong with the shader file watcher:\r\n{:?}", err);
+                log::info!(
+                    "Something went wrong with the shader file watcher:\r\n{:?}",
+                    err
+                );
                 false
-            },
+            }
             Err(err) => {
-                log::info!("Something went wrong with the shader file watcher:\r\n{:?}", err);
+                log::info!(
+                    "Something went wrong with the shader file watcher:\r\n{:?}",
+                    err
+                );
                 false
-            },
+            }
         }
     }
 
@@ -520,11 +513,13 @@ impl Painter {
     pub fn resize(&mut self, width: u32, height: u32) {
         self.swap_chain_descriptor.width = width;
         self.swap_chain_descriptor.height = height;
-        self.swap_chain = self.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
+        self.swap_chain = self
+            .device
+            .create_swap_chain(&self.surface, &self.swap_chain_descriptor);
         self.multisampled_framebuffer = Self::create_multisampled_framebuffer(
             &self.device,
             &self.swap_chain_descriptor,
-            CONFIG.renderer.msaa_samples
+            CONFIG.renderer.msaa_samples,
         );
         self.stencil = Self::create_stencil(&self.device, &self.swap_chain_descriptor);
     }
@@ -533,30 +528,26 @@ impl Painter {
         &mut self,
         encoder: &mut CommandEncoder,
         app_state: &AppState,
-        feature_collection: &FeatureCollection
+        feature_collection: &FeatureCollection,
     ) {
         Self::copy_uniform_buffers(
             encoder,
-            &Self::create_uniform_buffers(
-                &self.device,
-                &app_state.screen,
-                feature_collection
-            ),
-            &self.uniform_buffer
+            &Self::create_uniform_buffers(&self.device, &app_state.screen, feature_collection),
+            &self.uniform_buffer,
         );
 
         self.tile_transform_buffer = Self::create_tile_transform_buffer(
             &self.device,
             &app_state.screen,
             app_state.zoom,
-            app_state.visible_tiles().values()
+            app_state.visible_tiles().values(),
         );
     }
 
     fn create_multisampled_framebuffer(
         device: &Device,
         swap_chain_descriptor: &SwapChainDescriptor,
-        sample_count: u32
+        sample_count: u32,
     ) -> TextureView {
         let multisampled_texture_extent = Extent3d {
             width: swap_chain_descriptor.width,
@@ -573,7 +564,9 @@ impl Painter {
             usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
         };
 
-        device.create_texture(multisampled_frame_descriptor).create_default_view()
+        device
+            .create_texture(multisampled_frame_descriptor)
+            .create_default_view()
     }
 
     fn create_stencil(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> TextureView {
@@ -592,11 +585,15 @@ impl Painter {
             usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
         };
 
-        device.create_texture(frame_descriptor).create_default_view()
+        device
+            .create_texture(frame_descriptor)
+            .create_default_view()
     }
 
     pub fn paint(&mut self, hud: &mut super::ui::HUD, app_state: &mut AppState) {
-        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor { todo: 0 });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor { todo: 0 });
 
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
         self.update_uniforms(&mut encoder, &app_state, &feature_collection);
@@ -604,7 +601,7 @@ impl Painter {
             &self.device,
             &self.bind_group_layout,
             &self.uniform_buffer,
-            &self.tile_transform_buffer
+            &self.tile_transform_buffer,
         );
         let num_tiles = app_state.visible_tiles().len();
         let features = feature_collection.get_features();
@@ -613,13 +610,21 @@ impl Painter {
             {
                 let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                     color_attachments: &[RenderPassColorAttachmentDescriptor {
-                        attachment: if CONFIG.renderer.msaa_samples > 1 { &self.multisampled_framebuffer } else { &frame.view },
-                        resolve_target: if CONFIG.renderer.msaa_samples > 1 { Some(&frame.view) } else { None },
+                        attachment: if CONFIG.renderer.msaa_samples > 1 {
+                            &self.multisampled_framebuffer
+                        } else {
+                            &frame.view
+                        },
+                        resolve_target: if CONFIG.renderer.msaa_samples > 1 {
+                            Some(&frame.view)
+                        } else {
+                            None
+                        },
                         load_op: LoadOp::Clear,
                         store_op: StoreOp::Store,
                         clear_color: wgpu::Color::TRANSPARENT,
                     }],
-                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor{
+                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
                         attachment: &self.stencil,
                         depth_load_op: LoadOp::Clear,
                         depth_store_op: StoreOp::Store,
@@ -633,55 +638,77 @@ impl Painter {
                 let vec = vec4(0.0, 0.0, 0.0, 1.0);
                 let screen_dimensions = vec2(
                     app_state.screen.width as f32,
-                    app_state.screen.height as f32
+                    app_state.screen.height as f32,
                 ) / 2.0;
                 for (i, vt) in app_state.visible_tiles().values().enumerate() {
                     if !vt.is_loaded_to_gpu() {
                         vt.load_to_gpu(&self.device);
                     }
                     let tile_id = vt.tile_id();
-                    let matrix = app_state.screen.tile_to_global_space(
-                        app_state.zoom,
-                        &tile_id
-                    );
+                    let matrix = app_state
+                        .screen
+                        .tile_to_global_space(app_state.zoom, &tile_id);
                     let start = (matrix * &vec).xy() + &vec2(1.0, 1.0);
-                    let s = vec2({
-                        let x = (start.x * screen_dimensions.x).round();
-                        if x < 0.0 { 0.0 } else { x }
-                    }, {
-                        let y = (start.y * screen_dimensions.y).round();
-                        if y < 0.0 { 0.0 } else { y }
-                    });
+                    let s = vec2(
+                        {
+                            let x = (start.x * screen_dimensions.x).round();
+                            if x < 0.0 {
+                                0.0
+                            } else {
+                                x
+                            }
+                        },
+                        {
+                            let y = (start.y * screen_dimensions.y).round();
+                            if y < 0.0 {
+                                0.0
+                            } else {
+                                y
+                            }
+                        },
+                    );
                     let matrix = app_state.screen.tile_to_global_space(
                         app_state.zoom,
-                        &(tile_id + TileId::new(tile_id.z, 1, 1))
+                        &(tile_id + TileId::new(tile_id.z, 1, 1)),
                     );
                     let end = (matrix * &vec).xy() + &vec2(1.0, 1.0);
-                    let e = vec2({
-                        let x = (end.x * screen_dimensions.x).round();
-                        if x < 0.0 { 0.0 } else { x }
-                    }, {
-                        let y = (end.y * screen_dimensions.y).round();
-                        if y < 0.0 { 0.0 } else { y }
-                    });
+                    let e = vec2(
+                        {
+                            let x = (end.x * screen_dimensions.x).round();
+                            if x < 0.0 {
+                                0.0
+                            } else {
+                                x
+                            }
+                        },
+                        {
+                            let y = (end.y * screen_dimensions.y).round();
+                            if y < 0.0 {
+                                0.0
+                            } else {
+                                y
+                            }
+                        },
+                    );
 
                     render_pass.set_scissor_rect(
                         s.x as u32,
                         s.y as u32,
                         (e.x - s.x) as u32,
-                        (e.y - s.y) as u32
+                        (e.y - s.y) as u32,
                     );
 
-                    vt.paint(&mut render_pass, &self.blend_pipeline, &feature_collection, i as u32);
+                    vt.paint(
+                        &mut render_pass,
+                        &self.blend_pipeline,
+                        &feature_collection,
+                        i as u32,
+                    );
                 }
             }
 
             for (_i, vt) in app_state.visible_tiles().values().enumerate() {
-                vt.queue_text(
-                    &mut self.glyph_brush,
-                    &app_state.screen,
-                    app_state.zoom
-                );
+                vt.queue_text(&mut self.glyph_brush, &app_state.screen, app_state.zoom);
             }
 
             let _ = self.glyph_brush.draw_queued(

@@ -1,30 +1,24 @@
-mod drawing;
 mod app_state;
-mod stats;
 mod config;
+mod drawing;
+mod stats;
 
 extern crate lyon;
 extern crate nalgebra_glm as glm;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate serde_derive;
 
-
+use lyon::math::vector;
 use osm::*;
-use lyon::math::{
-    vector,
-};
 
 use winit::{
     event::{
-        Event,
+        ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
         WindowEvent,
-        ElementState,
-        MouseButton,
-        MouseScrollDelta,
-        KeyboardInput,
-        VirtualKeyCode,
     },
-    event_loop::ControlFlow
+    event_loop::ControlFlow,
 };
 
 use crate::config::CONFIG;
@@ -41,9 +35,20 @@ fn main() {
     let height = 1000;
 
     let event_loop = winit::event_loop::EventLoop::new();
-    let hdpi_factor = event_loop.available_monitors().next().expect("No monitors found").hidpi_factor();
+    let hdpi_factor = event_loop
+        .available_monitors()
+        .next()
+        .expect("No monitors found")
+        .scale_factor();
 
-    let mut app_state = app_state::AppState::new("config/style.css", zurich.clone(), width, height, z, hdpi_factor);
+    let mut app_state = app_state::AppState::new(
+        "config/style.css",
+        zurich.clone(),
+        width,
+        height,
+        z,
+        hdpi_factor,
+    );
 
     let mut painter = drawing::Painter::init(&event_loop, width, height, &app_state);
     let mut hud = drawing::ui::HUD::new(&painter.window, &mut painter.device, &mut painter.queue);
@@ -58,90 +63,112 @@ fn main() {
             ControlFlow::Poll
         };
         let (route_mouse, route_keyboard) = hud.interact(&painter.window, &event);
-        match event.clone() {
+        match event {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Destroyed => {
                     *control_flow = ControlFlow::Exit;
-                },
-                WindowEvent::Resized(size) => {
-                    let physical = size.to_physical(painter.get_hidpi_factor());
-                    app_state.screen.width = physical.width.round() as u32;
-                    app_state.screen.height = physical.height.round() as u32;
-                    painter.resize(physical.width.round() as u32, physical.height.round() as u32);
-                },
+                }
+                WindowEvent::Resized(physical_size) => {
+                    app_state.screen.width = physical_size.width;
+                    app_state.screen.height = physical_size.height;
+                    painter.resize(physical_size.width, physical_size.height);
+                }
                 WindowEvent::KeyboardInput {
-                    input: KeyboardInput { virtual_keycode: Some(keycode), .. },
+                    input:
+                        KeyboardInput {
+                            virtual_keycode: Some(keycode),
+                            ..
+                        },
                     ..
                 } => {
                     if route_keyboard {
                         match keycode {
                             VirtualKeyCode::Escape => {
                                 *control_flow = ControlFlow::Exit;
-                            },
+                            }
                             VirtualKeyCode::Tab => app_state.advance_selected_object(),
                             _ => {}
                         }
                     }
-                },
+                }
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit;
-                },
+                }
                 WindowEvent::MouseInput { state, button, .. } => {
                     if route_mouse {
                         match button {
-                            MouseButton::Left => {
-                                match state {
-                                    ElementState::Pressed => {
-                                        mouse_down = true;
-                                    },
-                                    ElementState::Released => {
-                                        mouse_down = false;
-                                        app_state.update_selected_hover_objects();
-                                    }
+                            MouseButton::Left => match state {
+                                ElementState::Pressed => {
+                                    mouse_down = true;
+                                }
+                                ElementState::Released => {
+                                    mouse_down = false;
+                                    app_state.update_selected_hover_objects();
                                 }
                             },
-                            _ => {},
+                            _ => {}
                         }
                     }
-                },
+                }
                 WindowEvent::MouseWheel { delta, .. } => {
                     if route_mouse {
                         match delta {
                             MouseScrollDelta::LineDelta(_x, y) => app_state.zoom += 0.1 * y,
-                            _ => ()
+                            _ => (),
                         }
                     }
-                },
+                }
                 WindowEvent::CursorMoved { position, .. } => {
+                    let logical_position = position.to_logical(painter.get_hidpi_factor());
                     let size = app_state.screen.get_tile_size() as f32;
-                    let mut delta = vector((position.x - last_pos.x) as f32, (position.y - last_pos.y) as f32);
-                    let zoom_x = (app_state.screen.width as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
-                    let zoom_y = (app_state.screen.height as f32) / size / 2f32.powf(app_state.zoom) / size / 2.0 / 1.3;
+                    let mut delta = vector(
+                        (logical_position.x - last_pos.x) as f32,
+                        (logical_position.y - last_pos.y) as f32,
+                    );
+                    let zoom_x = (app_state.screen.width as f32)
+                        / size
+                        / 2f32.powf(app_state.zoom)
+                        / size
+                        / 2.0
+                        / 1.3;
+                    let zoom_y = (app_state.screen.height as f32)
+                        / size
+                        / 2f32.powf(app_state.zoom)
+                        / size
+                        / 2.0
+                        / 1.3;
                     delta.x *= zoom_x;
                     delta.y *= zoom_y;
 
-                    last_pos = position;
+                    last_pos = logical_position;
 
                     if route_mouse {
                         if mouse_down {
                             app_state.screen.center -= delta;
                         }
 
-                        app_state.update_hovered_objects((position.x as f32, position.y as f32))
+                        app_state.update_hovered_objects((
+                            logical_position.x as f32,
+                            logical_position.y as f32,
+                        ))
                     }
-                },
+                }
                 _ => (),
             },
-            Event::EventsCleared => {
+            Event::MainEventsCleared => {
                 painter.update_shader();
                 app_state.load_tiles();
                 painter.paint(&mut hud, &mut app_state);
 
                 app_state.stats.capture_frame();
                 if CONFIG.general.display_framerate {
-                    println!("Frametime {:.2} at zoom {:.2}", app_state.stats.get_average(), app_state.zoom);
+                    println!(
+                        "Frametime {:.2} at zoom {:.2}",
+                        app_state.stats.get_average(),
+                        app_state.zoom
+                    );
                 }
-            },
+            }
             _ => (),
         }
     });
