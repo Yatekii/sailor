@@ -1,32 +1,11 @@
-use crossbeam_channel::{
-    unbounded,
-    TryRecvError,
-};
-use notify::{
-    RecursiveMode,
-    RecommendedWatcher,
-    Watcher,
-    EventKind,
-    event::{
-        ModifyKind,
-    },
-};
-use wgpu::{
-    ShaderModule,
-    Device,
-    BindGroupLayout,
-    BindGroup,
-    RenderPipeline,
-    Texture,
-    Sampler,
-};
+use crossbeam_channel::{unbounded, TryRecvError};
+use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use wgpu::{BindGroup, BindGroupLayout, Device, RenderPipeline, Sampler, ShaderModule, Texture};
 
-use crate::drawing::helpers::{
-    ShaderStage,
-    load_glsl,
-};
+use crate::drawing::helpers::{load_glsl, ShaderStage};
 
 use crate::config::CONFIG;
+use osm::as_byte_slice;
 
 pub struct Temperature {
     pipeline: RenderPipeline,
@@ -39,64 +18,75 @@ pub struct Temperature {
 
 impl Temperature {
     pub fn init(device: &mut wgpu::Device, queue: &mut wgpu::Queue) -> Self {
-
-        let init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        let init_encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         let (tx, rx) = unbounded();
-        
-        let mut watcher: RecommendedWatcher = match Watcher::new(tx, std::time::Duration::from_secs(2)) {
-            Ok(watcher) => watcher,
-            Err(err) => {
-                log::info!("Failed to create a watcher for the vertex shader:");
-                log::info!("{}", err);
-                panic!("Unable to load a vertex shader.");
-            },
-        };
+
+        let mut watcher: RecommendedWatcher =
+            match Watcher::new(tx, std::time::Duration::from_secs(2)) {
+                Ok(watcher) => watcher,
+                Err(err) => {
+                    log::info!("Failed to create a watcher for the vertex shader:");
+                    log::info!("{}", err);
+                    panic!("Unable to load a vertex shader.");
+                }
+            };
 
         match watcher.watch(&CONFIG.renderer.vertex_shader, RecursiveMode::Recursive) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(err) => {
-                log::info!("Failed to start watching {}:", &CONFIG.renderer.vertex_shader);
+                log::info!(
+                    "Failed to start watching {}:",
+                    &CONFIG.renderer.vertex_shader
+                );
                 log::info!("{}", err);
-            },
+            }
         };
 
         match watcher.watch(&CONFIG.renderer.fragment_shader, RecursiveMode::Recursive) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(err) => {
-                log::info!("Failed to start watching {}:", &CONFIG.renderer.fragment_shader);
+                log::info!(
+                    "Failed to start watching {}:",
+                    &CONFIG.renderer.fragment_shader
+                );
                 log::info!("{}", err);
-            },
+            }
         };
 
         let (layer_vs_module, layer_fs_module) = Self::load_shader(
-            &device, &CONFIG.renderer.temperature.vertex_shader,
-            &CONFIG.renderer.temperature.fragment_shader
-        ).expect("Fatal Error. Unable to load shaders.");
-        
+            &device,
+            &CONFIG.renderer.temperature.vertex_shader,
+            &CONFIG.renderer.temperature.fragment_shader,
+        )
+        .expect("Fatal Error. Unable to load shaders.");
+
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
             bindings: &[
-                wgpu::BindGroupLayoutBinding {
+                wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::SampledTexture {
                         multisampled: false,
                         dimension: wgpu::TextureViewDimension::D2,
+                        component_type: wgpu::TextureComponentType::Float,
                     },
                 },
-                wgpu::BindGroupLayoutBinding {
+                wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler,
+                    ty: wgpu::BindingType::Sampler { comparison: false },
                 },
-            ]
+            ],
         });
 
         let pipeline = Self::create_render_pipeline(
             &device,
             &bind_group_layout,
             &layer_vs_module,
-            &layer_fs_module
+            &layer_fs_module,
         );
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -108,30 +98,30 @@ impl Temperature {
             mipmap_filter: wgpu::FilterMode::Linear,
             lod_min_clamp: -100.0,
             lod_max_clamp: 100.0,
-            compare_function: wgpu::CompareFunction::Always,
+            compare: wgpu::CompareFunction::Always,
         });
 
         let width = 64 * 8;
         let height = 64 * 8;
 
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: wgpu::Extent3d { width, height, depth: 1 },
+            label: None,
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth: 1,
+            },
             array_layer_count: 1,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R32Float,
             usage: wgpu::TextureUsage::SAMPLED
-                 | wgpu::TextureUsage::OUTPUT_ATTACHMENT
-                 | wgpu::TextureUsage::COPY_DST,
+                | wgpu::TextureUsage::OUTPUT_ATTACHMENT
+                | wgpu::TextureUsage::COPY_DST,
         });
 
-        let bind_group = Self::create_bind_group(
-            &device,
-            &bind_group_layout,
-            &texture,
-            &sampler,
-        );
+        let bind_group = Self::create_bind_group(&device, &bind_group_layout, &texture, &sampler);
 
         let init_command_buf = init_encoder.finish();
         queue.submit(&[init_command_buf]);
@@ -150,7 +140,7 @@ impl Temperature {
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         vs_module: &ShaderModule,
-        fs_module: &ShaderModule
+        fs_module: &ShaderModule,
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
@@ -189,8 +179,10 @@ impl Temperature {
                 write_mask: wgpu::ColorWrite::ALL,
             }],
             depth_stencil_state: None,
-            index_format: wgpu::IndexFormat::Uint32,
-            vertex_buffers: &[],
+            vertex_state: wgpu::VertexStateDescriptor {
+                index_format: wgpu::IndexFormat::Uint32,
+                vertex_buffers: &[],
+            },
             sample_count: CONFIG.renderer.msaa_samples,
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
@@ -204,6 +196,7 @@ impl Temperature {
         sampler: &Sampler,
     ) -> BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
             layout: bind_group_layout,
             bindings: &[
                 wgpu::Binding {
@@ -223,7 +216,7 @@ impl Temperature {
         device: &mut wgpu::Device,
         queue: &mut wgpu::Queue,
         width: u32,
-        height: u32
+        height: u32,
     ) {
         // Generate data.
         let mut data = Vec::with_capacity((width * height) as usize);
@@ -234,33 +227,29 @@ impl Temperature {
         }
 
         // Place in wgpu buffer
-        let buffer = device.create_buffer_mapped(
-            (width * height) as usize,
-            wgpu::BufferUsage::COPY_SRC,
-        )
-        .fill_from_slice(data.as_slice());
+        let buffer = device.create_buffer_mapped(&wgpu::BufferDescriptor {
+            label: None,
+            size: (width * height) as u64 * 4,
+            usage: wgpu::BufferUsage::COPY_SRC,
+        });
+        buffer.data.copy_from_slice(as_byte_slice(data.as_slice()));
 
         // Upload immediately
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            todo: 0,
-        });
+        let mut encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         encoder.copy_buffer_to_texture(
             wgpu::BufferCopyView {
-                buffer: &buffer,
+                buffer: &buffer.finish(),
                 offset: 0,
-                row_pitch: width * 4,
-                image_height: height,
+                bytes_per_row: width * 4,
+                rows_per_image: height,
             },
             wgpu::TextureCopyView {
                 texture: &self.texture,
                 mip_level: 0,
                 array_layer: 0,
-                origin: wgpu::Origin3d {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                },
+                origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
             },
             wgpu::Extent3d {
                 width,
@@ -273,10 +262,20 @@ impl Temperature {
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.
-    fn load_shader(device: &Device, vertex_shader: &str, fragment_shader: &str) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
-        let vs_bytes = load_glsl(&std::fs::read_to_string(vertex_shader)?, ShaderStage::Vertex);
+    fn load_shader(
+        device: &Device,
+        vertex_shader: &str,
+        fragment_shader: &str,
+    ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
+        let vs_bytes = load_glsl(
+            &std::fs::read_to_string(vertex_shader)?,
+            ShaderStage::Vertex,
+        );
         let vs_module = device.create_shader_module(vs_bytes.as_slice());
-        let fs_bytes = load_glsl(&std::fs::read_to_string(fragment_shader)?, ShaderStage::Fragment);
+        let fs_bytes = load_glsl(
+            &std::fs::read_to_string(fragment_shader)?,
+            ShaderStage::Fragment,
+        );
         let fs_module = device.create_shader_module(fs_bytes.as_slice());
         Ok((vs_module, fs_module))
     }
@@ -291,31 +290,37 @@ impl Temperature {
                 if let Ok((vs_module, fs_module)) = Self::load_shader(
                     device,
                     &CONFIG.renderer.temperature.vertex_shader,
-                    &CONFIG.renderer.temperature.fragment_shader
+                    &CONFIG.renderer.temperature.fragment_shader,
                 ) {
                     self.pipeline = Self::create_render_pipeline(
                         device,
                         &self.bind_group_layout,
                         &vs_module,
-                        &fs_module
+                        &fs_module,
                     );
                     true
                 } else {
                     false
                 }
-            },
+            }
             // Everything is alright but file wasn't actually changed.
-            Ok(Ok(_)) => { false },
+            Ok(Ok(_)) => false,
             // This happens all the time when there is no new message.
             Err(TryRecvError::Empty) => false,
             Ok(Err(err)) => {
-                log::info!("Something went wrong with the shader file watcher:\r\n{:?}", err);
+                log::info!(
+                    "Something went wrong with the shader file watcher:\r\n{:?}",
+                    err
+                );
                 false
-            },
+            }
             Err(err) => {
-                log::info!("Something went wrong with the shader file watcher:\r\n{:?}", err);
+                log::info!(
+                    "Something went wrong with the shader file watcher:\r\n{:?}",
+                    err
+                );
                 false
-            },
+            }
         }
     }
 
@@ -337,6 +342,6 @@ impl Temperature {
         });
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self._bind_group, &[]);
-        rpass.draw(0 .. 6, 0 .. 1);
+        rpass.draw(0..6, 0..1);
     }
 }

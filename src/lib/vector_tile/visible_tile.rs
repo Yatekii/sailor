@@ -1,13 +1,7 @@
-use std::sync::{
-    Arc,
-    RwLock,
-};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use wgpu::*;
-use wgpu_glyph::{
-    Section,
-    GlyphBrush,
-};
+use wgpu_glyph::{GlyphBrush, Section};
 
 use crate::*;
 
@@ -37,7 +31,7 @@ impl VisibleTile {
     pub fn objects(&self) -> Arc<RwLock<Vec<Object>>> {
         self.tile.read().unwrap().objects()
     }
-    
+
     pub fn load_to_gpu(&self, device: &Device) {
         let read_tile = self.tile.read().unwrap();
         let mut write_gpu_tile = self.gpu_tile.write().unwrap();
@@ -61,16 +55,21 @@ impl VisibleTile {
         self.tile_collider.clone()
     }
 
-    pub fn paint(
-        &self,
-        render_pass: &mut RenderPass,
-        blend_pipeline: &RenderPipeline,
-        feature_collection: &FeatureCollection,
-        tile_id: u32
+    pub fn gpu_tile<'a>(&'a self) -> RwLockReadGuard<'a, Option<LoadedGPUTile>> {
+        self.gpu_tile.try_read().unwrap()
+    }
+
+    pub fn paint<'a>(
+        &'a self,
+        render_pass: &mut RenderPass<'a>,
+        blend_pipeline: &'a RenderPipeline,
+        data: Option<&'a LoadedGPUTile>,
+        feature_collection: &'a FeatureCollection,
+        tile_id: u32,
     ) {
-        if let Some(data) = self.gpu_tile.try_read().unwrap().as_ref() {
-            render_pass.set_index_buffer(&data.index_buffer, 0);
-            render_pass.set_vertex_buffers(0, &[(&data.vertex_buffer, 0)]);
+        if let Some(data) = data {
+            render_pass.set_index_buffer(&data.index_buffer, 0, 0);
+            render_pass.set_vertex_buffer(0, &data.vertex_buffer, 0, 0);
 
             let features = {
                 let read_tile = self.tile.read().unwrap();
@@ -78,7 +77,8 @@ impl VisibleTile {
                 features.sort_by(|a, b| {
                     feature_collection
                         .get_zindex(a.0)
-                        .partial_cmp(&feature_collection.get_zindex(b.0)).unwrap()
+                        .partial_cmp(&feature_collection.get_zindex(b.0))
+                        .unwrap()
                 });
                 features
             };
@@ -91,23 +91,22 @@ impl VisibleTile {
                     i += 1;
 
                     let range_start = (tile_id << 1) | 1;
-                    render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
+                    render_pass.draw_indexed(range.clone(), 0, 0 + range_start..1 + range_start);
 
                     if feature_collection.has_outline(*id) {
                         let range_start = tile_id << 1;
-                        render_pass.draw_indexed(range.clone(), 0, 0 + range_start .. 1 + range_start);
+                        render_pass.draw_indexed(
+                            range.clone(),
+                            0,
+                            0 + range_start..1 + range_start,
+                        );
                     }
                 }
             }
         }
     }
 
-    pub fn queue_text(
-        &self,
-        glyph_brush: &mut GlyphBrush<'static, ()>,
-        screen: &Screen,
-        z: f32
-    ) {
+    pub fn queue_text(&self, glyph_brush: &mut GlyphBrush<'static, ()>, screen: &Screen, z: f32) {
         let read_tile = self.tile.read().unwrap();
         let matrix = screen.tile_to_global_space(z, &read_tile.tile_id());
         for text in read_tile.text() {
@@ -117,7 +116,7 @@ impl VisibleTile {
                 text: &text.1,
                 screen_position: (
                     (position.x + 1.0) * screen.width as f32 / 2.0,
-                    (position.y + 1.0) * screen.height as f32 / 2.0
+                    (position.y + 1.0) * screen.height as f32 / 2.0,
                 ),
                 ..Section::default() // color, position, etc
             };

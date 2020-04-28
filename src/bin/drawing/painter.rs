@@ -1,4 +1,5 @@
 use crossbeam_channel::{unbounded, TryRecvError};
+use futures::executor::block_on;
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use osm::*;
@@ -50,20 +51,23 @@ impl Painter {
             (window, size, surface, factor)
         };
 
-        let adapter = wgpu::Adapter::request(&RequestAdapterOptions {
-            power_preference: PowerPreference::LowPower,
-            backends: wgpu::BackendBit::PRIMARY,
-        })
+        let adapter = block_on(wgpu::Adapter::request(
+            &RequestAdapterOptions {
+                power_preference: PowerPreference::LowPower,
+                compatible_surface: Some(&surface),
+            },
+            wgpu::BackendBit::PRIMARY,
+        ))
         .unwrap();
 
-        let (mut device, mut queue) = adapter.request_device(&DeviceDescriptor {
+        let (mut device, mut queue) = block_on(adapter.request_device(&DeviceDescriptor {
             extensions: Extensions {
                 anisotropic_filtering: false,
             },
             limits: Limits::default(),
-        });
+        }));
 
-        let init_encoder = device.create_command_encoder(&CommandEncoderDescriptor { todo: 0 });
+        let init_encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         let (tx, rx) = unbounded();
 
@@ -107,13 +111,14 @@ impl Painter {
         .expect("Fatal Error. Unable to load shaders.");
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: None,
             bindings: &[
-                BindGroupLayoutBinding {
+                BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
                     ty: BindingType::UniformBuffer { dynamic: false },
                 },
-                BindGroupLayoutBinding {
+                BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStage::VERTEX,
                     ty: BindingType::UniformBuffer { dynamic: false },
@@ -126,7 +131,7 @@ impl Painter {
             format: TextureFormat::Bgra8Unorm,
             width: size.width,
             height: size.height,
-            present_mode: PresentMode::NoVsync,
+            present_mode: PresentMode::Immediate,
         };
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(
@@ -182,8 +187,9 @@ impl Painter {
         );
 
         let font: &[u8] = include_bytes!("../../../config/Ruda-Bold.ttf");
-        let glyph_brush =
-            GlyphBrushBuilder::using_font_bytes(font).build(&mut device, TextureFormat::Bgra8Unorm);
+        let glyph_brush = GlyphBrushBuilder::using_font_bytes(font)
+            .unwrap()
+            .build(&mut device, TextureFormat::Bgra8Unorm);
 
         let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
@@ -274,28 +280,30 @@ impl Painter {
                 stencil_read_mask: std::u32::MAX,
                 stencil_write_mask: std::u32::MAX,
             }),
-            index_format: IndexFormat::Uint32,
-            vertex_buffers: &[VertexBufferDescriptor {
-                stride: std::mem::size_of::<Vertex>() as BufferAddress,
-                step_mode: InputStepMode::Vertex,
-                attributes: &[
-                    VertexAttributeDescriptor {
-                        format: VertexFormat::Short2,
-                        offset: 0,
-                        shader_location: 0,
-                    },
-                    VertexAttributeDescriptor {
-                        format: VertexFormat::Short2,
-                        offset: 4,
-                        shader_location: 1,
-                    },
-                    VertexAttributeDescriptor {
-                        format: VertexFormat::Uint,
-                        offset: 8,
-                        shader_location: 2,
-                    },
-                ],
-            }],
+            vertex_state: VertexStateDescriptor {
+                index_format: IndexFormat::Uint32,
+                vertex_buffers: &[VertexBufferDescriptor {
+                    stride: std::mem::size_of::<Vertex>() as BufferAddress,
+                    step_mode: InputStepMode::Vertex,
+                    attributes: &[
+                        VertexAttributeDescriptor {
+                            format: VertexFormat::Short2,
+                            offset: 0,
+                            shader_location: 0,
+                        },
+                        VertexAttributeDescriptor {
+                            format: VertexFormat::Short2,
+                            offset: 4,
+                            shader_location: 1,
+                        },
+                        VertexAttributeDescriptor {
+                            format: VertexFormat::Uint,
+                            offset: 8,
+                            shader_location: 2,
+                        },
+                    ],
+                }],
+            },
             sample_count: CONFIG.renderer.msaa_samples,
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
@@ -308,37 +316,49 @@ impl Painter {
         screen: &Screen,
         feature_collection: &FeatureCollection,
     ) -> Vec<(Buffer, usize)> {
-        let canvas_size_len = 4 * 4;
-        let canvas_size_buffer = device
-            .create_buffer_mapped(
-                canvas_size_len / 4,
-                BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
-            )
-            .fill_from_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]);
+        let canvas_size_len = 4 * 4 as usize;
+        let canvas_size_buffer = device.create_buffer_mapped(&BufferDescriptor {
+            label: None,
+            size: canvas_size_len as u64,
+            usage: BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
+        });
+        canvas_size_buffer.data.copy_from_slice(as_byte_slice(&[
+            screen.width as f32,
+            screen.height as f32,
+            0.0,
+            0.0,
+        ]));
 
         let buffer = feature_collection.assemble_style_buffer();
-        let layer_data_len = buffer.len() * 12 * 4;
-        let layer_data_buffer = device
-            .create_buffer_mapped(
-                layer_data_len / 12 / 4,
-                BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
-            )
-            .fill_from_slice(&buffer.as_slice());
+        let len = buffer.len();
+        let layer_data_len = len.max(1) * 12 * 4;
+        let layer_data_buffer = device.create_buffer_mapped(&BufferDescriptor {
+            label: None,
+            size: layer_data_len as u64,
+            usage: BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
+        });
+
+        layer_data_buffer.data.copy_from_slice(if len == 0 {
+            &[0; 48]
+        } else {
+            as_byte_slice(&buffer.as_slice())
+        });
 
         vec![
-            (canvas_size_buffer, canvas_size_len),
-            (layer_data_buffer, layer_data_len),
+            (canvas_size_buffer.finish(), canvas_size_len),
+            (layer_data_buffer.finish(), layer_data_len),
         ]
     }
 
     fn create_uniform_buffer(device: &Device) -> Buffer {
         let data = vec![0; Self::uniform_buffer_size() as usize];
-        device
-            .create_buffer_mapped::<u8>(
-                Self::uniform_buffer_size() as usize,
-                BufferUsage::UNIFORM | BufferUsage::COPY_DST,
-            )
-            .fill_from_slice(&data)
+        let buffer = device.create_buffer_mapped(&BufferDescriptor {
+            label: None,
+            size: Self::uniform_buffer_size() * 4,
+            usage: BufferUsage::UNIFORM | BufferUsage::COPY_DST,
+        });
+        buffer.data.copy_from_slice(as_byte_slice(&data));
+        buffer.finish()
     }
 
     /// Creates a new transform buffer from the tile transforms.
@@ -368,12 +388,15 @@ impl Painter {
             }
         }
         (
-            device
-                .create_buffer_mapped::<f32>(
-                    tile_data_buffer_byte_size,
-                    BufferUsage::UNIFORM | BufferUsage::COPY_DST,
-                )
-                .fill_from_slice(data.as_slice()),
+            {
+                let buffer = device.create_buffer_mapped(&BufferDescriptor {
+                    label: None,
+                    size: tile_data_buffer_byte_size as u64 * 4,
+                    usage: BufferUsage::UNIFORM | BufferUsage::COPY_DST,
+                });
+                buffer.data.copy_from_slice(as_byte_slice(data.as_slice()));
+                buffer.finish()
+            },
             tile_data_buffer_byte_size as u64,
         )
     }
@@ -401,6 +424,7 @@ impl Painter {
         tile_transform_buffer: &(Buffer, u64),
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
+            label: None,
             layout: bind_group_layout,
             bindings: &[
                 Binding {
@@ -555,6 +579,7 @@ impl Painter {
             depth: 1,
         };
         let multisampled_frame_descriptor = &TextureDescriptor {
+            label: None,
             size: multisampled_texture_extent,
             array_layer_count: 1,
             mip_level_count: 1,
@@ -576,6 +601,7 @@ impl Painter {
             depth: 1,
         };
         let frame_descriptor = &TextureDescriptor {
+            label: None,
             size: texture_extent,
             array_layer_count: 1,
             mip_level_count: 1,
@@ -593,7 +619,7 @@ impl Painter {
     pub fn paint(&mut self, hud: &mut super::ui::HUD, app_state: &mut AppState) {
         let mut encoder = self
             .device
-            .create_command_encoder(&CommandEncoderDescriptor { todo: 0 });
+            .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
         self.update_uniforms(&mut encoder, &app_state, &feature_collection);
@@ -606,129 +632,138 @@ impl Painter {
         let num_tiles = app_state.visible_tiles().len();
         let features = feature_collection.get_features();
         if features.len() > 0 && num_tiles > 0 {
-            let frame = self.swap_chain.get_next_texture();
-            {
-                let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                    color_attachments: &[RenderPassColorAttachmentDescriptor {
-                        attachment: if CONFIG.renderer.msaa_samples > 1 {
-                            &self.multisampled_framebuffer
-                        } else {
-                            &frame.view
-                        },
-                        resolve_target: if CONFIG.renderer.msaa_samples > 1 {
-                            Some(&frame.view)
-                        } else {
-                            None
-                        },
-                        load_op: LoadOp::Clear,
-                        store_op: StoreOp::Store,
-                        clear_color: wgpu::Color::TRANSPARENT,
-                    }],
-                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachmentDescriptor {
-                        attachment: &self.stencil,
-                        depth_load_op: LoadOp::Clear,
-                        depth_store_op: StoreOp::Store,
-                        clear_depth: 0.0,
-                        stencil_load_op: LoadOp::Clear,
-                        stencil_store_op: StoreOp::Store,
-                        clear_stencil: 255,
-                    }),
-                });
-                render_pass.set_bind_group(0, &self.bind_group, &[]);
-                let vec = vec4(0.0, 0.0, 0.0, 1.0);
-                let screen_dimensions = vec2(
-                    app_state.screen.width as f32,
-                    app_state.screen.height as f32,
-                ) / 2.0;
-                for (i, vt) in app_state.visible_tiles().values().enumerate() {
-                    if !vt.is_loaded_to_gpu() {
-                        vt.load_to_gpu(&self.device);
+            if let Ok(frame) = self.swap_chain.get_next_texture() {
+                {
+                    let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                        color_attachments: &[RenderPassColorAttachmentDescriptor {
+                            attachment: if CONFIG.renderer.msaa_samples > 1 {
+                                &self.multisampled_framebuffer
+                            } else {
+                                &frame.view
+                            },
+                            resolve_target: if CONFIG.renderer.msaa_samples > 1 {
+                                Some(&frame.view)
+                            } else {
+                                None
+                            },
+                            load_op: LoadOp::Clear,
+                            store_op: StoreOp::Store,
+                            clear_color: wgpu::Color::TRANSPARENT,
+                        }],
+                        depth_stencil_attachment: Some(
+                            RenderPassDepthStencilAttachmentDescriptor {
+                                attachment: &self.stencil,
+                                depth_load_op: LoadOp::Clear,
+                                depth_store_op: StoreOp::Store,
+                                clear_depth: 0.0,
+                                stencil_load_op: LoadOp::Clear,
+                                stencil_store_op: StoreOp::Store,
+                                clear_stencil: 255,
+                            },
+                        ),
+                    });
+                    render_pass.set_bind_group(0, &self.bind_group, &[]);
+                    let vec = vec4(0.0, 0.0, 0.0, 1.0);
+                    let screen_dimensions = vec2(
+                        app_state.screen.width as f32,
+                        app_state.screen.height as f32,
+                    ) / 2.0;
+
+                    for (i, vt) in app_state.visible_tiles().values().enumerate() {
+                        if !vt.is_loaded_to_gpu() {
+                            vt.load_to_gpu(&self.device);
+                        }
+                        let tile_id = vt.tile_id();
+                        let matrix = app_state
+                            .screen
+                            .tile_to_global_space(app_state.zoom, &tile_id);
+                        let start = (matrix * &vec).xy() + &vec2(1.0, 1.0);
+                        let s = vec2(
+                            {
+                                let x = (start.x * screen_dimensions.x).round();
+                                if x < 0.0 {
+                                    0.0
+                                } else {
+                                    x
+                                }
+                            },
+                            {
+                                let y = (start.y * screen_dimensions.y).round();
+                                if y < 0.0 {
+                                    0.0
+                                } else {
+                                    y
+                                }
+                            },
+                        );
+                        let matrix = app_state.screen.tile_to_global_space(
+                            app_state.zoom,
+                            &(tile_id + TileId::new(tile_id.z, 1, 1)),
+                        );
+                        let end = (matrix * &vec).xy() + &vec2(1.0, 1.0);
+                        let e = vec2(
+                            {
+                                let x = (end.x * screen_dimensions.x).round();
+                                if x < 0.0 {
+                                    0.0
+                                } else {
+                                    x
+                                }
+                            },
+                            {
+                                let y = (end.y * screen_dimensions.y).round();
+                                if y < 0.0 {
+                                    0.0
+                                } else {
+                                    y
+                                }
+                            },
+                        );
+
+                        render_pass.set_scissor_rect(
+                            s.x as u32,
+                            s.y as u32,
+                            (e.x - s.x) as u32,
+                            (e.y - s.y) as u32,
+                        );
+
+                        unsafe {
+                            let gpu_tile = vt.gpu_tile();
+                            let gpu_tile2 = std::mem::transmute(gpu_tile.as_ref());
+                            vt.paint(
+                                &mut render_pass,
+                                &self.blend_pipeline,
+                                gpu_tile2,
+                                &feature_collection,
+                                i as u32,
+                            );
+                        }
                     }
-                    let tile_id = vt.tile_id();
-                    let matrix = app_state
-                        .screen
-                        .tile_to_global_space(app_state.zoom, &tile_id);
-                    let start = (matrix * &vec).xy() + &vec2(1.0, 1.0);
-                    let s = vec2(
-                        {
-                            let x = (start.x * screen_dimensions.x).round();
-                            if x < 0.0 {
-                                0.0
-                            } else {
-                                x
-                            }
-                        },
-                        {
-                            let y = (start.y * screen_dimensions.y).round();
-                            if y < 0.0 {
-                                0.0
-                            } else {
-                                y
-                            }
-                        },
-                    );
-                    let matrix = app_state.screen.tile_to_global_space(
-                        app_state.zoom,
-                        &(tile_id + TileId::new(tile_id.z, 1, 1)),
-                    );
-                    let end = (matrix * &vec).xy() + &vec2(1.0, 1.0);
-                    let e = vec2(
-                        {
-                            let x = (end.x * screen_dimensions.x).round();
-                            if x < 0.0 {
-                                0.0
-                            } else {
-                                x
-                            }
-                        },
-                        {
-                            let y = (end.y * screen_dimensions.y).round();
-                            if y < 0.0 {
-                                0.0
-                            } else {
-                                y
-                            }
-                        },
-                    );
-
-                    render_pass.set_scissor_rect(
-                        s.x as u32,
-                        s.y as u32,
-                        (e.x - s.x) as u32,
-                        (e.y - s.y) as u32,
-                    );
-
-                    vt.paint(
-                        &mut render_pass,
-                        &self.blend_pipeline,
-                        &feature_collection,
-                        i as u32,
-                    );
                 }
+
+                for (_i, vt) in app_state.visible_tiles().values().enumerate() {
+                    vt.queue_text(&mut self.glyph_brush, &app_state.screen, app_state.zoom);
+                }
+
+                let _ = self.glyph_brush.draw_queued(
+                    &mut self.device,
+                    &mut encoder,
+                    &frame.view,
+                    app_state.screen.width,
+                    app_state.screen.height,
+                );
+
+                // self.temperature.paint(&mut encoder, &frame.view);
+
+                hud.paint(
+                    app_state,
+                    &self.window,
+                    &mut self.device,
+                    &mut encoder,
+                    &frame.view,
+                );
+                self.queue.submit(&[encoder.finish()]);
             }
-
-            for (_i, vt) in app_state.visible_tiles().values().enumerate() {
-                vt.queue_text(&mut self.glyph_brush, &app_state.screen, app_state.zoom);
-            }
-
-            let _ = self.glyph_brush.draw_queued(
-                &mut self.device,
-                &mut encoder,
-                &frame.view,
-                app_state.screen.width,
-                app_state.screen.height,
-            );
-
-            // self.temperature.paint(&mut encoder, &frame.view);
-
-            hud.paint(
-                app_state,
-                &self.window,
-                &mut self.device,
-                &mut encoder,
-                &frame.view,
-            );
-            self.queue.submit(&[encoder.finish()]);
         }
     }
 }

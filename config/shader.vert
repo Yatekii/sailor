@@ -87,6 +87,7 @@ void main() {
 
     // Feather
     gl_Position.xy += local_normal / canvas_size * 2;
+    gl_Position.y = -gl_Position.y;
 
     gl_Position.z = layer_data.z_index / 1000 + 0.001;
 }

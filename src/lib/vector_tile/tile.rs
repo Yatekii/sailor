@@ -198,9 +198,9 @@ impl Tile {
         }
 
         let collider = Arc::new(RwLock::new(TileCollider::new()));
-        let collider_keep = collider.clone();
+        let _collider_keep = collider.clone();
         let objects = Arc::new(RwLock::new(objects));
-        let objects_keep = objects.clone();
+        let _objects_keep = objects.clone();
 
         let stats = {
             let objects = objects
