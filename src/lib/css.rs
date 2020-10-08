@@ -48,7 +48,7 @@ impl RulesCache {
 
         let (tx, rx) = unbounded();
         let mut watcher: RecommendedWatcher =
-            match Watcher::new(tx, std::time::Duration::from_secs(2)) {
+            match Watcher::new_immediate(move |res| tx.send(res).unwrap()) {
                 Ok(watcher) => watcher,
                 Err(err) => {
                     log::info!("Failed to create a watcher for the stylesheet:");

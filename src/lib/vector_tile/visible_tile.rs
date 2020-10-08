@@ -91,15 +91,11 @@ impl VisibleTile {
                     i += 1;
 
                     let range_start = (tile_id << 1) | 1;
-                    render_pass.draw_indexed(range.clone(), 0, 0 + range_start..1 + range_start);
+                    render_pass.draw_indexed(range.clone(), 0, range_start..1 + range_start);
 
                     if feature_collection.has_outline(*id) {
                         let range_start = tile_id << 1;
-                        render_pass.draw_indexed(
-                            range.clone(),
-                            0,
-                            0 + range_start..1 + range_start,
-                        );
+                        render_pass.draw_indexed(range.clone(), 0, range_start..1 + range_start);
                     }
                 }
             }
@@ -111,7 +107,12 @@ impl VisibleTile {
         let matrix = screen.tile_to_global_space(z, &read_tile.tile_id());
         for text in read_tile.text() {
             let position = matrix * glm::vec4((text.0).0, (text.0).1, 0.0, 1.0);
-            // dbg!(&position);
+            // let section = Section::default()
+            //     .add_text(Text::new(&text.1))
+            //     .with_screen_position((
+            //         (position.x + 1.0) * screen.width as f32 / 2.0,
+            //         (position.y + 1.0) * screen.height as f32 / 2.0,
+            //     ));
             let section = Section {
                 text: &text.1,
                 screen_position: (

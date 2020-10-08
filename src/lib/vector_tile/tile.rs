@@ -100,7 +100,7 @@ impl Tile {
     /// This includes vertex and index buffers.
     pub fn from_mbvt(
         tile_id: &TileId,
-        pbf_data: &Vec<u8>,
+        pbf_data: &[u8],
         feature_collection: Arc<RwLock<FeatureCollection>>,
         selection_tags: Vec<String>,
     ) -> Self {
@@ -323,11 +323,7 @@ impl Tile {
             )
             .expect("This is a bug. Please report it.");
 
-        let object = Object::new(
-            selector,
-            path.points().to_vec(),
-            ObjectType::Polygon,
-        );
+        let object = Object::new(selector, path.points().to_vec(), ObjectType::Polygon);
 
         (
             current_feature_id,
@@ -340,7 +336,7 @@ impl Tile {
     fn classify(
         layer: &vector_tile::mod_Tile::Layer,
         feature: &vector_tile::mod_Tile::Feature,
-        selection_tags: &Vec<String>,
+        selection_tags: &[String],
     ) -> (Selector, HashMap<String, String>) {
         let mut selector = Selector::new()
             .with_type("layer".to_string())

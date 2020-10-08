@@ -72,7 +72,7 @@ impl Painter {
         let (tx, rx) = unbounded();
 
         let mut watcher: RecommendedWatcher =
-            match Watcher::new(tx, std::time::Duration::from_secs(2)) {
+            match Watcher::new_immediate(move |res| tx.send(res).unwrap()) {
                 Ok(watcher) => watcher,
                 Err(err) => {
                     log::info!("Failed to create a watcher for the vertex shader:");
@@ -186,10 +186,17 @@ impl Painter {
             &tile_transform_buffer,
         );
 
+        // let font =
+        //     ab_glyph::FontArc::try_from_slice(include_bytes!("../../../config/Ruda-Bold.ttf"))
+        //         .unwrap();
+
+        // let mut glyph_brush =
+        //     GlyphBrushBuilder::using_font(font).build(&mut device, TextureFormat::Bgra8Unorm);
+
         let font: &[u8] = include_bytes!("../../../config/Ruda-Bold.ttf");
         let glyph_brush = GlyphBrushBuilder::using_font_bytes(font)
             .unwrap()
-            .build(&mut device, TextureFormat::Bgra8Unorm);
+            .build(&device, TextureFormat::Bgra8Unorm);
 
         let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
@@ -403,7 +410,7 @@ impl Painter {
 
     fn copy_uniform_buffers(
         encoder: &mut CommandEncoder,
-        source: &Vec<(Buffer, usize)>,
+        source: &[(Buffer, usize)],
         destination: &Buffer,
     ) {
         let mut total_bytes = 0;
@@ -548,7 +555,7 @@ impl Painter {
         self.stencil = Self::create_stencil(&self.device, &self.swap_chain_descriptor);
     }
 
-    fn update_uniforms<'a>(
+    fn update_uniforms(
         &mut self,
         encoder: &mut CommandEncoder,
         app_state: &AppState,
@@ -677,7 +684,7 @@ impl Painter {
                         let matrix = app_state
                             .screen
                             .tile_to_global_space(app_state.zoom, &tile_id);
-                        let start = (matrix * &vec).xy() + &vec2(1.0, 1.0);
+                        let start = (matrix * vec).xy() + vec2(1.0, 1.0);
                         let s = vec2(
                             {
                                 let x = (start.x * screen_dimensions.x).round();
@@ -700,7 +707,7 @@ impl Painter {
                             app_state.zoom,
                             &(tile_id + TileId::new(tile_id.z, 1, 1)),
                         );
-                        let end = (matrix * &vec).xy() + &vec2(1.0, 1.0);
+                        let end = (matrix * vec).xy() + vec2(1.0, 1.0);
                         let e = vec2(
                             {
                                 let x = (end.x * screen_dimensions.x).round();
@@ -746,7 +753,7 @@ impl Painter {
                 }
 
                 let _ = self.glyph_brush.draw_queued(
-                    &mut self.device,
+                    &self.device,
                     &mut encoder,
                     &frame.view,
                     app_state.screen.width,

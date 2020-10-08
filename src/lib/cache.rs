@@ -67,7 +67,7 @@ impl TileCache {
         &mut self,
         tile_id: &TileId,
         feature_collection: Arc<RwLock<FeatureCollection>>,
-        selection_tags: &Vec<String>,
+        selection_tags: &[String],
     ) {
         let id = self.id;
         self.id += 1;
@@ -82,7 +82,7 @@ impl TileCache {
             let tx = self.channel.0.clone();
 
             // Make sure we load all tags we want to include.
-            let selection_tags = selection_tags.clone();
+            let selection_tags = selection_tags.to_vec();
             let cache_location = self.cache_location.clone();
 
             // Store a new loader.
