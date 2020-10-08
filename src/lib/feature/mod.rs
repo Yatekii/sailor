@@ -99,7 +99,7 @@ impl Feature {
             match color {
                 CSSValue::Color(bg) => {
                     self.style.border_color = bg.clone().into();
-                    self.style.border_color;
+                    self.style.border_color; // TODO this is probably no intended to be this way
                 }
                 CSSValue::String(string) => {
                     match &string[..] {

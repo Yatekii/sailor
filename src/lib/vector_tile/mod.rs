@@ -41,7 +41,7 @@ fn area(path: &Path) -> f32 {
 
 fn parse_one_to_path(
     geometry_type: GeomType,
-    geometry: &Vec<u32>,
+    geometry: &[u32],
     cursor: &mut usize,
     gcursor: &mut Point,
 ) -> Path {
@@ -99,19 +99,12 @@ fn parse_one_to_path(
     match geometry_type {
         GeomType::POINT => panic!("This is a bug. Please report it."),
         GeomType::LINESTRING => panic!("This is a bug. Please report it."),
-        GeomType::POLYGON => {
-            let path = builder.build();
-            if area(&path) < 0f32 {
-                path
-            } else {
-                path
-            }
-        }
+        GeomType::POLYGON => builder.build(),
         _ => panic!("This is a bug. Please report it."),
     }
 }
 
-pub fn geometry_commands_to_paths(geometry_type: GeomType, geometry: &Vec<u32>) -> Vec<Path> {
+pub fn geometry_commands_to_paths(geometry_type: GeomType, geometry: &[u32]) -> Vec<Path> {
     let mut cursor = 0;
     let mut c = point(0f32, 0f32);
     let mut paths = Vec::new();

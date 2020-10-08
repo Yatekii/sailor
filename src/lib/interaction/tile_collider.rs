@@ -61,7 +61,8 @@ impl TileCollider {
                     for edge in polyline.edges() {
                         let segment = Segment::new(points[edge.indices.x], points[edge.indices.y]);
                         use ncollide2d::query::RayCast;
-                        if segment.intersects_ray(&Isometry::identity(), &ray) {
+                        if segment.intersects_ray(&Isometry::identity(), &ray, f32::MAX) {
+                            // TODO is toi f32::MAX here correct?
                             winding_number += 1;
                         }
                     }

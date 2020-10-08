@@ -41,14 +41,8 @@ fn main() {
         .expect("No monitors found")
         .scale_factor();
 
-    let mut app_state = app_state::AppState::new(
-        "config/style.css",
-        zurich,
-        width,
-        height,
-        z,
-        hdpi_factor,
-    );
+    let mut app_state =
+        app_state::AppState::new("config/style.css", zurich, width, height, z, hdpi_factor);
 
     let mut painter = drawing::Painter::init(&event_loop, width, height, &app_state);
     let mut hud = drawing::ui::HUD::new(&painter.window, &mut painter.device, &mut painter.queue);
