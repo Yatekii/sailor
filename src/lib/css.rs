@@ -43,7 +43,7 @@ impl RulesCache {
     pub fn try_load_from_file(filename: impl Into<String>) -> Option<Self> {
         let filename = filename.into();
 
-        let contents = std::fs::read_to_string(std::path::Path::new(&filename.clone()))
+        let contents = std::fs::read_to_string(std::path::Path::new(&filename))
             .expect("Something went wrong reading the file");
 
         let (tx, rx) = unbounded();
@@ -69,7 +69,7 @@ impl RulesCache {
         let rules = try_parse_styles(&contents)?;
 
         Some(Self {
-            rules: rules,
+            rules,
             rx,
             _watcher: watcher,
         })
@@ -194,7 +194,7 @@ impl Default for Selector {
 
 impl std::fmt::Display for Selector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut selector = self.typ.clone().unwrap_or(String::new());
+        let mut selector = self.typ.clone().unwrap_or_default();
         self.id.as_ref().map(|id| selector += &id);
         for class in &self.classes {
             selector += ".";
@@ -366,7 +366,7 @@ fn selector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Sele
     let (remaining, typ) = take_while(|c| is_alphanumeric(c as u8))(input)?;
 
     // The type is optional. So if no type was found, set the type to `None`.
-    selector.typ = if typ.len() > 0 {
+    selector.typ = if !typ.is_empty() {
         Some(typ.into())
     } else {
         None

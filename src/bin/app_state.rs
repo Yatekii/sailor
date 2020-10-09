@@ -73,10 +73,8 @@ impl AppState {
                 if !old_tile_field.contains(&key) {
                     self.visible_tiles.remove(&key);
                 }
-            } else {
-                if !tile_field.contains(&key) {
-                    self.visible_tiles.remove(&key);
-                }
+            } else if !tile_field.contains(&key) {
+                self.visible_tiles.remove(&key);
             }
         }
 
@@ -95,7 +93,7 @@ impl AppState {
 
                     visible_tile.load_collider();
 
-                    self.visible_tiles.insert(tile_id.clone(), visible_tile);
+                    self.visible_tiles.insert(tile_id, visible_tile);
 
                     // Remove old bigger tile when all 4 smaller tiles are loaded.
                     let mut count = 0;

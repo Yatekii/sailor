@@ -129,7 +129,7 @@ impl Feature {
         if let Some(border_width) = border_width {
             match border_width {
                 CSSValue::Number(number) => match number {
-                    Number::Px(px) => self.style.border_width = (*px).into(),
+                    Number::Px(px) => self.style.border_width = *px,
                     value => log::info!(
                         "The value '{:?}' is currently not supported for 'border-width'.",
                         value

@@ -14,7 +14,7 @@ pub struct VisibleTile {
 impl VisibleTile {
     pub fn new(tile: Arc<RwLock<Tile>>) -> Self {
         Self {
-            tile: tile,
+            tile,
             gpu_tile: Arc::new(RwLock::new(None)),
             tile_collider: Arc::new(RwLock::new(TileCollider::new())),
         }
@@ -86,7 +86,7 @@ impl VisibleTile {
             let mut i = 0;
             render_pass.set_pipeline(blend_pipeline);
             for (id, range) in &features {
-                if range.len() > 0 && feature_collection.is_visible(*id) {
+                if !range.is_empty() && feature_collection.is_visible(*id) {
                     render_pass.set_stencil_reference(i as u32);
                     i += 1;
 

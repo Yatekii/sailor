@@ -30,7 +30,7 @@ impl TileCache {
             cache: HashMap::new(),
             loaders: vec![],
             channel: channel(),
-            cache_location: cache_location,
+            cache_location,
             id: 0,
         }
     }
@@ -78,7 +78,7 @@ impl TileCache {
         // Check if tile is not in the cache yet and is not currently being loaded.
         if !self.cache.contains_key(&tile_id) && loader.is_none() {
             // Clone values to be moved into the thread.
-            let tile_id_clone = tile_id.clone();
+            let tile_id_clone = *tile_id;
             let tx = self.channel.0.clone();
 
             // Make sure we load all tags we want to include.
@@ -104,7 +104,7 @@ impl TileCache {
                         None
                     }
                 }),
-                tile_id.clone(),
+                *tile_id,
             ));
         }
     }
@@ -121,7 +121,7 @@ impl TileCache {
         let mut total_stats = TileStats::new();
         for tile in &self.cache {
             let read_tile = tile.1.read().unwrap();
-            total_stats = total_stats + *read_tile.stats();
+            total_stats += *read_tile.stats();
         }
         CacheStats {
             cached_tiles: self.cache.len(),

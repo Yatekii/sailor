@@ -153,7 +153,7 @@ impl Tile {
                 if let Some(ot) = object_type {
                     objects.push(Object::new_with_tags(
                         selector.clone(),
-                        paths[0].points().iter().cloned().collect(),
+                        paths[0].points().to_vec(),
                         tags,
                         ot,
                     ));
@@ -240,7 +240,7 @@ impl Tile {
         // });
 
         Self {
-            tile_id: tile_id.clone(),
+            tile_id: *tile_id,
             mesh,
             extent,
             objects,
@@ -325,7 +325,7 @@ impl Tile {
 
         let object = Object::new(
             selector,
-            path.points().iter().cloned().collect(),
+            path.points().to_vec(),
             ObjectType::Polygon,
         );
 

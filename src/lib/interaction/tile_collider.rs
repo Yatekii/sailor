@@ -52,7 +52,7 @@ impl TileCollider {
             .broad_phase
             .interferences_with_point(point, &mut interferences);
 
-        let ray = Ray::new(point.clone(), Vector::x());
+        let ray = Ray::new(*point, Vector::x());
         for handle in interferences {
             if let Some(co) = self.world.collision_object(*handle) {
                 if let Some(polyline) = co.shape().downcast_ref::<Polyline<f32>>() {

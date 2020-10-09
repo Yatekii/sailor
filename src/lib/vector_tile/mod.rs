@@ -28,7 +28,7 @@ pub struct Layer {
 
 fn area(path: &Path) -> f32 {
     let mut points = path.points().to_vec();
-    points.push(points.first().expect("Path contains no points!").clone());
+    points.push(*points.first().expect("Path contains no points!"));
     let mut area = 0f32;
     for i in 0..points.len() - 1 {
         area += points[i].x * points[i + 1].y;
@@ -102,9 +102,9 @@ fn parse_one_to_path(
         GeomType::POLYGON => {
             let path = builder.build();
             if area(&path) < 0f32 {
-                return path;
+                path
             } else {
-                return path;
+                path
             }
         }
         _ => panic!("This is a bug. Please report it."),
