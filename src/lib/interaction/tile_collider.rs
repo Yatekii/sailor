@@ -1,40 +1,22 @@
+pub use crate::*;
+use ncollide2d::{
+    math::{Isometry, Point, Vector},
+    pipeline::object::{CollisionGroups, GeometricQueryType},
+    query::Ray,
+    shape::{Polyline, Segment, ShapeHandle},
+    world::CollisionWorld,
+};
 use std::{
-    sync::{
-        Arc,
-        RwLock,
-    },
+    sync::{Arc, RwLock},
     thread::spawn,
 };
-use ncollide2d::{
-    world::{
-        CollisionWorld,
-    },
-    pipeline::object::{
-        CollisionGroups,
-        GeometricQueryType,
-    },
-    math::{
-        Isometry,
-        Point,
-        Vector,
-    },
-    query::{
-        Ray,
-    },
-    shape::{
-        ShapeHandle,
-        Polyline,
-        Segment,
-    },
-};
-pub use crate::*;
 
 pub struct TileCollider {
     world: CollisionWorld<f32, usize>,
 }
 
 impl TileCollider {
-    pub fn new() -> Self  {
+    pub fn new() -> Self {
         Self {
             world: CollisionWorld::new(0.02),
         }
@@ -42,11 +24,12 @@ impl TileCollider {
 
     pub fn add_object(&mut self, id: usize, object: &Object) {
         let polygon = Polyline::new(
-            object.points()
+            object
+                .points()
                 .iter()
                 .map(|p| Point::new(p.x, p.y))
                 .collect::<Vec<Point<f32>>>(),
-            None
+            None,
         );
 
         self.world.add(
@@ -54,7 +37,7 @@ impl TileCollider {
             ShapeHandle::new(polygon),
             CollisionGroups::new(),
             GeometricQueryType::Contacts(0.02, 0.02),
-            id
+            id,
         );
     }
 
@@ -65,11 +48,9 @@ impl TileCollider {
     pub fn get_hovered_objects(&self, point: &Point<f32>) -> Vec<usize> {
         let mut object_ids = vec![];
         let mut interferences = vec![];
-        self.world.broad_phase
-            .interferences_with_point(
-                point,
-                &mut interferences
-            );
+        self.world
+            .broad_phase
+            .interferences_with_point(point, &mut interferences);
 
         let ray = Ray::new(point.clone(), Vector::x());
         for handle in interferences {
@@ -115,8 +96,10 @@ impl TileColliderLoader for Arc<RwLock<TileCollider>> {
                                 }
                             }
                             collider.update();
-                        },
-                        Err(_e) => log::error!("Could not aquire collider lock. Not loading the objects of this tile."),
+                        }
+                        Err(_e) => log::error!(
+                            "Could not aquire collider lock. Not loading the objects of this tile."
+                        ),
                     }
                 }
             }

@@ -21,7 +21,8 @@ impl Stats {
 
     pub fn capture_frame(&mut self) {
         self.last_frametimes.pop_front();
-        self.last_frametimes.push_back(self.stamp.elapsed().as_micros() as u64);
+        self.last_frametimes
+            .push_back(self.stamp.elapsed().as_micros() as u64);
         self.frames += 1;
         self.stamp = std::time::Instant::now();
     }

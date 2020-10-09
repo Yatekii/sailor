@@ -1,24 +1,10 @@
 use crate::drawing::vertex::VertexType;
-use crate::drawing::vertex::{
-    Vertex,
-    LayerVertexCtor
-};
+use crate::drawing::vertex::{LayerVertexCtor, Vertex};
 use lyon::{
-    path::{
-        Index,
-        VertexId,
-    },
+    path::{Index, VertexId},
     tessellation::{
-        VertexBuffers,
-        GeometryBuilder,
-        FillVertex,
-        StrokeVertex,
-        VertexConstructor,
-        geometry_builder::{
-            GeometryBuilderError,
-            MaxIndex,
-            Count,
-        },
+        geometry_builder::{Count, GeometryBuilderError, MaxIndex},
+        FillVertex, GeometryBuilder, StrokeVertex, VertexBuffers, VertexConstructor,
     },
 };
 
@@ -30,7 +16,10 @@ pub struct MeshBuilder<'l> {
 }
 
 impl<'l> MeshBuilder<'l> {
-    pub fn new(buffers: &'l mut VertexBuffers<Vertex, u32>, vertex_constructor: LayerVertexCtor) -> Self {
+    pub fn new(
+        buffers: &'l mut VertexBuffers<Vertex, u32>,
+        vertex_constructor: LayerVertexCtor,
+    ) -> Self {
         let vertex_offset = buffers.vertices.len() as Index;
         let index_offset = buffers.indices.len() as Index;
         Self {
@@ -58,9 +47,7 @@ impl<'l> MeshBuilder<'l> {
     }
 }
 
-impl<'l> GeometryBuilder<FillVertex>
-    for MeshBuilder<'l>
-{
+impl<'l> GeometryBuilder<FillVertex> for MeshBuilder<'l> {
     fn begin_geometry(&mut self) {
         self.vertex_offset = self.buffers.vertices.len() as Index;
         self.index_offset = self.buffers.indices.len() as Index;
@@ -74,7 +61,9 @@ impl<'l> GeometryBuilder<FillVertex>
     }
 
     fn add_vertex(&mut self, v: FillVertex) -> Result<VertexId, GeometryBuilderError> {
-        self.buffers.vertices.push(self.vertex_constructor.new_vertex(v));
+        self.buffers
+            .vertices
+            .push(self.vertex_constructor.new_vertex(v));
         let len = self.buffers.vertices.len();
         if len > u32::max_index() {
             return Err(GeometryBuilderError::TooManyVertices);
@@ -94,9 +83,7 @@ impl<'l> GeometryBuilder<FillVertex>
     }
 }
 
-impl<'l> GeometryBuilder<StrokeVertex>
-    for MeshBuilder<'l>
-{
+impl<'l> GeometryBuilder<StrokeVertex> for MeshBuilder<'l> {
     fn begin_geometry(&mut self) {
         self.vertex_offset = self.buffers.vertices.len() as Index;
         self.index_offset = self.buffers.indices.len() as Index;
@@ -110,7 +97,9 @@ impl<'l> GeometryBuilder<StrokeVertex>
     }
 
     fn add_vertex(&mut self, v: StrokeVertex) -> Result<VertexId, GeometryBuilderError> {
-        self.buffers.vertices.push(self.vertex_constructor.new_vertex(v));
+        self.buffers
+            .vertices
+            .push(self.vertex_constructor.new_vertex(v));
         let len = self.buffers.vertices.len();
         if len > u32::max_index() {
             return Err(GeometryBuilderError::TooManyVertices);

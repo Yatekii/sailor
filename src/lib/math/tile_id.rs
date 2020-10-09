@@ -7,9 +7,7 @@ pub struct TileId {
 
 impl TileId {
     pub fn new(z: u32, x: u32, y: u32) -> Self {
-        Self {
-            z, x, y
-        }
+        Self { z, x, y }
     }
 }
 
@@ -26,7 +24,7 @@ impl From<TileCoordinate> for TileId {
 impl std::fmt::Display for TileId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}/{}/{}", self.z, self.x, self.y)
-    } 
+    }
 }
 
 impl std::ops::Add for TileId {
@@ -76,8 +74,6 @@ pub struct TileCoordinate {
 
 impl TileCoordinate {
     pub fn new(z: u32, x: f32, y: f32) -> Self {
-        Self {
-            z, x, y
-        }
+        Self { z, x, y }
     }
 }

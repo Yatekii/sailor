@@ -1,49 +1,19 @@
 extern crate nom;
 
+use crossbeam_channel::{unbounded, TryRecvError};
 use nom::{
-    number::complete::float,
-    error::{
-        convert_error,
-        VerboseError,
-        ParseError,
-    },
-    InputTakeAtPosition,
-    character::complete::multispace0,
-    AsChar,
-    sequence::{
-        delimited,
-        tuple,
-        separated_pair,
-        preceded,
-    },
-    multi::many0,
     branch::alt,
-    character::{
-        is_alphanumeric,
-        complete::char,
-    },
-    bytes::complete::{
-        take_while,
-        take_while_m_n,
-        tag,
-    },
+    bytes::complete::{tag, take_while, take_while_m_n},
+    character::complete::multispace0,
+    character::{complete::char, is_alphanumeric},
     combinator::map_res,
-    IResult,
-    Err,
+    error::{convert_error, ParseError, VerboseError},
+    multi::many0,
+    number::complete::float,
+    sequence::{delimited, preceded, separated_pair, tuple},
+    AsChar, Err, IResult, InputTakeAtPosition,
 };
-use crossbeam_channel::{
-    unbounded,
-    TryRecvError,
-};
-use notify::{
-    RecursiveMode,
-    RecommendedWatcher,
-    Watcher,
-    EventKind,
-    event::{
-        ModifyKind,
-    },
-};
+use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::BTreeMap;
 
 /// Tries to parse an entire stylesheet.
@@ -54,7 +24,7 @@ pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
             log::info!("Failed to load stylesheet.");
             log::info!("Trace: {}", convert_error(style, e));
             None
-        },
+        }
         Err(Err::Incomplete(_)) => {
             log::info!("Unexpected EOF loading the stylesheet.");
             None
@@ -77,22 +47,23 @@ impl RulesCache {
             .expect("Something went wrong reading the file");
 
         let (tx, rx) = unbounded();
-        let mut watcher: RecommendedWatcher = match Watcher::new(tx, std::time::Duration::from_secs(2)) {
-            Ok(watcher) => watcher,
-            Err(err) => {
-                log::info!("Failed to create a watcher for the stylesheet:");
-                log::info!("{}", err);
-                return None;
-            },
-        };
+        let mut watcher: RecommendedWatcher =
+            match Watcher::new(tx, std::time::Duration::from_secs(2)) {
+                Ok(watcher) => watcher,
+                Err(err) => {
+                    log::info!("Failed to create a watcher for the stylesheet:");
+                    log::info!("{}", err);
+                    return None;
+                }
+            };
 
         match watcher.watch(&filename, RecursiveMode::Recursive) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(err) => {
                 log::info!("Failed to start watching {}:", filename);
                 log::info!("{}", err);
                 return None;
-            },
+            }
         };
 
         let rules = try_parse_styles(&contents)?;
@@ -105,15 +76,21 @@ impl RulesCache {
     }
 
     /// Returns all Rules that match a given selector.
-    /// 
+    ///
     /// E.g. `layer` does not match the `layer[zoom=5]` rule selector.
     /// On the contrary, `layer[zoom=5]` matches the `layer` rule selector.
     pub fn get_matching_rules(&self, selector: &Selector) -> Vec<&Rule> {
-        self.rules.iter().filter(|rule| selector.matches(&rule.selector)).collect()
+        self.rules
+            .iter()
+            .filter(|rule| selector.matches(&rule.selector))
+            .collect()
     }
 
     pub fn get_matching_rules_mut(&mut self, selector: &Selector) -> Vec<&mut Rule> {
-        self.rules.iter_mut().filter(|rule| selector.matches(&rule.selector)).collect()
+        self.rules
+            .iter_mut()
+            .filter(|rule| selector.matches(&rule.selector))
+            .collect()
     }
 
     pub fn add_rule(&mut self, rule: Rule) {
@@ -125,7 +102,7 @@ impl RulesCache {
     }
 
     /// Updates the CSS cache from the watched file if there was any changes.
-    /// 
+    ///
     /// Returns whether a successful update happened.
     /// Returns false if there was no changes or if the update failed.
     pub fn update(&mut self) -> bool {
@@ -134,26 +111,30 @@ impl RulesCache {
                 kind: EventKind::Modify(ModifyKind::Data(_)),
                 paths,
                 ..
-            })) => {
-                self.try_reload_from_file(&paths[0].as_path())
-            },
+            })) => self.try_reload_from_file(&paths[0].as_path()),
             // Everything is alright but file wasn't actually changed.
-            Ok(Ok(_)) => { false },
+            Ok(Ok(_)) => false,
             Ok(Err(err)) => {
-                log::info!("Something went wrong with the CSS file watcher:\r\n{:?}", err);
+                log::info!(
+                    "Something went wrong with the CSS file watcher:\r\n{:?}",
+                    err
+                );
                 false
-            },
+            }
             // This happens all the time when there is no new message.
             Err(TryRecvError::Empty) => false,
             Err(err) => {
-                log::info!("Something went wrong with the CSS file watcher:\r\n{:?}", err);
+                log::info!(
+                    "Something went wrong with the CSS file watcher:\r\n{:?}",
+                    err
+                );
                 false
-            },
+            }
         }
     }
 
     /// Tries reloading the cached styles from a file.
-    /// 
+    ///
     /// Returns `true` if it succeeded.
     /// Returns `false` in any error case.
     fn try_reload_from_file(&mut self, filename: &std::path::Path) -> bool {
@@ -163,12 +144,12 @@ impl RulesCache {
                     Some(rules) => rules,
                     None => return false,
                 }
-            },
+            }
             Err(err) => {
                 log::info!("Failed to read file at {:?}:", filename);
                 log::info!("{}", err);
                 return false;
-            },
+            }
         }
         true
     }
@@ -266,12 +247,14 @@ impl Selector {
     }
 
     /// Checks if a subset of criteria of this selector matches all the criteria of another.
-    /// 
+    ///
     /// Use example: layer.selector.matches(&landmark_selector)`.
     pub fn matches(&self, other: &Selector) -> bool {
         if let Some(t1) = &other.typ {
             if let Some(t2) = &self.typ {
-                if t1 != t2 { return false; }
+                if t1 != t2 {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -279,7 +262,9 @@ impl Selector {
 
         if let Some(i1) = &other.id {
             if let Some(i2) = &self.id {
-                if i1 != i2 { return false; }
+                if i1 != i2 {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -366,7 +351,7 @@ fn rule<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Rule, E>
         whitespace(selector),
         whitespace(char('{')),
         body,
-        whitespace(char('}'))
+        whitespace(char('}')),
     ))(input)?;
 
     Ok((remaining, Rule { selector, kvs }))
@@ -376,12 +361,16 @@ fn rule<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Rule, E>
 /// E.g. `layer[name=water].class#id`.
 fn selector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Selector, E> {
     let mut selector: Selector = Default::default();
-    
+
     // Try parsing the type (Html tag) of a selector.
     let (remaining, typ) = take_while(|c| is_alphanumeric(c as u8))(input)?;
 
     // The type is optional. So if no type was found, set the type to `None`.
-    selector.typ = if typ.len() > 0 { Some(typ.into()) } else { None };
+    selector.typ = if typ.len() > 0 {
+        Some(typ.into())
+    } else {
+        None
+    };
 
     // Parse all the remaining selector parts.
     let (remaining, pairs) = many0(alt((class, id, any)))(remaining)?;
@@ -390,7 +379,9 @@ fn selector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Sele
         match pair {
             SelectorPart::Class(v) => selector.classes.push(v),
             SelectorPart::Id(v) => selector.id = Some(v),
-            SelectorPart::Any(k, v) => { selector.any.insert(k, v); },
+            SelectorPart::Any(k, v) => {
+                selector.any.insert(k, v);
+            }
         }
     }
 
@@ -400,13 +391,15 @@ fn selector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Sele
 /// Parse a single class name.
 /// E.g. `.class`.
 fn class<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorPart, E> {
-    preceded(char('.'), take_while(|c| is_alphanumeric(c as u8)))(input).map(|(r, v)| (r, SelectorPart::Class(v.into())))
+    preceded(char('.'), take_while(|c| is_alphanumeric(c as u8)))(input)
+        .map(|(r, v)| (r, SelectorPart::Class(v.into())))
 }
 
 /// Parse a single id name.
 /// E.g. `#id`.
 fn id<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorPart, E> {
-    preceded(char('#'), take_while(|c| is_alphanumeric(c as u8)))(input).map(|(r, v)| (r, SelectorPart::Id(v.into())))
+    preceded(char('#'), take_while(|c| is_alphanumeric(c as u8)))(input)
+        .map(|(r, v)| (r, SelectorPart::Id(v.into())))
 }
 
 /// Parse any CSS selector k/v pair.
@@ -422,18 +415,23 @@ fn any<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorP
 
 /// Parses the body of a CSS rule.
 /// E.g. `{}`.
-fn body<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, std::collections::BTreeMap::<String, CSSValue>, E> {
+fn body<'a, E: ParseError<&'a str>>(
+    input: &'a str,
+) -> IResult<&'a str, std::collections::BTreeMap<String, CSSValue>, E> {
     let mut hm = std::collections::BTreeMap::new();
-    many0(kv)(input).map(|v| { v.1.into_iter().for_each(|v| { hm.insert(v.0.into(), v.1); }); (v.0, hm) })
+    many0(kv)(input).map(|v| {
+        v.1.into_iter().for_each(|v| {
+            hm.insert(v.0.into(), v.1);
+        });
+        (v.0, hm)
+    })
 }
 
 /// Parses a single CSS k/v pair.
 /// E.g. `background-color: #FF0000;`.
 fn kv<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (&'a str, CSSValue), E> {
-    let (remaining, (kv, _)) = tuple((
-        separated_pair(css_name, char(':'), css_value),
-        char(';')
-    ))(input)?;
+    let (remaining, (kv, _)) =
+        tuple((separated_pair(css_name, char(':'), css_value), char(';')))(input)?;
     Ok((remaining, kv))
 }
 
@@ -476,7 +474,9 @@ pub enum CSSValue {
 /// Parses a single CSS qualified string.
 /// Can contain alphanumeric characters, '-' and spaces.
 fn string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
-    let (input, value) = whitespace(take_while(|c| is_alphanumeric(c as u8) || c == '-' || c == ' '))(input)?;
+    let (input, value) = whitespace(take_while(|c| {
+        is_alphanumeric(c as u8) || c == '-' || c == ' '
+    }))(input)?;
 
     Ok((input, CSSValue::String(value.into())))
 }
@@ -501,7 +501,7 @@ fn unitless_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str
 }
 
 /// A struct to represent any RGB color.
-#[derive(Debug,PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Color {
     pub r: f32,
     pub g: f32,
@@ -510,12 +510,42 @@ pub struct Color {
 }
 
 impl Color {
-    pub const TRANSPARENT: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0, };
-    pub const WHITE: Color = Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0, };
-    pub const BLACK: Color = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0, };
-    pub const RED:   Color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0, };
-    pub const GREEN: Color = Color { r: 0.0, g: 1.0, b: 0.0, a: 1.0, };
-    pub const BLUE:  Color = Color { r: 0.0, g: 0.0, b: 1.0, a: 1.0, };
+    pub const TRANSPARENT: Color = Color {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 0.0,
+    };
+    pub const WHITE: Color = Color {
+        r: 1.0,
+        g: 1.0,
+        b: 1.0,
+        a: 1.0,
+    };
+    pub const BLACK: Color = Color {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
+    pub const RED: Color = Color {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
+    pub const GREEN: Color = Color {
+        r: 0.0,
+        g: 1.0,
+        b: 0.0,
+        a: 1.0,
+    };
+    pub const BLUE: Color = Color {
+        r: 0.0,
+        g: 0.0,
+        b: 1.0,
+        a: 1.0,
+    };
 }
 
 /// Converts a hex string into an `u8`.
@@ -530,10 +560,7 @@ fn is_hex_digit(c: char) -> bool {
 
 /// Parse an actual hex code.
 fn hex_primary<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E> {
-    map_res(
-        take_while_m_n(2, 2, is_hex_digit),
-        from_hex
-    )(input)
+    map_res(take_while_m_n(2, 2, is_hex_digit), from_hex)(input)
 }
 
 /// Parse a single hex color code including the `#`.
@@ -541,15 +568,20 @@ fn hex_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSS
     let (input, _) = tag("#")(input)?;
     let (input, (r, g, b)) = tuple((hex_primary, hex_primary, hex_primary))(input)?;
 
-    Ok((input, CSSValue::Color(Color { r: r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a: 1.0 })))
+    Ok((
+        input,
+        CSSValue::Color(Color {
+            r: r as f32 / 255.0,
+            g: g as f32 / 255.0,
+            b: b as f32 / 255.0,
+            a: 1.0,
+        }),
+    ))
 }
 
 fn u8<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E> {
     use std::str::FromStr;
-    map_res(
-        take_while(|c: char| c.is_digit(10)),
-        u8::from_str
-    )(input)
+    map_res(take_while(|c: char| c.is_digit(10)), u8::from_str)(input)
 }
 
 /// Parse a single hex color code including the `#`.
@@ -565,21 +597,32 @@ fn rgba_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CS
         float,
     ))(input)?;
     let (input, _) = tag(")")(input)?;
-    Ok((input, CSSValue::Color(Color {r:  r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a })))
+    Ok((
+        input,
+        CSSValue::Color(Color {
+            r: r as f32 / 255.0,
+            g: g as f32 / 255.0,
+            b: b as f32 / 255.0,
+            a,
+        }),
+    ))
 }
 
 /// Parse a single hex color code including the `#`.
 fn rgb_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
     let (input, _) = whitespace(tag("rgb("))(input)?;
-    let (input, (r, _, g, _, b)) = tuple((
-        u8,
-        whitespace(char(',')),
-        u8,
-        whitespace(char(',')),
-        u8,
-    ))(input)?;
+    let (input, (r, _, g, _, b)) =
+        tuple((u8, whitespace(char(',')), u8, whitespace(char(',')), u8))(input)?;
     let (input, _) = tag(")")(input)?;
-    Ok((input, CSSValue::Color(Color { r: r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a: 1.0 })))
+    Ok((
+        input,
+        CSSValue::Color(Color {
+            r: r as f32 / 255.0,
+            g: g as f32 / 255.0,
+            b: b as f32 / 255.0,
+            a: 1.0,
+        }),
+    ))
 }
 
 #[test]

@@ -1,8 +1,5 @@
-use lyon::tessellation::{
-    self,
-    geometry_builder::VertexConstructor,
-};
 use crate::*;
+use lyon::tessellation::{self, geometry_builder::VertexConstructor};
 
 #[derive(Copy, Clone, Debug)]
 pub enum VertexType {
@@ -11,7 +8,7 @@ pub enum VertexType {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(C,packed)]
+#[repr(C, packed)]
 pub struct Vertex {
     pub position: [i16; 2],
     pub normal: [i16; 2],

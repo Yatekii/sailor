@@ -1,24 +1,26 @@
 extern crate nalgebra_glm as glm;
 extern crate parity_util_mem as malloc_size_of;
-#[macro_use] extern crate malloc_size_of_derive;
-#[macro_use] extern crate derivative;
+#[macro_use]
+extern crate malloc_size_of_derive;
+#[macro_use]
+extern crate derivative;
 
-mod vector_tile;
-mod math;
-mod fetch;
-mod drawing;
 mod cache;
-mod object;
 mod css;
-mod interaction;
+mod drawing;
 mod feature;
+mod fetch;
+mod interaction;
+mod math;
+mod object;
+mod vector_tile;
 
-pub use vector_tile::*;
+pub use cache::*;
 pub use css::*;
-pub use math::*;
 pub use drawing::*;
-pub use object::*;
+pub use feature::*;
 pub use fetch::*;
 pub use interaction::*;
-pub use cache::*;
-pub use feature::*;
+pub use math::*;
+pub use object::*;
+pub use vector_tile::*;

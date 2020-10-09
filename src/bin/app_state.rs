@@ -1,12 +1,9 @@
-use std::collections::BTreeMap;
-use std::sync::{
-    Arc,
-    RwLock,
-};
-use lyon::math::Point;
-use crate::*;
 use crate::drawing::ui::*;
+use crate::*;
+use lyon::math::Point;
 use stats::Stats;
+use std::collections::BTreeMap;
+use std::sync::{Arc, RwLock};
 
 pub struct AppState {
     pub tile_cache: TileCache,
@@ -33,8 +30,15 @@ impl AppState {
     ) -> Self {
         Self {
             tile_cache: TileCache::new(CONFIG.general.data_root.clone()),
-            css_cache: RulesCache::try_load_from_file(style).expect("Unable to load the style file. Please consult the log."),
-            screen: Screen::new(center, width, height, CONFIG.renderer.tile_size, hidpi_factor),
+            css_cache: RulesCache::try_load_from_file(style)
+                .expect("Unable to load the style file. Please consult the log."),
+            screen: Screen::new(
+                center,
+                width,
+                height,
+                CONFIG.renderer.tile_size,
+                hidpi_factor,
+            ),
             tile_field: TileField::new(TileId::new(8, 0, 0), TileId::new(8, 0, 0)),
             zoom,
             hovered_objects: vec![],
@@ -42,7 +46,9 @@ impl AppState {
             stats: Stats::new(),
             ui: UIState::new(),
             visible_tiles: BTreeMap::new(),
-            feature_collection: Arc::new(RwLock::new(FeatureCollection::new(CONFIG.renderer.max_features as u32))),
+            feature_collection: Arc::new(RwLock::new(FeatureCollection::new(
+                CONFIG.renderer.max_features as u32,
+            ))),
         }
     }
 
@@ -58,7 +64,9 @@ impl AppState {
         let tile_field = self.screen.get_tile_boundaries_for_zoom_level(self.zoom, 1);
 
         // Remove old bigger tiles which are not in the FOV anymore.
-        let old_tile_field = self.screen.get_tile_boundaries_for_zoom_level(self.zoom - 1.0, 2);
+        let old_tile_field = self
+            .screen
+            .get_tile_boundaries_for_zoom_level(self.zoom - 1.0, 2);
         let key_iter: Vec<_> = self.visible_tiles.keys().copied().collect();
         for key in key_iter {
             if key.z == (self.zoom - 1.0) as u32 {
@@ -75,19 +83,19 @@ impl AppState {
         self.tile_cache.finalize_loaded_tiles();
         for tile_id in tile_field.iter() {
             if !self.visible_tiles.contains_key(&tile_id) {
-                self.tile_cache.request_tile(&tile_id, self.feature_collection.clone(), &CONFIG.renderer.selection_tags.clone());
-                
+                self.tile_cache.request_tile(
+                    &tile_id,
+                    self.feature_collection.clone(),
+                    &CONFIG.renderer.selection_tags.clone(),
+                );
+
                 let tile_cache = &mut self.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
-
                     let mut visible_tile = VisibleTile::new(tile);
 
                     visible_tile.load_collider();
 
-                    self.visible_tiles.insert(
-                        tile_id.clone(),
-                        visible_tile
-                    );
+                    self.visible_tiles.insert(tile_id.clone(), visible_tile);
 
                     // Remove old bigger tile when all 4 smaller tiles are loaded.
                     let mut count = 0;
@@ -108,7 +116,11 @@ impl AppState {
                         }
                     }
                     if count == 4 {
-                        self.visible_tiles.remove(&TileId::new(tile_id.z - 1, num_x / 2, num_y / 2));
+                        self.visible_tiles.remove(&TileId::new(
+                            tile_id.z - 1,
+                            num_x / 2,
+                            num_y / 2,
+                        ));
                     }
 
                     // Remove old smaller tiles when all 4 smaller tiles are loaded.
@@ -132,15 +144,16 @@ impl AppState {
     }
 
     pub fn update_hovered_objects(&mut self, point: (f32, f32)) {
-        self.hovered_objects = Collider::get_hovered_objects(&self.visible_tiles, &self.screen, self.zoom ,point);
+        self.hovered_objects =
+            Collider::get_hovered_objects(&self.visible_tiles, &self.screen, self.zoom, point);
     }
 
     pub fn update_selected_hover_objects(&mut self) {
-        self.selected_objects =
-            self.hovered_objects
-                .iter()
-                .map(|o| EditableObject::new(o.clone()))
-                .collect();
+        self.selected_objects = self
+            .hovered_objects
+            .iter()
+            .map(|o| EditableObject::new(o.clone()))
+            .collect();
     }
 
     pub fn advance_selected_object(&mut self) {
