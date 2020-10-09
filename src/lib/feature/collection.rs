@@ -19,7 +19,11 @@ impl FeatureCollection {
     }
 
     fn get_feature_id(&mut self, selector: &crate::css::Selector) -> Option<u32> {
-        self.features.iter_mut().enumerate().find(|(_, feature)| &feature.selector == selector).map(|(i, _)| i as u32)
+        self.features
+            .iter_mut()
+            .enumerate()
+            .find(|(_, feature)| &feature.selector == selector)
+            .map(|(i, _)| i as u32)
     }
 
     fn add_feature(&mut self, mut feature: Feature) -> u32 {

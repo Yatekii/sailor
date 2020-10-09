@@ -1,11 +1,4 @@
-use lyon::{
-    lyon_tessellation::GeometryBuilder,
-    path::Path,
-    math::*,
-    tessellation::{
-        FillVertex,
-    },
-};
+use lyon::{lyon_tessellation::GeometryBuilder, math::*, path::Path, tessellation::FillVertex};
 
 use crate::*;
 
@@ -35,7 +28,9 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>, z:
         }
     } else {
         normal
-    }.normalize() * width_factor;
+    }
+    .normalize()
+        * width_factor;
 
     let (vl, vr) = {
         let v1 = (first, last_normal);
@@ -47,15 +42,19 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>, z:
         }
     };
 
-    let mut last_vertex_left = builder.add_vertex(FillVertex {
-        position: vl.0,
-        normal: vl.1,
-    }).unwrap();
+    let mut last_vertex_left = builder
+        .add_vertex(FillVertex {
+            position: vl.0,
+            normal: vl.1,
+        })
+        .unwrap();
 
-    let mut last_vertex_right = builder.add_vertex(FillVertex {
-        position: vr.0,
-        normal: vr.1,
-    }).unwrap();
+    let mut last_vertex_right = builder
+        .add_vertex(FillVertex {
+            position: vr.0,
+            normal: vr.1,
+        })
+        .unwrap();
 
     if points.len() > 2 {
         for i in 0..points.len() - 2 {
@@ -72,14 +71,11 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>, z:
                 local_normal
             } else {
                 -local_normal
-            }.normalize();
+            }
+            .normalize();
 
             let dot = local_normal.dot(normal);
-            let normal = if dot == 0.0 {
-                local_normal
-            } else {
-                normal
-            }.normalize() * width_factor;
+            let normal = if dot == 0.0 { local_normal } else { normal }.normalize() * width_factor;
 
             let factor = (1.0 / normal.dot(local_normal).abs()).min(3.0);
 
@@ -93,27 +89,31 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>, z:
                 }
             };
 
-            let vertex_left = builder.add_vertex(FillVertex {
-                position: vl.0,
-                normal: vl.1,
-            }).unwrap();
+            let vertex_left = builder
+                .add_vertex(FillVertex {
+                    position: vl.0,
+                    normal: vl.1,
+                })
+                .unwrap();
 
-            let vertex_right = builder.add_vertex(FillVertex {
-                position: vr.0,
-                normal: vr.1,
-            }).unwrap();
+            let vertex_right = builder
+                .add_vertex(FillVertex {
+                    position: vr.0,
+                    normal: vr.1,
+                })
+                .unwrap();
 
             GeometryBuilder::<FillVertex>::add_triangle(
                 builder,
                 last_vertex_left,
                 last_vertex_right,
-                vertex_left
+                vertex_left,
             );
             GeometryBuilder::<FillVertex>::add_triangle(
                 builder,
                 last_vertex_right,
                 vertex_right,
-                vertex_left
+                vertex_left,
             );
 
             last_vertex_left = vertex_left;
@@ -146,27 +146,31 @@ pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>, z:
         }
     };
 
-    let vertex_left = builder.add_vertex(FillVertex {
-        position: vl.0,
-        normal: vl.1,
-    }).unwrap();
+    let vertex_left = builder
+        .add_vertex(FillVertex {
+            position: vl.0,
+            normal: vl.1,
+        })
+        .unwrap();
 
-    let vertex_right = builder.add_vertex(FillVertex {
-        position: vr.0,
-        normal: vr.1,
-    }).unwrap();
+    let vertex_right = builder
+        .add_vertex(FillVertex {
+            position: vr.0,
+            normal: vr.1,
+        })
+        .unwrap();
 
     GeometryBuilder::<FillVertex>::add_triangle(
         builder,
         last_vertex_left,
         last_vertex_right,
-        vertex_left
+        vertex_left,
     );
     GeometryBuilder::<FillVertex>::add_triangle(
         builder,
         last_vertex_right,
         vertex_right,
-        vertex_left
+        vertex_left,
     );
 
     GeometryBuilder::<FillVertex>::end_geometry(builder);

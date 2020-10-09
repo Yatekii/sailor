@@ -53,13 +53,13 @@ impl<'a> Iterator for TileIterator<'a> {
         for _ in self.current_tile.x..self.tile_field.bottomright.x + 1 {
             let c = self.current_tile;
             self.current_tile = self.current_tile + TileId::new(self.current_tile.z, 1, 0);
-            return Some(c)
+            return Some(c);
         }
         if self.current_tile.y < self.tile_field.bottomright.y {
             self.current_tile = TileId::new(
                 self.current_tile.z,
                 self.tile_field.topleft.x + 1,
-                self.current_tile.y + 1
+                self.current_tile.y + 1,
             );
             let c = self.current_tile - TileId::new(self.current_tile.z, 1, 0);
             Some(c)

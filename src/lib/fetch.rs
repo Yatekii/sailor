@@ -1,15 +1,8 @@
-use std::{
-    fs::File,
-    path::Path,
-    io::Read,
-};
+use std::{fs::File, io::Read, path::Path};
 
 use super::*;
 
-pub fn fetch_tile_data(
-    cache_location: impl AsRef<Path>,
-    tile_id: &TileId
-) -> Option<Vec<u8>> {
+pub fn fetch_tile_data(cache_location: impl AsRef<Path>, tile_id: &TileId) -> Option<Vec<u8>> {
     let zxy: String = format!("{}", tile_id);
     let pbf = format!("cache/{}.pbf", zxy);
     if !is_in_cache(pbf.clone()) {
@@ -19,15 +12,13 @@ pub fn fetch_tile_data(
                 Ok(mut file) => {
                     use std::io::Write;
                     match file.write_all(&data[..]) {
-                        Ok(_) => {
-                            Some(data)
-                        },
+                        Ok(_) => Some(data),
                         Err(e) => {
                             log::error!("Unable to write pbf {}. Reason:\r\n{}", pbf, e);
                             None
-                        },
+                        }
                     }
-                },
+                }
                 Err(e) => {
                     log::error!("Could not create pbf {}. Reason:\r\n{}", pbf, e);
                     None
@@ -41,15 +32,13 @@ pub fn fetch_tile_data(
             Ok(mut f) => {
                 let mut buffer = Vec::new();
                 match f.read_to_end(&mut buffer) {
-                    Ok(_) => {
-                        Some(buffer)
-                    },
+                    Ok(_) => Some(buffer),
                     Err(e) => {
                         log::error!("Unable to read {}. Reason:\r\n{}", pbf, e);
                         None
-                    },
+                    }
                 }
-            },
+            }
             Err(e) => {
                 log::error!("Unable to open {}. Reason:\r\n{}", pbf, e);
                 None
@@ -59,25 +48,34 @@ pub fn fetch_tile_data(
 }
 
 fn fetch_tile_from_server(tile_id: &TileId) -> Option<Vec<u8>> {
-    let request_url = format!("https://api.maptiler.com/tiles/v3/{}.pbf?key=t2mP0OQnprAXkW20R6Wd", tile_id);
+    let request_url = format!(
+        "https://api.maptiler.com/tiles/v3/{}.pbf?key=t2mP0OQnprAXkW20R6Wd",
+        tile_id
+    );
     match reqwest::get(&request_url) {
         Ok(mut resp) => {
             if resp.status() != reqwest::StatusCode::OK {
-                log::warn!("Tile request failed for {}. Status was:\r\n{}", tile_id, resp.status());
+                log::warn!(
+                    "Tile request failed for {}. Status was:\r\n{}",
+                    tile_id,
+                    resp.status()
+                );
                 None
             } else {
                 let mut data: Vec<u8> = vec![];
                 match resp.copy_to(&mut data) {
-                    Ok(_) => {
-                        Some(data)
-                    },
+                    Ok(_) => Some(data),
                     Err(e) => {
-                        log::warn!("Could not read http response for {} to buffer. Reason:\r\n{}", tile_id, e);
+                        log::warn!(
+                            "Could not read http response for {} to buffer. Reason:\r\n{}",
+                            tile_id,
+                            e
+                        );
                         None
-                    },
+                    }
                 }
             }
-        },
+        }
         Err(err) => {
             log::warn!("Http request for {} failed. Reason:\r\n{:?}", tile_id, err);
             None
@@ -90,7 +88,9 @@ fn is_in_cache(path: impl Into<String>) -> bool {
 }
 
 fn ensure_cache_structure(root: impl AsRef<Path>, tile_id: &TileId) {
-    let dir_path = root.as_ref().join(&format!("cache/{}/{}/", tile_id.z, tile_id.x));
+    let dir_path = root
+        .as_ref()
+        .join(&format!("cache/{}/{}/", tile_id.z, tile_id.x));
     std::fs::create_dir_all(dir_path).expect("Could not create cache directories.");
 }
 

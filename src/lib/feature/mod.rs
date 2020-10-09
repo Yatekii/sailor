@@ -15,7 +15,10 @@ pub struct DrawableColor {
 impl From<Color> for DrawableColor {
     fn from(value: Color) -> Self {
         Self {
-            r: value.r, g: value.g, b: value.b, a: value.a,
+            r: value.r,
+            g: value.g,
+            b: value.b,
+            a: value.a,
         }
     }
 }
@@ -51,7 +54,10 @@ impl Feature {
 
     pub fn load_style(&mut self, zoom: f32, css_cache: &mut RulesCache) {
         let rules = css_cache.get_matching_rules(
-            &self.selector.clone().with_any("zoom".to_string(), (zoom.floor() as u32).to_string())
+            &self
+                .selector
+                .clone()
+                .with_any("zoom".to_string(), (zoom.floor() as u32).to_string()),
         );
 
         let background_color = rules
@@ -63,7 +69,7 @@ impl Feature {
             match color {
                 CSSValue::Color(bg) => {
                     self.style.background_color = bg.clone().into();
-                },
+                }
                 CSSValue::String(string) => {
                     match &string[..] {
                         "red" => self.style.background_color = Color::RED.into(),
@@ -72,14 +78,15 @@ impl Feature {
                         "black" => self.style.background_color = Color::BLACK.into(),
                         "white" => self.style.background_color = Color::WHITE.into(),
                         // Other CSS colors to come later.
-                        color => {
-                            log::info!("The color '{}' is currently not supported.", color)
-                        },
+                        color => log::info!("The color '{}' is currently not supported.", color),
                     }
-                },
+                }
                 value => {
-                    log::info!("The value '{:?}' is currently not supported for 'background-color'.", value);
-                },
+                    log::info!(
+                        "The value '{:?}' is currently not supported for 'background-color'.",
+                        value
+                    );
+                }
             }
         }
 
@@ -93,7 +100,7 @@ impl Feature {
                 CSSValue::Color(bg) => {
                     self.style.border_color = bg.clone().into();
                     self.style.border_color;
-                },
+                }
                 CSSValue::String(string) => {
                     match &string[..] {
                         "red" => self.style.border_color = Color::RED.into(),
@@ -102,14 +109,15 @@ impl Feature {
                         "black" => self.style.background_color = Color::BLACK.into(),
                         "white" => self.style.background_color = Color::WHITE.into(),
                         // Other CSS colors to come later.
-                        color => {
-                            log::info!("The color '{}' is currently not supported.", color)
-                        },
+                        color => log::info!("The color '{}' is currently not supported.", color),
                     }
-                },
+                }
                 value => {
-                    log::info!("The value '{:?}' is currently not supported for 'border-color'.", value);
-                },
+                    log::info!(
+                        "The value '{:?}' is currently not supported for 'border-color'.",
+                        value
+                    );
+                }
             }
         }
 
@@ -122,16 +130,19 @@ impl Feature {
             match border_width {
                 CSSValue::Number(number) => match number {
                     Number::Px(px) => self.style.border_width = (*px).into(),
-                    value => log::info!("The value '{:?}' is currently not supported for 'border-width'.", value)
+                    value => log::info!(
+                        "The value '{:?}' is currently not supported for 'border-width'.",
+                        value
+                    ),
                 },
-                value => log::info!("The value '{:?}' is currently not supported for 'border-width'.", value)
+                value => log::info!(
+                    "The value '{:?}' is currently not supported for 'border-width'.",
+                    value
+                ),
             }
         }
 
-        let display = rules
-            .iter()
-            .filter_map(|r| r.kvs.get("display"))
-            .last();
+        let display = rules.iter().filter_map(|r| r.kvs.get("display")).last();
 
         if let Some(display) = display {
             match display {
@@ -139,42 +150,51 @@ impl Feature {
                     "none" => self.style.display = false,
                     _ => self.style.display = true,
                 },
-                value => log::info!("The value '{:?}' is currently not supported for 'display'.", value)
+                value => log::info!(
+                    "The value '{:?}' is currently not supported for 'display'.",
+                    value
+                ),
             }
         } else {
             self.style.display = true;
         }
 
-        let line_width = rules
-            .iter()
-            .filter_map(|r| r.kvs.get("line-width"))
-            .last();
+        let line_width = rules.iter().filter_map(|r| r.kvs.get("line-width")).last();
 
         if let Some(line_width) = line_width {
             match line_width {
                 CSSValue::Number(number) => match number {
                     Number::Px(px) => self.style.line_width = (*px as u32) << 1 | 0b01,
                     Number::World(world) => self.style.line_width = ((*world as u32) << 1) | 0b00,
-                    value => log::info!("The value '{:?}' is currently not supported for 'line-width'.", value)
+                    value => log::info!(
+                        "The value '{:?}' is currently not supported for 'line-width'.",
+                        value
+                    ),
                 },
-                value => log::info!("The value '{:?}' is currently not supported for 'line-width'.", value)
+                value => log::info!(
+                    "The value '{:?}' is currently not supported for 'line-width'.",
+                    value
+                ),
             }
         } else {
             self.style.line_width = 0;
         }
 
-        let z_index = rules
-            .iter()
-            .filter_map(|r| r.kvs.get("z-index"))
-            .last();
+        let z_index = rules.iter().filter_map(|r| r.kvs.get("z-index")).last();
 
         if let Some(z_index) = z_index {
             match z_index {
                 CSSValue::Number(number) => match number {
                     Number::Unitless(unitless) => self.style.z_index = *unitless,
-                    value => log::info!("The value '{:?}' is currently not supported for 'z-index'.", value)
+                    value => log::info!(
+                        "The value '{:?}' is currently not supported for 'z-index'.",
+                        value
+                    ),
                 },
-                value => log::info!("The value '{:?}' is currently not supported for 'z-index'.", value)
+                value => log::info!(
+                    "The value '{:?}' is currently not supported for 'z-index'.",
+                    value
+                ),
             }
         } else {
             self.style.z_index = self.layer_id as f32;

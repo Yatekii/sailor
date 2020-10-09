@@ -23,19 +23,26 @@ impl Screen {
 
     pub fn get_tile_boundaries_for_zoom_level(&self, z: f32, scale: u32) -> TileField {
         let z = z.min(14.0);
-        let px_to_world = self.width as f32 / self.get_tile_size() as f32 / 2.0 / 2f32.powi(z as i32) / scale as f32;
-        let py_to_world = self.height as f32 / self.get_tile_size() as f32 / 2.0 / 2f32.powi(z as i32) / scale as f32;
+        let px_to_world = self.width as f32
+            / self.get_tile_size() as f32
+            / 2.0
+            / 2f32.powi(z as i32)
+            / scale as f32;
+        let py_to_world = self.height as f32
+            / self.get_tile_size() as f32
+            / 2.0
+            / 2f32.powi(z as i32)
+            / scale as f32;
 
-        let top_left: TileId = global_to_num_space(&(self.center - vector(px_to_world, py_to_world)), z as u32).into();
-        let bottom_right: TileId = global_to_num_space(&(self.center + vector(px_to_world, py_to_world)), z as u32).into();
-        TileField::new(
-            top_left,
-            bottom_right
-        )
+        let top_left: TileId =
+            global_to_num_space(&(self.center - vector(px_to_world, py_to_world)), z as u32).into();
+        let bottom_right: TileId =
+            global_to_num_space(&(self.center + vector(px_to_world, py_to_world)), z as u32).into();
+        TileField::new(top_left, bottom_right)
     }
 
     pub fn tile_to_global_space(&self, z: f32, coordinate: &TileId) -> glm::TMat4<f32> {
-        let zoom = 1.0/2f32.powi(coordinate.z as i32);
+        let zoom = 1.0 / 2f32.powi(coordinate.z as i32);
         let zoom = glm::scaling(&glm::vec3(zoom, zoom, 1.0));
         let pos = glm::translation(&glm::vec3(coordinate.x as f32, coordinate.y as f32, 0.0));
         self.global_to_screen(z) * zoom * pos

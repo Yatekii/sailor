@@ -1,25 +1,22 @@
-mod vector_tile;
 mod tile;
 mod tile_id;
+mod vector_tile;
 mod visible_tile;
 
-pub use vector_tile::*;
 pub use tile::*;
 pub use tile_id::*;
+pub use vector_tile::*;
 pub use visible_tile::*;
 
+use super::*;
 use core::ops::Range;
 use lyon::{
-    path::Path,
     math::*,
-    tessellation::{
-        FillTessellator,
-        FillOptions,
-    },
+    path::Path,
+    tessellation::{FillOptions, FillTessellator},
 };
 use varint::ZigZag;
 use vector_tile::mod_Tile::*;
-use super::*;
 
 #[derive(Debug, Clone)]
 pub struct Layer {
@@ -42,7 +39,12 @@ fn area(path: &Path) -> f32 {
     area + points[points.len() - 1].x * points[1].y - points[points.len() - 1].y * points[1].x
 }
 
-fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, cursor: &mut usize, gcursor: &mut Point) -> Path {
+fn parse_one_to_path(
+    geometry_type: GeomType,
+    geometry: &Vec<u32>,
+    cursor: &mut usize,
+    gcursor: &mut Point,
+) -> Path {
     let mut builder = Path::builder();
 
     while *cursor < geometry.len() {
@@ -62,9 +64,9 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, cursor: &mut 
                 }
                 match geometry_type {
                     GeomType::POINT => return builder.build(),
-                    _ => {},
+                    _ => {}
                 }
-            },
+            }
             2 => {
                 for _ in 0..count {
                     let dx = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32;
@@ -77,21 +79,21 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, cursor: &mut 
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),
                     GeomType::LINESTRING => return builder.build(),
-                    _ => {},
+                    _ => {}
                 }
-            },
+            }
             7 => {
                 builder.close();
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),
                     GeomType::LINESTRING => panic!("This is a bug. Please report it."),
-                    GeomType::POLYGON => {},
+                    GeomType::POLYGON => {}
                     _ => panic!("This is a bug. Please report it."),
                 }
-            },
+            }
             _ => {
                 panic!("This is a bug. Please report it.");
-            },
+            }
         }
     }
     match geometry_type {
@@ -104,7 +106,7 @@ fn parse_one_to_path(geometry_type: GeomType, geometry: &Vec<u32>, cursor: &mut 
             } else {
                 return path;
             }
-        },
+        }
         _ => panic!("This is a bug. Please report it."),
     }
 }
@@ -139,7 +141,10 @@ pub fn paths_to_drawable<'a, 'l>(
                     path,
                     &FillOptions::tolerance(0.0001).with_normals(true),
                     builder,
-                ).map_err(|_e| { log::error!("Broken path."); });
+                )
+                .map_err(|_e| {
+                    log::error!("Broken path.");
+                });
         }
 
         if geometry_type == GeomType::LINESTRING {
