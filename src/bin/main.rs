@@ -43,7 +43,7 @@ fn main() {
 
     let mut app_state = app_state::AppState::new(
         "config/style.css",
-        zurich.clone(),
+        zurich,
         width,
         height,
         z,

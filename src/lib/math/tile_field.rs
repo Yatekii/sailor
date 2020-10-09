@@ -72,7 +72,7 @@ impl<'a> Iterator for TileIterator<'a> {
 #[test]
 fn get_tile_boundaries_for_8_zoom() {
     use super::*;
-    let bb = Screen::new(point(47.607371, 6.114297), 800, 800, 256, 1.0);
+    let bb = Screen::new(point(47.607_372, 6.114297), 800, 800, 256, 1.0);
     let tile_field = bb.get_tile_boundaries_for_zoom_level(8.0, 1);
     let tiles = tile_field.iter().collect::<Vec<_>>();
 

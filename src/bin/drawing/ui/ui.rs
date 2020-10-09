@@ -152,7 +152,7 @@ impl HUD {
 
                     add_header_separator(&ui, im_str!("Selected Object"));
 
-                    if item >= 0 && items.len() > 0 {
+                    if item >= 0 && !items.is_empty() {
                         app_state.selected_objects[item as usize].selected = true;
                     }
 
@@ -222,7 +222,7 @@ impl HUD {
                             .ui
                             .loaction_finder
                             .input
-                            .split(" ")
+                            .split(' ')
                             .map(|s| s.parse::<f32>())
                             .collect();
                         if let Ok(split) = split {
@@ -316,10 +316,7 @@ fn add_display_none(ui: &Ui, rule: &mut Rule) {
     let attribute = "display";
     let mut value = if let Some(value) = rule.kvs.get(attribute) {
         match value {
-            CSSValue::String(value) => match &value[..] {
-                "none" => false,
-                _ => true,
-            },
+            CSSValue::String(value) => !matches!(&value[..], "none"),
             _ => true,
         }
     } else {

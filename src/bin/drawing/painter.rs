@@ -202,7 +202,7 @@ impl Painter {
         temperature.generate_texture(&mut device, &mut queue, width, height);
 
         Self {
-            window: window,
+            window,
             hidpi_factor: factor,
             device,
             queue,
@@ -583,7 +583,7 @@ impl Painter {
             size: multisampled_texture_extent,
             array_layer_count: 1,
             mip_level_count: 1,
-            sample_count: sample_count,
+            sample_count,
             dimension: TextureDimension::D2,
             format: swap_chain_descriptor.format,
             usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
@@ -631,7 +631,7 @@ impl Painter {
         );
         let num_tiles = app_state.visible_tiles().len();
         let features = feature_collection.get_features();
-        if features.len() > 0 && num_tiles > 0 {
+        if !features.is_empty() && num_tiles > 0 {
             if let Ok(frame) = self.swap_chain.get_next_texture() {
                 {
                     let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {

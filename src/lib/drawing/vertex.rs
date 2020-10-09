@@ -26,7 +26,7 @@ pub struct LayerVertexCtor {
 impl LayerVertexCtor {
     pub fn new(tile_id: &TileId, extent: f32) -> Self {
         Self {
-            tile_id: tile_id.clone(),
+            tile_id: *tile_id,
             feature_id: 0,
             extent,
             vertex_type: VertexType::Polygon,
