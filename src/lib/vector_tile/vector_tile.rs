@@ -10,7 +10,7 @@
 
 
 use std::io::Write;
-use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Result, Writer, WriterBackend};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -39,7 +39,7 @@ impl<'a> MessageWrite for Tile<'a> {
         + self.layers.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         for s in &self.layers { w.write_with_tag(26, |w| w.write_message(s))?; }
         Ok(())
     }
@@ -93,7 +93,7 @@ impl<'a> MessageWrite for Value<'a> {
         + self.bool_value.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.string_value { w.write_with_tag(10, |w| w.write_string(&**s))?; }
         if let Some(ref s) = self.float_value { w.write_with_tag(21, |w| w.write_float(*s))?; }
         if let Some(ref s) = self.double_value { w.write_with_tag(25, |w| w.write_double(*s))?; }
@@ -139,7 +139,7 @@ impl MessageWrite for Feature {
         + if self.geometry.is_empty() { 0 } else { 1 + sizeof_len(self.geometry.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.id != 0u64 { w.write_with_tag(8, |w| w.write_uint64(*&self.id))?; }
         w.write_packed_with_tag(18, &self.tags, |w, m| w.write_uint32(*m), &|m| sizeof_varint(*(m) as u64))?;
         if self.type_pb != vector_tile::mod_Tile::GeomType::UNKNOWN { w.write_with_tag(24, |w| w.write_enum(*&self.type_pb as i32))?; }
@@ -192,7 +192,7 @@ impl<'a> MessageWrite for Layer<'a> {
         + if self.extent == 4096u32 { 0 } else { 1 + sizeof_varint(*(&self.extent) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_with_tag(120, |w| w.write_uint32(*&self.version))?;
         w.write_with_tag(10, |w| w.write_string(&**&self.name))?;
         for s in &self.features { w.write_with_tag(18, |w| w.write_message(s))?; }
@@ -242,4 +242,3 @@ impl<'a> From<&'a str> for GeomType {
 }
 
 }
-

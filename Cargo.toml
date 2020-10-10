@@ -24,10 +24,10 @@ name = "sailor"
 path = "src/bin/main.rs"
 
 [dependencies]
-quick-protobuf = "0.6.3"
+quick-protobuf = "0.8.0"
 lyon = "0.13.2"
 varint = "0.9.0"
-reqwest = "0.9.18"
+ureq = "1.5.1"
 nalgebra = "0.22.0"
 nalgebra-glm = "0.8.0"
 nom = "5.0.0-beta2"
