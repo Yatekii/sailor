@@ -52,34 +52,28 @@ fn fetch_tile_from_server(tile_id: &TileId) -> Option<Vec<u8>> {
         "https://api.maptiler.com/tiles/v3/{}.pbf?key=t2mP0OQnprAXkW20R6Wd",
         tile_id
     );
-    match reqwest::get(&request_url) {
-        Ok(mut resp) => {
-            if resp.status() != reqwest::StatusCode::OK {
+    let response = ureq::get(&request_url).call();
+    if response.ok() {
+        let mut reader = response.into_reader();
+        let mut data = vec![];
+        match reader.read_to_end(&mut data) {
+            Ok(_) => Some(data),
+            Err(e) => {
                 log::warn!(
-                    "Tile request failed for {}. Status was:\r\n{}",
+                    "Could not read http response for {} to buffer. Reason:\r\n{}",
                     tile_id,
-                    resp.status()
+                    e
                 );
                 None
-            } else {
-                let mut data: Vec<u8> = vec![];
-                match resp.copy_to(&mut data) {
-                    Ok(_) => Some(data),
-                    Err(e) => {
-                        log::warn!(
-                            "Could not read http response for {} to buffer. Reason:\r\n{}",
-                            tile_id,
-                            e
-                        );
-                        None
-                    }
-                }
             }
         }
-        Err(err) => {
-            log::warn!("Http request for {} failed. Reason:\r\n{:?}", tile_id, err);
-            None
-        }
+    } else {
+        log::warn!(
+            "Http request for {} failed. Reason:\r\n{:?}",
+            tile_id,
+            response.status()
+        );
+        None
     }
 }
 
