@@ -41,7 +41,7 @@ lazy_static = "1.3.0"
 config = "0.10.1"
 pretty_env_logger = "0.4.0"
 log = { version = "0.4.7", features = ["serde"] }
-glsl-to-spirv = "0.1"
+shaderc = "0.6"
 num-traits = "0.2.8"
 imgui = "0.3.0"
 imgui-wgpu = "0.6.0"
