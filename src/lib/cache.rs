@@ -95,10 +95,7 @@ impl TileCache {
                         // Create a new Tile from the fetched data.
                         let tile = Tile::from_mbvt(&tile_id_clone, &data, feature_collection, selection_tags);
                         // Signalize that the end of the tile loading process could not be signalized.
-                        match tx.send(id) {
-                            Err(_) => log::debug!("Could not send the tile load message. This most likely happened because the app was terminated."),
-                            _ => (),
-                        }
+                       if tx.send(id).is_err() { log::debug!("Could not send the tile load message. This most likely happened because the app was terminated.") }
                         Some(tile)
                     } else {
                         None

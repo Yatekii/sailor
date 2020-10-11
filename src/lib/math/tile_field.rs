@@ -24,7 +24,7 @@ impl TileField {
         }
     }
 
-    pub fn iter<'a>(&'a self) -> TileIterator<'a> {
+    pub fn iter(&self) -> TileIterator {
         TileIterator {
             tile_field: self,
             current_tile: self.topleft,
@@ -53,6 +53,9 @@ impl<'a> Iterator for TileIterator<'a> {
         for _ in self.current_tile.x..self.tile_field.bottomright.x + 1 {
             let c = self.current_tile;
             self.current_tile = self.current_tile + TileId::new(self.current_tile.z, 1, 0);
+            // TODO error?
+            //    = note: `#[warn(clippy::never_loop)]` on by default
+            //    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#never_loop
             return Some(c);
         }
         if self.current_tile.y < self.tile_field.bottomright.y {
@@ -74,7 +77,6 @@ fn get_tile_boundaries_for_8_zoom() {
     use super::*;
     let bb = Screen::new(point(47.607_372, 6.114297), 800, 800, 256, 1.0);
     let tile_field = bb.get_tile_boundaries_for_zoom_level(8.0, 1);
-    let tiles = tile_field.iter().collect::<Vec<_>>();
 
-    assert_eq!(tiles.len(), 20);
+    assert_eq!(tile_field.iter().count(), 20);
 }

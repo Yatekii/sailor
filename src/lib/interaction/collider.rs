@@ -7,8 +7,8 @@ use crate::*;
 pub struct Collider {}
 
 impl Collider {
-    pub fn get_hovered_objects<'a>(
-        visible_tiles: &'a BTreeMap<TileId, VisibleTile>,
+    pub fn get_hovered_objects(
+        visible_tiles: &BTreeMap<TileId, VisibleTile>,
         screen: &Screen,
         zoom: f32,
         point: (f32, f32),

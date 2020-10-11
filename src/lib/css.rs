@@ -195,7 +195,11 @@ impl Default for Selector {
 impl std::fmt::Display for Selector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut selector = self.typ.clone().unwrap_or_default();
-        self.id.as_ref().map(|id| selector += &id);
+
+        if let Some(id) = self.id.as_ref() {
+            selector += id
+        }
+
         for class in &self.classes {
             selector += ".";
             selector += &class;

@@ -2,8 +2,6 @@ extern crate nalgebra_glm as glm;
 extern crate parity_util_mem as malloc_size_of;
 #[macro_use]
 extern crate malloc_size_of_derive;
-#[macro_use]
-extern crate derivative;
 
 mod cache;
 mod css;

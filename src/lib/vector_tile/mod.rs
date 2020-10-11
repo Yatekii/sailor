@@ -62,9 +62,9 @@ fn parse_one_to_path(
                     *gcursor += vector(dx, dy);
                     builder.move_to(*gcursor);
                 }
-                match geometry_type {
-                    GeomType::POINT => return builder.build(),
-                    _ => {}
+
+                if let GeomType::POINT = geometry_type {
+                    return builder.build();
                 }
             }
             2 => {
@@ -117,10 +117,10 @@ pub fn geometry_commands_to_paths(geometry_type: GeomType, geometry: &[u32]) -> 
     paths
 }
 
-pub fn paths_to_drawable<'a, 'l>(
-    builder: &'a mut MeshBuilder<'l>,
+pub fn paths_to_drawable(
+    builder: &mut MeshBuilder,
     geometry_type: GeomType,
-    paths: &Vec<Path>,
+    paths: &[Path],
     extent: f32,
     z: u32,
 ) {

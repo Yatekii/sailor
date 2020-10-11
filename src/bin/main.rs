@@ -6,8 +6,6 @@ mod stats;
 extern crate lyon;
 extern crate nalgebra_glm as glm;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate serde_derive;
 
 use lyon::math::vector;
@@ -90,8 +88,8 @@ fn main() {
                 }
                 WindowEvent::MouseInput { state, button, .. } => {
                     if route_mouse {
-                        match button {
-                            MouseButton::Left => match state {
+                        if let MouseButton::Left = button {
+                            match state {
                                 ElementState::Pressed => {
                                     mouse_down = true;
                                 }
@@ -99,16 +97,14 @@ fn main() {
                                     mouse_down = false;
                                     app_state.update_selected_hover_objects();
                                 }
-                            },
-                            _ => {}
+                            }
                         }
                     }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
                     if route_mouse {
-                        match delta {
-                            MouseScrollDelta::LineDelta(_x, y) => app_state.zoom += 0.1 * y,
-                            _ => (),
+                        if let MouseScrollDelta::LineDelta(_, y) = delta {
+                            app_state.zoom += 0.1 * y
                         }
                     }
                 }

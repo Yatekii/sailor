@@ -1,7 +1,6 @@
-lazy_static! {
-    /// This is an example for using doc comment attributes
-    pub static ref CONFIG: Config = Config::new().expect("Config could not be loaded.");
-}
+use once_cell::sync::Lazy;
+
+pub static CONFIG: Lazy<Config> = Lazy::new(|| Config::new().expect("Config could not be loaded."));
 
 #[derive(Debug, Deserialize)]
 pub struct Renderer {

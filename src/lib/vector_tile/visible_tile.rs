@@ -55,7 +55,7 @@ impl VisibleTile {
         self.tile_collider.clone()
     }
 
-    pub fn gpu_tile<'a>(&'a self) -> RwLockReadGuard<'a, Option<LoadedGPUTile>> {
+    pub fn gpu_tile(&self) -> RwLockReadGuard<Option<LoadedGPUTile>> {
         self.gpu_tile.try_read().unwrap()
     }
 

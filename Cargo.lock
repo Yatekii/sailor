@@ -490,17 +490,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "derivative"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb582b60359da160a9477ee80f15c8d784c477e69c217ef2cdd4169c24ea380f"
-dependencies = [
- "proc-macro2 1.0.24",
- "quote 1.0.7",
- "syn 1.0.44",
-]
-
-[[package]]
 name = "discard"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -785,15 +774,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
 dependencies = [
  "byteorder",
-]
-
-[[package]]
-name = "generic-array"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c68f0274ae0e023facc3c97b2e00f076be70e254bc851d972503b328db79b2ec"
-dependencies = [
- "typenum",
 ]
 
 [[package]]
@@ -1483,7 +1463,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a3f0b89b0a44cb7bb9b62c5e6fd485145ddc6bc14483ab005355e96029b3fbf"
 dependencies = [
  "approx",
- "generic-array 0.13.2",
+ "generic-array",
  "matrixmultiply",
  "num-complex",
  "num-rational",
@@ -1587,19 +1567,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8536030f9fea7127f841b45bb6243b27255787fb4eb83958aa1ef9d2fdc0c36"
-dependencies = [
- "num-complex",
- "num-integer",
- "num-iter",
- "num-rational",
- "num-traits 0.2.12",
-]
-
-[[package]]
 name = "num-complex"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1616,17 +1583,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d59457e662d541ba17869cf51cf177c0b5f0cbf476c66bdc90bf1edac4f875b"
 dependencies = [
  "autocfg 1.0.1",
- "num-traits 0.2.12",
-]
-
-[[package]]
-name = "num-iter"
-version = "0.1.41"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a6e6b7c748f995c4c29c5f5ae0248536e04a5739927c74ec0fa564805094b9f"
-dependencies = [
- "autocfg 1.0.1",
- "num-integer",
  "num-traits 0.2.12",
 ]
 
@@ -2173,12 +2129,10 @@ version = "0.1.0"
 dependencies = [
  "config",
  "crossbeam-channel",
- "derivative",
  "futures",
  "imgui",
  "imgui-wgpu",
  "imgui-winit-support",
- "lazy_static",
  "log",
  "lyon",
  "malloc_size_of_derive",
@@ -2187,15 +2141,13 @@ dependencies = [
  "ncollide2d",
  "nom",
  "notify",
- "num-traits 0.2.12",
+ "once_cell",
  "parity-util-mem",
  "pretty_env_logger",
  "quick-protobuf",
- "raw-window-handle",
  "serde 1.0.116",
  "serde_derive",
  "shaderc",
- "size_format",
  "ureq",
  "varint",
  "wgpu",
@@ -2347,16 +2299,6 @@ dependencies = [
  "num-complex",
  "num-traits 0.2.12",
  "paste",
-]
-
-[[package]]
-name = "size_format"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ed5f6ab2122c6dec69dca18c72fa4590a27e581ad20d44960fe74c032a0b23b"
-dependencies = [
- "generic-array 0.12.3",
- "num",
 ]
 
 [[package]]
