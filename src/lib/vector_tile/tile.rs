@@ -9,22 +9,12 @@ use std::ops::Range;
 use std::sync::{Arc, RwLock};
 use vector_tile::mod_Tile::GeomType;
 
-fn format_size(value: &usize, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(
-        f,
-        "{:.1}B",
-        size_format::SizeFormatterSI::new(*value as u64)
-    )
-}
-
-#[derive(Clone, Copy, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TileStats {
     pub objects: usize,
     pub features: usize,
     pub vertices: usize,
     pub indices: usize,
-    #[derivative(Debug(format_with = "format_size"))]
     pub size: usize,
 }
 
@@ -286,8 +276,8 @@ impl Tile {
     /// Creates a rectangle the size of a tile to be used as the background of a tile.
     ///
     /// Could also display a texture in the future (speak swisstopo).
-    fn create_background_feature<'l>(
-        builder: &mut MeshBuilder<'l>,
+    fn create_background_feature(
+        builder: &mut MeshBuilder,
         feature_collection: Arc<RwLock<FeatureCollection>>,
         extent: u16,
     ) -> (u32, Object, Range<u32>) {

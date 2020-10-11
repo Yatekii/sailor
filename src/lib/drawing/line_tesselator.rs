@@ -3,10 +3,10 @@ use lyon::{lyon_tessellation::GeometryBuilder, math::*, path::Path, tessellation
 use crate::*;
 
 pub fn get_side(a: &Point, b: &Point, c: &Point) -> i32 {
-    num_traits::sign::signum((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) as i32
+    ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)).signum() as i32
 }
 
-pub fn tesselate_line2<'a, 'l>(path: &Path, builder: &'a mut MeshBuilder<'l>, z: u32) {
+pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, z: u32) {
     GeometryBuilder::<FillVertex>::begin_geometry(builder);
     // Fill
     let points = path.points();
