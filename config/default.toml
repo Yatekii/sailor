@@ -1,5 +1,5 @@
 [general]
-log_level = "Warn"
+log_level = "WARN"
 display_framerate = false
 data_root = ""
 

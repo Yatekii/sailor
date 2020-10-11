@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 #[allow(dead_code)]
 pub enum ShaderStage {
     Vertex,
@@ -7,10 +9,16 @@ pub enum ShaderStage {
 
 pub fn load_glsl(code: &str, stage: ShaderStage) -> Vec<u32> {
     let ty = match stage {
-        ShaderStage::Vertex => glsl_to_spirv::ShaderType::Vertex,
-        ShaderStage::Fragment => glsl_to_spirv::ShaderType::Fragment,
-        ShaderStage::Compute => glsl_to_spirv::ShaderType::Compute,
+        ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+        ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
+        ShaderStage::Compute => shaderc::ShaderKind::Compute,
     };
 
-    wgpu::read_spirv(glsl_to_spirv::compile(&code, ty).unwrap()).unwrap()
+    let mut compiler = shaderc::Compiler::new().unwrap();
+    let binary_result = compiler
+        .compile_into_spirv(code, ty, "shader.glsl", "main", None)
+        .unwrap();
+
+    let reader = Cursor::new(binary_result.as_binary_u8());
+    wgpu::read_spirv(reader).unwrap()
 }
