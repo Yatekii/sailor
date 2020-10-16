@@ -12,6 +12,7 @@ use lyon::math::vector;
 use osm::*;
 
 use winit::{
+    dpi::LogicalPosition,
     event::{
         ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
         WindowEvent,
@@ -103,8 +104,11 @@ fn main() {
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
                     if route_mouse {
-                        if let MouseScrollDelta::LineDelta(_, y) = delta {
-                            app_state.zoom += 0.1 * y
+                        match delta {
+                            MouseScrollDelta::LineDelta(_, y) => app_state.zoom += 0.1 * y,
+                            MouseScrollDelta::PixelDelta(LogicalPosition { y, .. }) => {
+                                app_state.zoom += 0.001 * y as f32
+                            }
                         }
                     }
                 }
