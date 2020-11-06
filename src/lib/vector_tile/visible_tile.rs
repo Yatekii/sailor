@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use wgpu::*;
-use wgpu_glyph::{GlyphBrush, Section};
+use wgpu_glyph::{GlyphBrush, Section, Text};
 
 use crate::*;
 
@@ -68,8 +68,8 @@ impl VisibleTile {
         tile_id: u32,
     ) {
         if let Some(data) = data {
-            render_pass.set_index_buffer(&data.index_buffer, 0, 0);
-            render_pass.set_vertex_buffer(0, &data.vertex_buffer, 0, 0);
+            render_pass.set_index_buffer(data.index_buffer.slice(..));
+            render_pass.set_vertex_buffer(0, data.vertex_buffer.slice(..));
 
             let features = {
                 let read_tile = self.tile.read().unwrap();
@@ -102,25 +102,17 @@ impl VisibleTile {
         }
     }
 
-    pub fn queue_text(&self, glyph_brush: &mut GlyphBrush<'static, ()>, screen: &Screen, z: f32) {
+    pub fn queue_text(&self, glyph_brush: &mut GlyphBrush<()>, screen: &Screen, z: f32) {
         let read_tile = self.tile.read().unwrap();
         let matrix = screen.tile_to_global_space(z, &read_tile.tile_id());
         for text in read_tile.text() {
             let position = matrix * glm::vec4((text.0).0, (text.0).1, 0.0, 1.0);
-            // let section = Section::default()
-            //     .add_text(Text::new(&text.1))
-            //     .with_screen_position((
-            //         (position.x + 1.0) * screen.width as f32 / 2.0,
-            //         (position.y + 1.0) * screen.height as f32 / 2.0,
-            //     ));
-            let section = Section {
-                text: &text.1,
-                screen_position: (
+            let section = Section::default()
+                .add_text(Text::new(&text.1))
+                .with_screen_position((
                     (position.x + 1.0) * screen.width as f32 / 2.0,
                     (position.y + 1.0) * screen.height as f32 / 2.0,
-                ),
-                ..Section::default() // color, position, etc
-            };
+                ));
 
             glyph_brush.queue(section);
         }
