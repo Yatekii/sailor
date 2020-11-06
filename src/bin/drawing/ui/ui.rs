@@ -57,13 +57,8 @@ impl HUD {
 
         let _style = imgui.style_mut();
 
-        let renderer = imgui_wgpu::Renderer::new(
-            &mut imgui,
-            device,
-            queue,
-            wgpu::TextureFormat::Bgra8Unorm,
-            None,
-        );
+        let renderer =
+            imgui_wgpu::Renderer::new(&mut imgui, device, queue, imgui_wgpu::RendererConfig::new());
 
         Self {
             platform,
@@ -78,8 +73,7 @@ impl HUD {
         app_state: &mut AppState,
         window: &winit::window::Window,
         device: &mut wgpu::Device,
-        encoder: &mut wgpu::CommandEncoder,
-        view: &wgpu::TextureView,
+        queue: &wgpu::Queue,
     ) {
         self.platform
             .prepare_frame(self.imgui.io_mut(), window) // step 4
@@ -198,9 +192,9 @@ impl HUD {
                 .size([400.0, 250.0], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
                     // Show cache stats
-                    let head = CollapsingHeader::new(&ui, im_str!("Cache Stats"))
+                    let head = CollapsingHeader::new(im_str!("Cache Stats"))
                         .default_open(true)
-                        .build();
+                        .build(&ui);
                     if head {
                         ui.text(im_str!("{:#?}", app_state.tile_cache.get_stats()));
                     }
@@ -237,8 +231,9 @@ impl HUD {
         }
 
         self.platform.prepare_render(&ui, window);
+        // TODO where to get the renderpass from?
         self.renderer
-            .render(ui.render(), device, encoder, &view)
+            .render(ui.render(), queue, device, todo!())
             .expect("Rendering failed");
     }
 
@@ -248,7 +243,7 @@ impl HUD {
         event: &winit::event::Event<()>,
     ) -> (bool, bool) {
         self.platform
-            .handle_event(self.imgui.io_mut(), window, &event);
+            .handle_event(self.imgui.io_mut(), window, event);
         let io = self.imgui.io();
         (!io.want_capture_mouse, !io.want_capture_keyboard)
     }
@@ -305,8 +300,9 @@ fn add_slider_float(ui: &Ui, rule: &mut Rule, attribute: &str) {
     };
 
     let label = im_str!("{}", attribute);
-    let cp = imgui::Slider::new(&label, 0.0..=10.0);
-    cp.build(&ui, &mut value);
+    imgui::Slider::new(&label)
+        .range(0.0..=10.0)
+        .build(&ui, &mut value);
 
     rule.kvs
         .insert(attribute.to_string(), CSSValue::Number(Number::Px(value)));
@@ -335,14 +331,12 @@ fn add_display_none(ui: &Ui, rule: &mut Rule) {
 }
 
 fn add_header_separator(ui: &Ui, title: impl Into<ImString>) -> bool {
-    CollapsingHeader::new(&ui, &title.into())
+    CollapsingHeader::new(&title.into())
+        .default_open(true)
+        .bullet(true)
+        .leaf(true)
         .flags(
-            ImGuiTreeNodeFlags::Bullet
-                | ImGuiTreeNodeFlags::Leaf
-                | ImGuiTreeNodeFlags::Framed
-                | ImGuiTreeNodeFlags::Selected
-                | ImGuiTreeNodeFlags::NoTreePushOnOpen
-                | ImGuiTreeNodeFlags::DefaultOpen,
+            TreeNodeFlags::FRAMED | TreeNodeFlags::SELECTED | TreeNodeFlags::NO_TREE_PUSH_ON_OPEN,
         )
-        .build()
+        .build(&ui)
 }

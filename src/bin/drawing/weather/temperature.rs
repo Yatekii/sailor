@@ -1,6 +1,9 @@
 use crossbeam_channel::{unbounded, TryRecvError};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use wgpu::{BindGroup, BindGroupLayout, Device, RenderPipeline, Sampler, ShaderModule, Texture};
+use wgpu::{
+    util::DeviceExt, BindGroup, BindGroupLayout, Device, RenderPipeline, Sampler, ShaderModule,
+    Texture,
+};
 
 use crate::drawing::helpers::{load_glsl, ShaderStage};
 
@@ -64,7 +67,7 @@ impl Temperature {
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
-            bindings: &[
+            entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::FRAGMENT,
@@ -73,11 +76,13 @@ impl Temperature {
                         dimension: wgpu::TextureViewDimension::D2,
                         component_type: wgpu::TextureComponentType::Float,
                     },
+                    count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::Sampler { comparison: false },
+                    count: None,
                 },
             ],
         });
@@ -90,6 +95,7 @@ impl Temperature {
         );
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: None,
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -98,7 +104,8 @@ impl Temperature {
             mipmap_filter: wgpu::FilterMode::Linear,
             lod_min_clamp: -100.0,
             lod_max_clamp: 100.0,
-            compare: wgpu::CompareFunction::Always,
+            compare: Some(wgpu::CompareFunction::Always),
+            anisotropy_clamp: None,
         });
 
         let width = 64 * 8;
@@ -111,7 +118,7 @@ impl Temperature {
                 height,
                 depth: 1,
             },
-            array_layer_count: 1,
+            // array_layer_count: 1,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -124,7 +131,7 @@ impl Temperature {
         let bind_group = Self::create_bind_group(&device, &bind_group_layout, &texture, &sampler);
 
         let init_command_buf = init_encoder.finish();
-        queue.submit(&[init_command_buf]);
+        queue.submit(vec![init_command_buf]);
 
         Self {
             bind_group_layout,
@@ -143,11 +150,14 @@ impl Temperature {
         fs_module: &ShaderModule,
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
             bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
         });
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &pipeline_layout,
+            label: None,
+            layout: Some(&pipeline_layout),
             vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",
@@ -162,6 +172,7 @@ impl Temperature {
                 depth_bias: 0,
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
+                clamp_depth: false,
             }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
@@ -198,12 +209,14 @@ impl Temperature {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: bind_group_layout,
-            bindings: &[
-                wgpu::Binding {
+            entries: &[
+                wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture.create_default_view()),
+                    resource: wgpu::BindingResource::TextureView(
+                        &texture.create_view(&wgpu::TextureViewDescriptor::default()),
+                    ),
                 },
-                wgpu::Binding {
+                wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(sampler),
                 },
@@ -227,12 +240,11 @@ impl Temperature {
         }
 
         // Place in wgpu buffer
-        let buffer = device.create_buffer_mapped(&wgpu::BufferDescriptor {
+        let buffer = &device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            size: (width * height) as u64 * 4,
+            contents: as_byte_slice(data.as_slice()),
             usage: wgpu::BufferUsage::COPY_SRC,
         });
-        buffer.data.copy_from_slice(as_byte_slice(data.as_slice()));
 
         // Upload immediately
         let mut encoder =
@@ -240,15 +252,17 @@ impl Temperature {
 
         encoder.copy_buffer_to_texture(
             wgpu::BufferCopyView {
-                buffer: &buffer.finish(),
-                offset: 0,
-                bytes_per_row: width * 4,
-                rows_per_image: height,
+                layout: wgpu::TextureDataLayout {
+                    offset: 0,
+                    bytes_per_row: width * 4,
+                    rows_per_image: height,
+                },
+                buffer,
             },
             wgpu::TextureCopyView {
                 texture: &self.texture,
                 mip_level: 0,
-                array_layer: 0,
+                // array_layer: 0,
                 origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
             },
             wgpu::Extent3d {
@@ -258,7 +272,7 @@ impl Temperature {
             },
         );
 
-        queue.submit(&[encoder.finish()]);
+        queue.submit(vec![encoder.finish()]);
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.
@@ -267,16 +281,14 @@ impl Temperature {
         vertex_shader: &str,
         fragment_shader: &str,
     ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
-        let vs_bytes = load_glsl(
-            &std::fs::read_to_string(vertex_shader)?,
-            ShaderStage::Vertex,
-        );
-        let vs_module = device.create_shader_module(vs_bytes.as_slice());
-        let fs_bytes = load_glsl(
-            &std::fs::read_to_string(fragment_shader)?,
-            ShaderStage::Fragment,
-        );
-        let fs_module = device.create_shader_module(fs_bytes.as_slice());
+        let vertex_shader = std::fs::read_to_string(vertex_shader)?;
+        let vs_bytes = load_glsl(&vertex_shader, ShaderStage::Vertex);
+        let vs_module = device.create_shader_module(vs_bytes);
+
+        let fragment_shader = std::fs::read_to_string(fragment_shader)?;
+        let fs_bytes = load_glsl(&fragment_shader, ShaderStage::Fragment);
+        let fs_module = device.create_shader_module(fs_bytes);
+
         Ok((vs_module, fs_module))
     }
 
@@ -329,13 +341,14 @@ impl Temperature {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: view,
                 resolve_target: None,
-                load_op: wgpu::LoadOp::Load,
-                store_op: wgpu::StoreOp::Store,
-                clear_color: wgpu::Color {
-                    r: 0.1,
-                    g: 0.2,
-                    b: 0.3,
-                    a: 1.0,
+                ops: wgpu::Operations::<wgpu::Color> {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    }),
+                    store: true,
                 },
             }],
             depth_stencil_attachment: None,

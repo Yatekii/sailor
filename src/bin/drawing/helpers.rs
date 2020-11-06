@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::borrow::Cow;
 
 #[allow(dead_code)]
 pub enum ShaderStage {
@@ -7,7 +7,7 @@ pub enum ShaderStage {
     Compute,
 }
 
-pub fn load_glsl(code: &str, stage: ShaderStage) -> Vec<u32> {
+pub fn load_glsl(code: &str, stage: ShaderStage) -> wgpu::ShaderModuleSource {
     let ty = match stage {
         ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
         ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
@@ -18,7 +18,7 @@ pub fn load_glsl(code: &str, stage: ShaderStage) -> Vec<u32> {
     let binary_result = compiler
         .compile_into_spirv(code, ty, "shader.glsl", "main", None)
         .unwrap();
-
-    let reader = Cursor::new(binary_result.as_binary_u8());
-    wgpu::read_spirv(reader).unwrap()
+    let binary_result = binary_result.as_binary();
+    let binary_result = binary_result.to_vec();
+    wgpu::ShaderModuleSource::SpirV(Cow::Owned(binary_result))
 }

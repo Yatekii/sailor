@@ -1,10 +1,11 @@
 use crossbeam_channel::{unbounded, TryRecvError};
-use pollster::block_on;
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use osm::*;
+use pollster::block_on;
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
-use wgpu_glyph::{GlyphBrush, GlyphBrushBuilder};
+use wgpu_glyph::{ab_glyph::FontArc, GlyphBrush, GlyphBrushBuilder};
 use winit::{dpi::LogicalSize, event_loop::EventLoop, window::Window};
 
 use crate::app_state::AppState;
@@ -30,42 +31,40 @@ pub struct Painter {
     bind_group: BindGroup,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
-    glyph_brush: GlyphBrush<'static, ()>,
+    glyph_brush: GlyphBrush<()>,
     temperature: crate::drawing::weather::Temperature,
 }
 
 impl Painter {
     /// Initializes the entire draw machinery.
     pub fn init(event_loop: &EventLoop<()>, width: u32, height: u32, app_state: &AppState) -> Self {
-        let (window, size, surface, factor) = {
-            let window = Window::new(&event_loop).unwrap();
-            window.set_inner_size(LogicalSize {
-                width: width as f64,
-                height: height as f64,
-            });
-            let factor = window.scale_factor();
-            let size = window.inner_size();
+        let window = Window::new(&event_loop).unwrap();
+        window.set_inner_size(LogicalSize {
+            width: width as f64,
+            height: height as f64,
+        });
+        let factor = window.scale_factor();
+        let size = window.inner_size();
 
-            let surface = wgpu::Surface::create(&window);
+        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+        let surface = unsafe { instance.create_surface(&window) };
 
-            (window, size, surface, factor)
-        };
+        let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::Default,
+            // Request an adapter which can render to our surface
+            compatible_surface: Some(&surface),
+        }))
+        .expect("Failed to find an appropiate adapter");
 
-        let adapter = block_on(wgpu::Adapter::request(
-            &RequestAdapterOptions {
-                power_preference: PowerPreference::LowPower,
-                compatible_surface: Some(&surface),
+        let (mut device, mut queue) = block_on(adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                features: wgpu::Features::empty(),
+                limits: wgpu::Limits::default(),
+                shader_validation: true,
             },
-            wgpu::BackendBit::PRIMARY,
+            None,
         ))
-        .unwrap();
-
-        let (mut device, mut queue) = block_on(adapter.request_device(&DeviceDescriptor {
-            extensions: Extensions {
-                anisotropic_filtering: false,
-            },
-            limits: Limits::default(),
-        }));
+        .expect("Failed to create device");
 
         let init_encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
 
@@ -112,16 +111,24 @@ impl Painter {
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
-            bindings: &[
+            entries: &[
                 BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: BindingType::UniformBuffer { dynamic: false },
+                    ty: BindingType::UniformBuffer {
+                        dynamic: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
                 BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: BindingType::UniformBuffer { dynamic: false },
+                    ty: BindingType::UniformBuffer {
+                        dynamic: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
             ],
         });
@@ -186,22 +193,16 @@ impl Painter {
             &tile_transform_buffer,
         );
 
-        // let font =
-        //     ab_glyph::FontArc::try_from_slice(include_bytes!("../../../config/Ruda-Bold.ttf"))
-        //         .unwrap();
+        let font =
+            FontArc::try_from_slice(include_bytes!("../../../config/Ruda-Bold.ttf")).unwrap();
 
-        // let mut glyph_brush =
-        //     GlyphBrushBuilder::using_font(font).build(&mut device, TextureFormat::Bgra8Unorm);
-
-        let font: &[u8] = include_bytes!("../../../config/Ruda-Bold.ttf");
-        let glyph_brush = GlyphBrushBuilder::using_font_bytes(font)
-            .unwrap()
-            .build(&device, TextureFormat::Bgra8Unorm);
+        let glyph_brush =
+            GlyphBrushBuilder::using_font(font).build(&mut device, TextureFormat::Bgra8Unorm);
 
         let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
         let init_command_buf = init_encoder.finish();
-        queue.submit(&[init_command_buf]);
+        queue.submit(vec![init_command_buf]); // TODO this fix is bad
 
         let width = 64 * 8;
         let height = 64 * 8;
@@ -241,11 +242,14 @@ impl Painter {
         depth_write_enabled: bool,
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: None,
             bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
         });
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
-            layout: &pipeline_layout,
+            label: None,
+            layout: Some(&pipeline_layout),
             vertex_stage: ProgrammableStageDescriptor {
                 module: &vs_module,
                 entry_point: "main",
@@ -260,6 +264,7 @@ impl Painter {
                 depth_bias: 0,
                 depth_bias_slope_scale: 0.0,
                 depth_bias_clamp: 0.0,
+                clamp_depth: false, // inactive because not enabled in extensions
             }),
             primitive_topology: PrimitiveTopology::TriangleList,
             color_states: &[ColorStateDescriptor {
@@ -272,20 +277,22 @@ impl Painter {
                 format: TextureFormat::Depth24PlusStencil8,
                 depth_write_enabled,
                 depth_compare: CompareFunction::Greater,
-                stencil_front: StencilStateFaceDescriptor {
-                    compare: CompareFunction::NotEqual,
-                    fail_op: StencilOperation::Keep,
-                    depth_fail_op: StencilOperation::Replace,
-                    pass_op: StencilOperation::Replace,
+                stencil: wgpu::StencilStateDescriptor {
+                    front: StencilStateFaceDescriptor {
+                        compare: CompareFunction::NotEqual,
+                        fail_op: StencilOperation::Keep,
+                        depth_fail_op: StencilOperation::Replace,
+                        pass_op: StencilOperation::Replace,
+                    },
+                    back: StencilStateFaceDescriptor {
+                        compare: CompareFunction::NotEqual,
+                        fail_op: StencilOperation::Keep,
+                        depth_fail_op: StencilOperation::Replace,
+                        pass_op: StencilOperation::Replace,
+                    },
+                    read_mask: std::u32::MAX,
+                    write_mask: std::u32::MAX,
                 },
-                stencil_back: StencilStateFaceDescriptor {
-                    compare: CompareFunction::NotEqual,
-                    fail_op: StencilOperation::Keep,
-                    depth_fail_op: StencilOperation::Replace,
-                    pass_op: StencilOperation::Replace,
-                },
-                stencil_read_mask: std::u32::MAX,
-                stencil_write_mask: std::u32::MAX,
             }),
             vertex_state: VertexStateDescriptor {
                 index_format: IndexFormat::Uint32,
@@ -324,48 +331,39 @@ impl Painter {
         feature_collection: &FeatureCollection,
     ) -> Vec<(Buffer, usize)> {
         let canvas_size_len = 4 * 4 as usize;
-        let canvas_size_buffer = device.create_buffer_mapped(&BufferDescriptor {
+        let canvas_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            size: canvas_size_len as u64,
+            contents: as_byte_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]),
             usage: BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
         });
-        canvas_size_buffer.data.copy_from_slice(as_byte_slice(&[
-            screen.width as f32,
-            screen.height as f32,
-            0.0,
-            0.0,
-        ]));
 
         let buffer = feature_collection.assemble_style_buffer();
         let len = buffer.len();
         let layer_data_len = len.max(1) * 12 * 4;
-        let layer_data_buffer = device.create_buffer_mapped(&BufferDescriptor {
+        let layer_data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            size: layer_data_len as u64,
+            contents: if len == 0 {
+                &[0; 48]
+            } else {
+                as_byte_slice(&buffer.as_slice())
+            },
             usage: BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
         });
 
-        layer_data_buffer.data.copy_from_slice(if len == 0 {
-            &[0; 48]
-        } else {
-            as_byte_slice(&buffer.as_slice())
-        });
-
         vec![
-            (canvas_size_buffer.finish(), canvas_size_len),
-            (layer_data_buffer.finish(), layer_data_len),
+            (canvas_size_buffer, canvas_size_len),
+            (layer_data_buffer, layer_data_len),
         ]
     }
 
     fn create_uniform_buffer(device: &Device) -> Buffer {
         let data = vec![0; Self::uniform_buffer_size() as usize];
-        let buffer = device.create_buffer_mapped(&BufferDescriptor {
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            size: Self::uniform_buffer_size() * 4,
+            contents: as_byte_slice(&data),
             usage: BufferUsage::UNIFORM | BufferUsage::COPY_DST,
         });
-        buffer.data.copy_from_slice(as_byte_slice(&data));
-        buffer.finish()
+        buffer
     }
 
     /// Creates a new transform buffer from the tile transforms.
@@ -396,13 +394,12 @@ impl Painter {
         }
         (
             {
-                let buffer = device.create_buffer_mapped(&BufferDescriptor {
+                let buffer = device.create_buffer_init(&BufferInitDescriptor {
                     label: None,
-                    size: tile_data_buffer_byte_size as u64 * 4,
+                    contents: as_byte_slice(data.as_slice()),
                     usage: BufferUsage::UNIFORM | BufferUsage::COPY_DST,
                 });
-                buffer.data.copy_from_slice(as_byte_slice(data.as_slice()));
-                buffer.finish()
+                buffer
             },
             tile_data_buffer_byte_size as u64,
         )
@@ -433,20 +430,18 @@ impl Painter {
         device.create_bind_group(&BindGroupDescriptor {
             label: None,
             layout: bind_group_layout,
-            bindings: &[
-                Binding {
+            entries: &[
+                wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::Buffer {
-                        buffer: uniform_buffer,
-                        range: 0..Self::uniform_buffer_size(),
-                    },
+                    resource: BindingResource::Buffer(
+                        uniform_buffer.slice(0..Self::uniform_buffer_size()),
+                    ),
                 },
-                Binding {
+                wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Buffer {
-                        buffer: &tile_transform_buffer.0,
-                        range: 0..tile_transform_buffer.1,
-                    },
+                    resource: BindingResource::Buffer(
+                        tile_transform_buffer.0.slice(0..tile_transform_buffer.1),
+                    ),
                 },
             ],
         })
@@ -458,16 +453,14 @@ impl Painter {
         vertex_shader: &str,
         fragment_shader: &str,
     ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
-        let vs_bytes = load_glsl(
-            &std::fs::read_to_string(vertex_shader)?,
-            ShaderStage::Vertex,
-        );
-        let vs_module = device.create_shader_module(vs_bytes.as_slice());
-        let fs_bytes = load_glsl(
-            &std::fs::read_to_string(fragment_shader)?,
-            ShaderStage::Fragment,
-        );
-        let fs_module = device.create_shader_module(fs_bytes.as_slice());
+        let vertex_shader = std::fs::read_to_string(vertex_shader)?;
+        let vs_bytes = load_glsl(&vertex_shader, ShaderStage::Vertex);
+        let vs_module = device.create_shader_module(vs_bytes);
+
+        let fragment_shader = std::fs::read_to_string(fragment_shader)?;
+        let fs_bytes = load_glsl(&fragment_shader, ShaderStage::Fragment);
+        let fs_module = device.create_shader_module(fs_bytes);
+
         Ok((vs_module, fs_module))
     }
 
@@ -588,7 +581,7 @@ impl Painter {
         let multisampled_frame_descriptor = &TextureDescriptor {
             label: None,
             size: multisampled_texture_extent,
-            array_layer_count: 1,
+            // array_layer_count: 1,
             mip_level_count: 1,
             sample_count,
             dimension: TextureDimension::D2,
@@ -598,7 +591,7 @@ impl Painter {
 
         device
             .create_texture(multisampled_frame_descriptor)
-            .create_default_view()
+            .create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     fn create_stencil(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> TextureView {
@@ -610,7 +603,7 @@ impl Painter {
         let frame_descriptor = &TextureDescriptor {
             label: None,
             size: texture_extent,
-            array_layer_count: 1,
+            // array_layer_count: 1,
             mip_level_count: 1,
             sample_count: CONFIG.renderer.msaa_samples,
             dimension: TextureDimension::D2,
@@ -620,7 +613,7 @@ impl Painter {
 
         device
             .create_texture(frame_descriptor)
-            .create_default_view()
+            .create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     pub fn paint(&mut self, hud: &mut super::ui::HUD, app_state: &mut AppState) {
@@ -639,33 +632,36 @@ impl Painter {
         let num_tiles = app_state.visible_tiles().len();
         let features = feature_collection.get_features();
         if !features.is_empty() && num_tiles > 0 {
-            if let Ok(frame) = self.swap_chain.get_next_texture() {
+            if let Ok(frame) = self.swap_chain.get_current_frame() {
                 {
                     let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                         color_attachments: &[RenderPassColorAttachmentDescriptor {
                             attachment: if CONFIG.renderer.msaa_samples > 1 {
                                 &self.multisampled_framebuffer
                             } else {
-                                &frame.view
+                                &frame.output.view
                             },
                             resolve_target: if CONFIG.renderer.msaa_samples > 1 {
-                                Some(&frame.view)
+                                Some(&frame.output.view)
                             } else {
                                 None
                             },
-                            load_op: LoadOp::Clear,
-                            store_op: StoreOp::Store,
-                            clear_color: wgpu::Color::TRANSPARENT,
+                            ops: Operations::<wgpu::Color> {
+                                load: LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                                store: true,
+                            },
                         }],
                         depth_stencil_attachment: Some(
                             RenderPassDepthStencilAttachmentDescriptor {
                                 attachment: &self.stencil,
-                                depth_load_op: LoadOp::Clear,
-                                depth_store_op: StoreOp::Store,
-                                clear_depth: 0.0,
-                                stencil_load_op: LoadOp::Clear,
-                                stencil_store_op: StoreOp::Store,
-                                clear_stencil: 255,
+                                depth_ops: Some(Operations::<f32> {
+                                    load: LoadOp::Clear(0.0),
+                                    store: true,
+                                }),
+                                stencil_ops: Some(Operations::<u32> {
+                                    load: LoadOp::Clear(255),
+                                    store: true,
+                                }),
                             },
                         ),
                     });
@@ -745,6 +741,16 @@ impl Painter {
                                 i as u32,
                             );
                         }
+
+                        // hud.paint(
+                        //     app_state,
+                        //     &self.window,
+                        //     &mut self.device,
+                        //     &mut render_pass,
+                        //     &self.queue,
+                        // );
+
+                        // TODO put hwd.paint here?
                     }
                 }
 
@@ -754,22 +760,17 @@ impl Painter {
 
                 let _ = self.glyph_brush.draw_queued(
                     &self.device,
+                    todo!(), // TODO this needs a stagingbelt, where to get this from?
                     &mut encoder,
-                    &frame.view,
+                    &frame.output.view,
                     app_state.screen.width,
                     app_state.screen.height,
                 );
 
                 // self.temperature.paint(&mut encoder, &frame.view);
 
-                hud.paint(
-                    app_state,
-                    &self.window,
-                    &mut self.device,
-                    &mut encoder,
-                    &frame.view,
-                );
-                self.queue.submit(&[encoder.finish()]);
+                hud.paint(app_state, &self.window, &mut self.device, &self.queue);
+                self.queue.submit(vec![encoder.finish()]);
             }
         }
     }
