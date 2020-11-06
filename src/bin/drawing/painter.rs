@@ -1,5 +1,5 @@
 use crossbeam_channel::{unbounded, TryRecvError};
-use futures::executor::block_on;
+use pollster::block_on;
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use osm::*;

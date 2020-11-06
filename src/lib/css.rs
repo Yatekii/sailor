@@ -1,5 +1,3 @@
-extern crate nom;
-
 use crossbeam_channel::{unbounded, TryRecvError};
 use nom::{
     branch::alt,
@@ -7,6 +5,7 @@ use nom::{
     character::complete::multispace0,
     character::{complete::char, is_alphanumeric},
     combinator::map_res,
+    error::FromExternalError,
     error::{convert_error, ParseError, VerboseError},
     multi::many0,
     number::complete::float,
@@ -14,7 +13,7 @@ use nom::{
     AsChar, Err, IResult, InputTakeAtPosition,
 };
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, num::ParseIntError};
 
 /// Tries to parse an entire stylesheet.
 pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
@@ -165,7 +164,7 @@ pub struct Rule {
 }
 
 /// A single CSS selector.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, MallocSizeOf)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, malloc_size_of_derive::MallocSizeOf)]
 pub struct Selector {
     /// The type a selector matches.
     /// E.g. `"layer"`.
@@ -333,12 +332,15 @@ enum SelectorPart {
 }
 
 /// Parses an entire set of rules.
-fn rules<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Vec<Rule>, E> {
+fn rules<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Vec<Rule>, E>
+where
+    E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     many0(rule)(input)
 }
 
 /// Munch all whitespace before and after `f`.
-fn whitespace<I, O, E, F>(f: F) -> impl Fn(I) -> IResult<I, O, E>
+fn whitespace<I, O, E, F>(f: F) -> impl FnMut(I) -> IResult<I, O, E>
 where
     I: Clone + PartialEq + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar + Clone,
@@ -350,7 +352,10 @@ where
 
 /// Parse a single rule.
 /// E.g. `layer[name=water]{ background-color: #FF0000; }`.
-fn rule<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Rule, E> {
+fn rule<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Rule, E>
+where
+    E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     let (remaining, (selector, _, kvs, _)) = tuple((
         whitespace(selector),
         whitespace(char('{')),
@@ -421,7 +426,10 @@ fn any<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorP
 /// E.g. `{}`.
 fn body<'a, E: ParseError<&'a str>>(
     input: &'a str,
-) -> IResult<&'a str, std::collections::BTreeMap<String, CSSValue>, E> {
+) -> IResult<&'a str, std::collections::BTreeMap<String, CSSValue>, E>
+where
+    E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     let mut hm = std::collections::BTreeMap::new();
     many0(kv)(input).map(|v| {
         v.1.into_iter().for_each(|v| {
@@ -433,7 +441,10 @@ fn body<'a, E: ParseError<&'a str>>(
 
 /// Parses a single CSS k/v pair.
 /// E.g. `background-color: #FF0000;`.
-fn kv<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (&'a str, CSSValue), E> {
+fn kv<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (&'a str, CSSValue), E>
+where
+    E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     let (remaining, (kv, _)) =
         tuple((separated_pair(css_name, char(':'), css_value), char(';')))(input)?;
     Ok((remaining, kv))
@@ -446,7 +457,10 @@ fn css_name<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a 
 }
 
 /// Parses a single CSS qualified value.
-fn css_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+fn css_value<'a, E>(input: &'a str) -> IResult<&'a str, CSSValue, E>
+where
+    E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     alt((
         whitespace(hex_color),
         whitespace(rgba_color),
@@ -563,12 +577,18 @@ fn is_hex_digit(c: char) -> bool {
 }
 
 /// Parse an actual hex code.
-fn hex_primary<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E> {
+fn hex_primary<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E>
+where
+    E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     map_res(take_while_m_n(2, 2, is_hex_digit), from_hex)(input)
 }
 
 /// Parse a single hex color code including the `#`.
-fn hex_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+fn hex_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E>
+where
+    E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     let (input, _) = tag("#")(input)?;
     let (input, (r, g, b)) = tuple((hex_primary, hex_primary, hex_primary))(input)?;
 
@@ -583,13 +603,19 @@ fn hex_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSS
     ))
 }
 
-fn u8<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E> {
+fn u8<'a, E>(input: &'a str) -> IResult<&'a str, u8, E>
+where
+    E: ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     use std::str::FromStr;
     map_res(take_while(|c: char| c.is_digit(10)), u8::from_str)(input)
 }
 
 /// Parse a single hex color code including the `#`.
-fn rgba_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+fn rgba_color<'a, E>(input: &'a str) -> IResult<&'a str, CSSValue, E>
+where
+    E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     let (input, _) = whitespace(tag("rgba("))(input)?;
     let (input, (r, _, g, _, b, _, a)) = tuple((
         u8,
@@ -613,7 +639,10 @@ fn rgba_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CS
 }
 
 /// Parse a single hex color code including the `#`.
-fn rgb_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
+fn rgb_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E>
+where
+    E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
+{
     let (input, _) = whitespace(tag("rgb("))(input)?;
     let (input, (r, _, g, _, b)) =
         tuple((u8, whitespace(char(',')), u8, whitespace(char(',')), u8))(input)?;

@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use serde_derive::Deserialize;
 
 pub static CONFIG: Lazy<Config> = Lazy::new(|| Config::new().expect("Config could not be loaded."));
 
