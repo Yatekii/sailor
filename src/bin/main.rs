@@ -3,14 +3,9 @@ mod config;
 mod drawing;
 mod stats;
 
-extern crate lyon;
-extern crate nalgebra_glm as glm;
-#[macro_use]
-extern crate serde_derive;
-
+use crate::config::CONFIG;
 use lyon::math::vector;
 use osm::*;
-
 use winit::{
     dpi::LogicalPosition,
     event::{
@@ -19,8 +14,6 @@ use winit::{
     },
     event_loop::ControlFlow,
 };
-
-use crate::config::CONFIG;
 
 fn main() {
     log::set_max_level(CONFIG.general.log_level.to_level_filter());
