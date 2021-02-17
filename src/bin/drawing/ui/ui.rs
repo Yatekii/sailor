@@ -2,6 +2,7 @@ use crate::app_state::AppState;
 use crate::app_state::EditableObject;
 use crate::*;
 use imgui::*;
+use wgpu::TextureFormat;
 
 use crate::config::CONFIG;
 
@@ -57,8 +58,12 @@ impl HUD {
 
         let _style = imgui.style_mut();
 
-        let renderer =
-            imgui_wgpu::Renderer::new(&mut imgui, device, queue, imgui_wgpu::RendererConfig::new());
+        let renderer = imgui_wgpu::Renderer::new(
+            &mut imgui,
+            device,
+            queue,
+            imgui_wgpu::RendererConfig::new().set_texture_format(TextureFormat::Bgra8Unorm),
+        );
 
         Self {
             platform,
@@ -74,6 +79,8 @@ impl HUD {
         window: &winit::window::Window,
         device: &mut wgpu::Device,
         queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        frame: &wgpu::SwapChainFrame,
     ) {
         self.platform
             .prepare_frame(self.imgui.io_mut(), window) // step 4
@@ -231,9 +238,21 @@ impl HUD {
         }
 
         self.platform.prepare_render(&ui, window);
-        // TODO where to get the renderpass from?
+
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                attachment: &frame.output.view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        });
+
         self.renderer
-            .render(ui.render(), queue, device, todo!())
+            .render(ui.render(), queue, device, &mut rpass)
             .expect("Rendering failed");
     }
 

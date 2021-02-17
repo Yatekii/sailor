@@ -54,3 +54,6 @@ winit = "0.22"
 version = "0.5"
 default-features = false
 features = ["winit-22"]
+
+[profile.release]
+debug = true

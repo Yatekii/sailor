@@ -81,7 +81,7 @@ impl Temperature {
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler { comparison: false },
+                    ty: wgpu::BindingType::Sampler { comparison: true },
                     count: None,
                 },
             ],
@@ -206,6 +206,7 @@ impl Temperature {
         texture: &Texture,
         sampler: &Sampler,
     ) -> BindGroup {
+        dbg!(&sampler);
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: bind_group_layout,

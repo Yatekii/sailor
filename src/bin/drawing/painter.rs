@@ -3,6 +3,7 @@ use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use osm::*;
 use pollster::block_on;
+use util::StagingBelt;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
 use wgpu_glyph::{ab_glyph::FontArc, GlyphBrush, GlyphBrushBuilder};
@@ -19,6 +20,7 @@ pub struct Painter {
     pub device: Device,
     pub queue: Queue,
     surface: Surface,
+    staging_belt: StagingBelt,
     swap_chain_descriptor: SwapChainDescriptor,
     swap_chain: SwapChain,
     blend_pipeline: RenderPipeline,
@@ -59,7 +61,10 @@ impl Painter {
         let (mut device, mut queue) = block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
                 features: wgpu::Features::empty(),
-                limits: wgpu::Limits::default(),
+                limits: wgpu::Limits {
+                    max_uniform_buffer_binding_size: 1 << 16,
+                    ..wgpu::Limits::default()
+                },
                 shader_validation: true,
             },
             None,
@@ -184,6 +189,8 @@ impl Painter {
             true,
         );
 
+        let staging_belt = wgpu::util::StagingBelt::new(1024);
+
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_descriptor);
 
         let bind_group = Self::create_blend_bind_group(
@@ -215,6 +222,7 @@ impl Painter {
             device,
             queue,
             surface,
+            staging_belt,
             swap_chain_descriptor,
             swap_chain,
             blend_pipeline,
@@ -760,7 +768,7 @@ impl Painter {
 
                 let _ = self.glyph_brush.draw_queued(
                     &self.device,
-                    todo!(), // TODO this needs a stagingbelt, where to get this from?
+                    &mut self.staging_belt,
                     &mut encoder,
                     &frame.output.view,
                     app_state.screen.width,
@@ -769,7 +777,15 @@ impl Painter {
 
                 // self.temperature.paint(&mut encoder, &frame.view);
 
-                hud.paint(app_state, &self.window, &mut self.device, &self.queue);
+                hud.paint(
+                    app_state,
+                    &self.window,
+                    &mut self.device,
+                    &self.queue,
+                    &mut encoder,
+                    &frame,
+                );
+                self.staging_belt.finish();
                 self.queue.submit(vec![encoder.finish()]);
             }
         }
