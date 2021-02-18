@@ -58,12 +58,9 @@ impl HUD {
 
         let _style = imgui.style_mut();
 
-        let renderer = imgui_wgpu::Renderer::new(
-            &mut imgui,
-            device,
-            queue,
-            imgui_wgpu::RendererConfig::new().set_texture_format(TextureFormat::Bgra8Unorm),
-        );
+        let mut config = imgui_wgpu::RendererConfig::new();
+        config.texture_format = TextureFormat::Bgra8Unorm;
+        let renderer = imgui_wgpu::Renderer::new(&mut imgui, device, queue, config);
 
         Self {
             platform,
@@ -240,6 +237,7 @@ impl HUD {
         self.platform.prepare_render(&ui, window);
 
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("UI"),
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: &frame.output.view,
                 resolve_target: None,

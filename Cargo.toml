@@ -26,8 +26,8 @@ path = "src/bin/main.rs"
 [dependencies]
 config = "0.10"
 crossbeam-channel = "0.5"
-imgui = "0.5"
-imgui-wgpu = "0.11"
+imgui = "0.7.0"
+imgui-wgpu = "0.14.0"
 log = { version = "0.4", features = ["serde"] }
 lyon = "0.13"
 malloc_size_of_derive = "0.1"
@@ -46,14 +46,14 @@ serde_derive = "1.0"
 shaderc = "0.6"
 ureq = "1.5"
 varint = "0.9"
-wgpu = "0.6"
-wgpu_glyph = "0.10"
-winit = "0.22"
+wgpu = "0.7.0"
+wgpu_glyph = "0.11"
+winit = "0.24"
 
 [dependencies.imgui-winit-support]
-version = "0.5"
+version = "0.7.0"
 default-features = false
-features = ["winit-22"]
+features = ["winit-24"]
 
 [profile.release]
 debug = true

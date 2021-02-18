@@ -68,7 +68,7 @@ impl VisibleTile {
         tile_id: u32,
     ) {
         if let Some(data) = data {
-            render_pass.set_index_buffer(data.index_buffer.slice(..));
+            render_pass.set_index_buffer(data.index_buffer.slice(..), IndexFormat::Uint32);
             render_pass.set_vertex_buffer(0, data.vertex_buffer.slice(..));
 
             let features = {

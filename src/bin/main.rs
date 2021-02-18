@@ -7,7 +7,7 @@ use crate::config::CONFIG;
 use lyon::math::vector;
 use osm::*;
 use winit::{
-    dpi::LogicalPosition,
+    dpi::PhysicalPosition,
     event::{
         ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
         WindowEvent,
@@ -99,7 +99,7 @@ fn main() {
                     if route_mouse {
                         match delta {
                             MouseScrollDelta::LineDelta(_, y) => app_state.zoom += 0.1 * y,
-                            MouseScrollDelta::PixelDelta(LogicalPosition { y, .. }) => {
+                            MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => {
                                 app_state.zoom += 0.001 * y as f32
                             }
                         }
