@@ -738,8 +738,8 @@ impl Painter {
                             },
                         );
 
-                        let x = (s.x as u32).min(0);
-                        let y = (s.y as u32).min(0);
+                        let x = s.x.max(0.0) as u32;
+                        let y = s.y.max(0.0) as u32;
 
                         let width = e.x as u32 - x;
                         let height = e.y as u32 - y;
