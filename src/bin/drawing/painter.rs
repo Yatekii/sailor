@@ -732,21 +732,22 @@ impl Painter {
                         let height = (e.y - s.y) as u32;
 
                         if width == 0 || height == 0 {
-                            println!("Skipping tile outside of the visible area!");
+                            log::debug!("Skipping tile outside of the visible area!");
                             continue;
                         }
 
-                        println!("-----------------------------------------");
+                        log::debug!("Rendering new tile:");
 
-                        println!(
-                            "Screen Max: {} / {}",
-                            app_state.screen.width, app_state.screen.height,
+                        log::debug!(
+                            "\tScreen Max: {} / {}",
+                            app_state.screen.width,
+                            app_state.screen.height,
                         );
-                        println!("Tile Max: {} / {}", end_x, end_y);
+                        log::debug!("\tTile Max: {} / {}", end_x, end_y);
 
-                        println!("Tile Dimensions: {} / {}", width, height);
-                        println!("Start: {} / {}", start_x, start_y);
-                        println!("End: {} / {}", end_x, end_y);
+                        log::debug!("\tTile Dimensions: {} / {}", width, height);
+                        log::debug!("\tStart: {} / {}", start_x, start_y);
+                        log::debug!("\tEnd: {} / {}", end_x, end_y);
 
                         render_pass.set_scissor_rect(start_x, start_y, width, height);
 
