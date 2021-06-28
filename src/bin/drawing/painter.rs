@@ -697,22 +697,14 @@ impl Painter {
                             .tile_to_global_space(app_state.zoom, &tile_id);
                         let start = (matrix * vec).xy() + vec2(1.0, 1.0);
                         let s = vec2(
-                            {
-                                let x = (start.x * screen_dimensions.x).round();
-                                if x < 0.0 {
-                                    0.0
-                                } else {
-                                    x
-                                }
-                            },
-                            {
-                                let y = (start.y * screen_dimensions.y).round();
-                                if y < 0.0 {
-                                    0.0
-                                } else {
-                                    y
-                                }
-                            },
+                            (start.x * screen_dimensions.x)
+                                .round()
+                                .max(0.0)
+                                .min(app_state.screen.width as f32),
+                            (start.y * screen_dimensions.y)
+                                .round()
+                                .max(0.0)
+                                .min(app_state.screen.height as f32),
                         );
                         let matrix = app_state.screen.tile_to_global_space(
                             app_state.zoom,
@@ -720,61 +712,43 @@ impl Painter {
                         );
                         let end = (matrix * vec).xy() + vec2(1.0, 1.0);
                         let e = vec2(
-                            {
-                                let x = (end.x * screen_dimensions.x).round();
-                                if x < 0.0 {
-                                    0.0
-                                } else {
-                                    x
-                                }
-                            },
-                            {
-                                let y = (end.y * screen_dimensions.y).round();
-                                if y < 0.0 {
-                                    0.0
-                                } else {
-                                    y
-                                }
-                            },
+                            (end.x * screen_dimensions.x)
+                                .round()
+                                .max(0.0)
+                                .min(app_state.screen.width as f32),
+                            (end.y * screen_dimensions.y)
+                                .round()
+                                .max(0.0)
+                                .min(app_state.screen.height as f32),
                         );
 
-                        let x = s.x.max(0.0) as u32;
-                        let y = s.y.max(0.0) as u32;
+                        let start_x = s.x.max(0.0) as u32;
+                        let start_y = s.y.max(0.0) as u32;
 
-                        let width = e.x as u32 - x;
-                        let height = e.y as u32 - y;
+                        let end_x = e.x.min(app_state.screen.width as f32) as u32;
+                        let end_y = e.y.min(app_state.screen.height as f32) as u32;
 
-                        println!("{}/{}", width, height);
+                        let width = (e.x - s.x) as u32;
+                        let height = (e.y - s.y) as u32;
 
-                        let excess_width =
-                            (x as i32 + width as i32 - app_state.screen.width as i32).max(0) as u32;
-                        let excess_height = (y as i32 + height as i32
-                            - app_state.screen.height as i32)
-                            .max(0) as u32;
+                        if width == 0 || height == 0 {
+                            println!("Skipping tile outside of the visible area!");
+                            continue;
+                        }
+
+                        println!("-----------------------------------------");
 
                         println!(
-                            "{}/{}, {}/{}",
-                            x + width - app_state.screen.width,
-                            y + height - app_state.screen.height,
-                            excess_width,
-                            excess_height
+                            "Screen Max: {} / {}",
+                            app_state.screen.width, app_state.screen.height,
                         );
+                        println!("Tile Max: {} / {}", end_x, end_y);
 
-                        println!(
-                            "{}/{}, {}/{}",
-                            x,
-                            y,
-                            width - excess_width,
-                            height - excess_height
-                        );
-                        println!("{}, {}", app_state.screen.width, app_state.screen.height);
+                        println!("Tile Dimensions: {} / {}", width, height);
+                        println!("Start: {} / {}", start_x, start_y);
+                        println!("End: {} / {}", end_x, end_y);
 
-                        render_pass.set_scissor_rect(
-                            x,
-                            y,
-                            width - excess_width,
-                            height - excess_height,
-                        );
+                        render_pass.set_scissor_rect(start_x, start_y, width, height);
 
                         unsafe {
                             let gpu_tile = vt.gpu_tile();
