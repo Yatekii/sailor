@@ -30,6 +30,12 @@ impl TileStats {
     }
 }
 
+impl Default for TileStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl std::ops::Add for TileStats {
     type Output = Self;
 
@@ -95,8 +101,8 @@ impl Tile {
         selection_tags: Vec<String>,
     ) -> Self {
         // Read tile data from the pbf data.
-        let mut reader = BytesReader::from_bytes(&pbf_data);
-        let tile = super::vector_tile::Tile::from_reader(&mut reader, &pbf_data)
+        let mut reader = BytesReader::from_bytes(pbf_data);
+        let tile = super::vector_tile::Tile::from_reader(&mut reader, pbf_data)
             .expect("Cannot read Tile object.");
 
         let mut objects = Vec::new();
@@ -119,7 +125,7 @@ impl Tile {
 
             // Preevaluate the selectors and group features by the selector they belong to.
             for feature in &layer.features {
-                let (selector, tags) = Self::classify(&layer, &feature, &selection_tags);
+                let (selector, tags) = Self::classify(&layer, feature, &selection_tags);
 
                 let paths = geometry_commands_to_paths(feature.type_pb, &feature.geometry);
 

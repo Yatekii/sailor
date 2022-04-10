@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+
 use crossbeam_channel::{unbounded, TryRecvError};
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -21,8 +23,7 @@ pub struct Painter {
     pub queue: Queue,
     surface: Surface,
     staging_belt: StagingBelt,
-    swap_chain_descriptor: SwapChainDescriptor,
-    swap_chain: SwapChain,
+    surface_config: SurfaceConfiguration,
     blend_pipeline: RenderPipeline,
     noblend_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
@@ -40,7 +41,7 @@ pub struct Painter {
 impl Painter {
     /// Initializes the entire draw machinery.
     pub fn init(event_loop: &EventLoop<()>, width: u32, height: u32, app_state: &AppState) -> Self {
-        let window = Window::new(&event_loop).unwrap();
+        let window = Window::new(event_loop).unwrap();
         window.set_inner_size(LogicalSize {
             width: width as f64,
             height: height as f64,
@@ -48,24 +49,25 @@ impl Painter {
         let factor = window.scale_factor();
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+        let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
         let surface = unsafe { instance.create_surface(&window) };
 
         let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::Default,
+            power_preference: wgpu::PowerPreference::HighPerformance,
             // Request an adapter which can render to our surface
             compatible_surface: Some(&surface),
+            ..Default::default()
         }))
         .expect("Failed to find an appropiate adapter");
 
         let (mut device, mut queue) = block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
+                label: Some("Main Device"),
                 features: wgpu::Features::empty(),
                 limits: wgpu::Limits {
                     max_uniform_buffer_binding_size: 1 << 16,
                     ..wgpu::Limits::default()
                 },
-                shader_validation: true,
             },
             None,
         ))
@@ -119,18 +121,20 @@ impl Painter {
             entries: &[
                 BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStage::VERTEX,
-                    ty: BindingType::UniformBuffer {
-                        dynamic: false,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
                         min_binding_size: None,
                     },
                     count: None,
                 },
                 BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStage::VERTEX,
-                    ty: BindingType::UniformBuffer {
-                        dynamic: false,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
                         min_binding_size: None,
                     },
                     count: None,
@@ -138,20 +142,22 @@ impl Painter {
             ],
         });
 
-        let swap_chain_descriptor = SwapChainDescriptor {
-            usage: TextureUsage::OUTPUT_ATTACHMENT,
+        let surface_config = SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: TextureFormat::Bgra8Unorm,
             width: size.width,
             height: size.height,
-            present_mode: PresentMode::Immediate,
+            present_mode: wgpu::PresentMode::Immediate,
         };
+
+        surface.configure(&device, &surface_config);
 
         let multisampled_framebuffer = Self::create_multisampled_framebuffer(
             &device,
-            &swap_chain_descriptor,
+            &surface_config,
             CONFIG.renderer.msaa_samples,
         );
-        let stencil = Self::create_stencil(&device, &swap_chain_descriptor);
+        let stencil = Self::create_stencil(&device, &surface_config);
 
         let uniform_buffer = Self::create_uniform_buffer(&device);
         let tile_transform_buffer = Self::create_tile_transform_buffer(
@@ -166,12 +172,12 @@ impl Painter {
             &bind_group_layout,
             &layer_vs_module,
             &layer_fs_module,
-            BlendDescriptor {
+            BlendComponent {
                 src_factor: BlendFactor::SrcAlpha,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
                 operation: BlendOperation::Add,
             },
-            BlendDescriptor {
+            BlendComponent {
                 src_factor: BlendFactor::One,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
                 operation: BlendOperation::Add,
@@ -184,14 +190,12 @@ impl Painter {
             &bind_group_layout,
             &layer_vs_module,
             &layer_fs_module,
-            BlendDescriptor::REPLACE,
-            BlendDescriptor::REPLACE,
+            BlendComponent::REPLACE,
+            BlendComponent::REPLACE,
             true,
         );
 
         let staging_belt = wgpu::util::StagingBelt::new(1024);
-
-        let swap_chain = device.create_swap_chain(&surface, &swap_chain_descriptor);
 
         let bind_group = Self::create_blend_bind_group(
             &device,
@@ -204,7 +208,7 @@ impl Painter {
             FontArc::try_from_slice(include_bytes!("../../../config/Ruda-Bold.ttf")).unwrap();
 
         let glyph_brush =
-            GlyphBrushBuilder::using_font(font).build(&mut device, TextureFormat::Bgra8Unorm);
+            GlyphBrushBuilder::using_font(font).build(&device, TextureFormat::Bgra8Unorm);
 
         let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
@@ -223,8 +227,7 @@ impl Painter {
             queue,
             surface,
             staging_belt,
-            swap_chain_descriptor,
-            swap_chain,
+            surface_config,
             blend_pipeline,
             noblend_pipeline,
             multisampled_framebuffer,
@@ -245,54 +248,77 @@ impl Painter {
         bind_group_layout: &BindGroupLayout,
         vs_module: &ShaderModule,
         fs_module: &ShaderModule,
-        color_blend: BlendDescriptor,
-        alpha_blend: BlendDescriptor,
+        color_blend: BlendComponent,
+        alpha_blend: BlendComponent,
         depth_write_enabled: bool,
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[bind_group_layout],
             push_constant_ranges: &[],
         });
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: None,
+            label: Some("Map"),
             layout: Some(&pipeline_layout),
-            vertex_stage: ProgrammableStageDescriptor {
-                module: &vs_module,
+            vertex: VertexState {
+                module: vs_module,
                 entry_point: "main",
+                buffers: &[VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vertex>() as u64,
+                    step_mode: VertexStepMode::Vertex,
+                    attributes: &[
+                        VertexAttribute {
+                            format: VertexFormat::Sint16x2,
+                            offset: 0,
+                            shader_location: 0,
+                        },
+                        VertexAttribute {
+                            format: VertexFormat::Sint16x2,
+                            offset: 4,
+                            shader_location: 1,
+                        },
+                        VertexAttribute {
+                            format: VertexFormat::Uint32,
+                            offset: 8,
+                            shader_location: 2,
+                        },
+                    ],
+                }],
             },
-            fragment_stage: Some(ProgrammableStageDescriptor {
-                module: &fs_module,
+            fragment: Some(FragmentState {
+                module: fs_module,
                 entry_point: "main",
+                targets: &[ColorTargetState {
+                    format: TextureFormat::Bgra8Unorm,
+                    blend: Some(BlendState {
+                        color: color_blend,
+                        alpha: alpha_blend,
+                    }),
+                    write_mask: ColorWrites::ALL,
+                }],
             }),
-            rasterization_state: Some(RasterizationStateDescriptor {
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::TriangleList,
+                strip_index_format: None,
                 front_face: FrontFace::Ccw,
-                cull_mode: CullMode::None,
-                depth_bias: 0,
-                depth_bias_slope_scale: 0.0,
-                depth_bias_clamp: 0.0,
-                clamp_depth: false, // inactive because not enabled in extensions
-            }),
-            primitive_topology: PrimitiveTopology::TriangleList,
-            color_states: &[ColorStateDescriptor {
-                format: TextureFormat::Bgra8Unorm,
-                color_blend,
-                alpha_blend,
-                write_mask: ColorWrite::ALL,
-            }],
-            depth_stencil_state: Some(DepthStencilStateDescriptor {
+                cull_mode: None,
+                unclipped_depth: false,
+                polygon_mode: PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: Some(DepthStencilState {
                 format: TextureFormat::Depth24PlusStencil8,
                 depth_write_enabled,
                 depth_compare: CompareFunction::Greater,
-                stencil: wgpu::StencilStateDescriptor {
-                    front: StencilStateFaceDescriptor {
+                stencil: wgpu::StencilState {
+                    front: StencilFaceState {
                         compare: CompareFunction::NotEqual,
                         fail_op: StencilOperation::Keep,
                         depth_fail_op: StencilOperation::Replace,
                         pass_op: StencilOperation::Replace,
                     },
-                    back: StencilStateFaceDescriptor {
+                    back: StencilFaceState {
                         compare: CompareFunction::NotEqual,
                         fail_op: StencilOperation::Keep,
                         depth_fail_op: StencilOperation::Replace,
@@ -301,34 +327,18 @@ impl Painter {
                     read_mask: std::u32::MAX,
                     write_mask: std::u32::MAX,
                 },
+                bias: DepthBiasState {
+                    constant: 0,
+                    slope_scale: 0.0,
+                    clamp: 0.0,
+                },
             }),
-            vertex_state: VertexStateDescriptor {
-                index_format: IndexFormat::Uint32,
-                vertex_buffers: &[VertexBufferDescriptor {
-                    stride: std::mem::size_of::<Vertex>() as BufferAddress,
-                    step_mode: InputStepMode::Vertex,
-                    attributes: &[
-                        VertexAttributeDescriptor {
-                            format: VertexFormat::Short2,
-                            offset: 0,
-                            shader_location: 0,
-                        },
-                        VertexAttributeDescriptor {
-                            format: VertexFormat::Short2,
-                            offset: 4,
-                            shader_location: 1,
-                        },
-                        VertexAttributeDescriptor {
-                            format: VertexFormat::Uint,
-                            offset: 8,
-                            shader_location: 2,
-                        },
-                    ],
-                }],
+            multisample: MultisampleState {
+                count: CONFIG.renderer.msaa_samples,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
             },
-            sample_count: CONFIG.renderer.msaa_samples,
-            sample_mask: !0,
-            alpha_to_coverage_enabled: false,
+            multiview: None,
         })
     }
 
@@ -338,11 +348,11 @@ impl Painter {
         screen: &Screen,
         feature_collection: &FeatureCollection,
     ) -> Vec<(Buffer, usize)> {
-        let canvas_size_len = 4 * 4 as usize;
+        let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: as_byte_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]),
-            usage: BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_SRC,
         });
 
         let buffer = feature_collection.assemble_style_buffer();
@@ -353,9 +363,9 @@ impl Painter {
             contents: if len == 0 {
                 &[0; 48]
             } else {
-                as_byte_slice(&buffer.as_slice())
+                as_byte_slice(&buffer)
             },
-            usage: BufferUsage::UNIFORM | BufferUsage::COPY_SRC,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_SRC,
         });
 
         vec![
@@ -369,7 +379,7 @@ impl Painter {
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: as_byte_slice(&data),
-            usage: BufferUsage::UNIFORM | BufferUsage::COPY_DST,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
         buffer
     }
@@ -405,7 +415,7 @@ impl Painter {
                 let buffer = device.create_buffer_init(&BufferInitDescriptor {
                     label: None,
                     contents: as_byte_slice(data.as_slice()),
-                    usage: BufferUsage::UNIFORM | BufferUsage::COPY_DST,
+                    usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
                 });
                 buffer
             },
@@ -420,7 +430,7 @@ impl Painter {
     ) {
         let mut total_bytes = 0;
         for (buffer, len) in source {
-            encoder.copy_buffer_to_buffer(&buffer, 0, &destination, total_bytes, *len as u64);
+            encoder.copy_buffer_to_buffer(buffer, 0, destination, total_bytes, *len as u64);
             total_bytes += *len as u64;
         }
     }
@@ -442,13 +452,25 @@ impl Painter {
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: BindingResource::Buffer(
-                        uniform_buffer.slice(0..Self::uniform_buffer_size()),
+                        BufferBinding {
+                            buffer: uniform_buffer,
+                            offset: 0,
+                            size: NonZeroU64::new(Self::uniform_buffer_size()),
+                        }
+                        // uniform_buffer.as_entire_buffer_binding(),
+                        // uniform_buffer.slice(0..Self::uniform_buffer_size()),
                     ),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: BindingResource::Buffer(
-                        tile_transform_buffer.0.slice(0..tile_transform_buffer.1),
+                        BufferBinding {
+                            buffer: &tile_transform_buffer.0,
+                            offset: 0,
+                            size: NonZeroU64::new(tile_transform_buffer.1),
+                        }
+                        // tile_transform_buffer.0.as_entire_buffer_binding(),
+                        // tile_transform_buffer.0.slice(0..tile_transform_buffer.1),
                     ),
                 },
             ],
@@ -463,11 +485,17 @@ impl Painter {
     ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
         let vertex_shader = std::fs::read_to_string(vertex_shader)?;
         let vs_bytes = load_glsl(&vertex_shader, ShaderStage::Vertex);
-        let vs_module = device.create_shader_module(vs_bytes);
+        let vs_module = device.create_shader_module(&ShaderModuleDescriptor {
+            label: Some("VertexShader"),
+            source: vs_bytes,
+        });
 
         let fragment_shader = std::fs::read_to_string(fragment_shader)?;
         let fs_bytes = load_glsl(&fragment_shader, ShaderStage::Fragment);
-        let fs_module = device.create_shader_module(fs_bytes);
+        let fs_module = device.create_shader_module(&ShaderModuleDescriptor {
+            label: Some("FragmentShader"),
+            source: fs_bytes,
+        });
 
         Ok((vs_module, fs_module))
     }
@@ -490,12 +518,12 @@ impl Painter {
                         &self.bind_group_layout,
                         &vs_module,
                         &fs_module,
-                        BlendDescriptor {
+                        BlendComponent {
                             src_factor: BlendFactor::SrcAlpha,
                             dst_factor: BlendFactor::OneMinusSrcAlpha,
                             operation: BlendOperation::Add,
                         },
-                        BlendDescriptor {
+                        BlendComponent {
                             src_factor: BlendFactor::One,
                             dst_factor: BlendFactor::OneMinusSrcAlpha,
                             operation: BlendOperation::Add,
@@ -508,8 +536,8 @@ impl Painter {
                         &self.bind_group_layout,
                         &vs_module,
                         &fs_module,
-                        BlendDescriptor::REPLACE,
-                        BlendDescriptor::REPLACE,
+                        BlendComponent::REPLACE,
+                        BlendComponent::REPLACE,
                         true,
                     );
                     true
@@ -543,17 +571,15 @@ impl Painter {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        self.swap_chain_descriptor.width = width;
-        self.swap_chain_descriptor.height = height;
-        self.swap_chain = self
-            .device
-            .create_swap_chain(&self.surface, &self.swap_chain_descriptor);
+        self.surface_config.width = width;
+        self.surface_config.height = height;
+        self.surface.configure(&self.device, &self.surface_config);
         self.multisampled_framebuffer = Self::create_multisampled_framebuffer(
             &self.device,
-            &self.swap_chain_descriptor,
+            &self.surface_config,
             CONFIG.renderer.msaa_samples,
         );
-        self.stencil = Self::create_stencil(&self.device, &self.swap_chain_descriptor);
+        self.stencil = Self::create_stencil(&self.device, &self.surface_config);
     }
 
     fn update_uniforms(
@@ -578,23 +604,22 @@ impl Painter {
 
     fn create_multisampled_framebuffer(
         device: &Device,
-        swap_chain_descriptor: &SwapChainDescriptor,
+        surface_config: &SurfaceConfiguration,
         sample_count: u32,
     ) -> TextureView {
         let multisampled_texture_extent = Extent3d {
-            width: swap_chain_descriptor.width,
-            height: swap_chain_descriptor.height,
-            depth: 1,
+            width: surface_config.width,
+            height: surface_config.height,
+            depth_or_array_layers: 1,
         };
         let multisampled_frame_descriptor = &TextureDescriptor {
             label: None,
             size: multisampled_texture_extent,
-            // array_layer_count: 1,
             mip_level_count: 1,
             sample_count,
             dimension: TextureDimension::D2,
-            format: swap_chain_descriptor.format,
-            usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
+            format: surface_config.format,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_DST,
         };
 
         device
@@ -602,21 +627,21 @@ impl Painter {
             .create_view(&wgpu::TextureViewDescriptor::default())
     }
 
-    fn create_stencil(device: &Device, swap_chain_descriptor: &SwapChainDescriptor) -> TextureView {
+    fn create_stencil(device: &Device, surface_config: &SurfaceConfiguration) -> TextureView {
         let texture_extent = Extent3d {
-            width: swap_chain_descriptor.width,
-            height: swap_chain_descriptor.height,
-            depth: 1,
+            width: surface_config.width,
+            height: surface_config.height,
+            depth_or_array_layers: 1,
         };
         let frame_descriptor = &TextureDescriptor {
             label: None,
             size: texture_extent,
-            // array_layer_count: 1,
             mip_level_count: 1,
             sample_count: CONFIG.renderer.msaa_samples,
             dimension: TextureDimension::D2,
             format: TextureFormat::Depth24PlusStencil8,
-            usage: TextureUsage::OUTPUT_ATTACHMENT | TextureUsage::SAMPLED,
+            // usage: TextureUsages::OUTPUT_ATTACHMENT | TextureUsages::SAMPLED,
+            usage: TextureUsages::RENDER_ATTACHMENT,
         };
 
         device
@@ -624,13 +649,13 @@ impl Painter {
             .create_view(&wgpu::TextureViewDescriptor::default())
     }
 
-    pub fn paint(&mut self, hud: &mut super::ui::HUD, app_state: &mut AppState) {
+    pub fn paint(&mut self, hud: &mut super::ui::Hud, app_state: &mut AppState) {
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
-        self.update_uniforms(&mut encoder, &app_state, &feature_collection);
+        self.update_uniforms(&mut encoder, app_state, &feature_collection);
         self.bind_group = Self::create_blend_bind_group(
             &self.device,
             &self.bind_group_layout,
@@ -640,17 +665,21 @@ impl Painter {
         let num_tiles = app_state.visible_tiles().len();
         let features = feature_collection.get_features();
         if !features.is_empty() && num_tiles > 0 {
-            if let Ok(frame) = self.swap_chain.get_current_frame() {
+            if let Ok(frame) = self.surface.get_current_texture() {
                 {
+                    let view = frame
+                        .texture
+                        .create_view(&wgpu::TextureViewDescriptor::default());
                     let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                        color_attachments: &[RenderPassColorAttachmentDescriptor {
-                            attachment: if CONFIG.renderer.msaa_samples > 1 {
+                        label: Some("Tiles"),
+                        color_attachments: &[RenderPassColorAttachment {
+                            view: if CONFIG.renderer.msaa_samples > 1 {
                                 &self.multisampled_framebuffer
                             } else {
-                                &frame.output.view
+                                &view
                             },
                             resolve_target: if CONFIG.renderer.msaa_samples > 1 {
-                                Some(&frame.output.view)
+                                Some(&view)
                             } else {
                                 None
                             },
@@ -659,19 +688,17 @@ impl Painter {
                                 store: true,
                             },
                         }],
-                        depth_stencil_attachment: Some(
-                            RenderPassDepthStencilAttachmentDescriptor {
-                                attachment: &self.stencil,
-                                depth_ops: Some(Operations::<f32> {
-                                    load: LoadOp::Clear(0.0),
-                                    store: true,
-                                }),
-                                stencil_ops: Some(Operations::<u32> {
-                                    load: LoadOp::Clear(255),
-                                    store: true,
-                                }),
-                            },
-                        ),
+                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                            view: &self.stencil,
+                            depth_ops: Some(Operations::<f32> {
+                                load: LoadOp::Clear(0.0),
+                                store: true,
+                            }),
+                            stencil_ops: Some(Operations::<u32> {
+                                load: LoadOp::Clear(255),
+                                store: true,
+                            }),
+                        }),
                     });
                     render_pass.set_bind_group(0, &self.bind_group, &[]);
                     let vec = vec4(0.0, 0.0, 0.0, 1.0);
@@ -766,16 +793,20 @@ impl Painter {
                     vt.queue_text(&mut self.glyph_brush, &app_state.screen, app_state.zoom);
                 }
 
+                let view = &frame
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+
                 let _ = self.glyph_brush.draw_queued(
                     &self.device,
                     &mut self.staging_belt,
                     &mut encoder,
-                    &frame.output.view,
+                    view,
                     app_state.screen.width,
                     app_state.screen.height,
                 );
 
-                // self.temperature.paint(&mut encoder, &frame.view);
+                self.temperature.paint(&mut encoder, view);
 
                 hud.paint(
                     app_state,
@@ -787,6 +818,8 @@ impl Painter {
                 );
                 self.staging_belt.finish();
                 self.queue.submit(vec![encoder.finish()]);
+
+                frame.present();
             }
         }
     }

@@ -50,7 +50,11 @@ impl<'a> Iterator for TileIterator<'a> {
     type Item = TileId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        for _ in self.current_tile.x..self.tile_field.bottomright.x + 1 {
+        // TODO: FIX
+        if (self.current_tile.x..self.tile_field.bottomright.x + 1)
+            .next()
+            .is_some()
+        {
             let c = self.current_tile;
             self.current_tile = self.current_tile + TileId::new(self.current_tile.z, 1, 0);
             // TODO error?

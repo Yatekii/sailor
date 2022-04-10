@@ -53,26 +53,31 @@ fn fetch_tile_from_server(tile_id: &TileId) -> Option<Vec<u8>> {
         tile_id
     );
     let response = ureq::get(&request_url).call();
-    if response.ok() {
-        let mut reader = response.into_reader();
-        let mut data = vec![];
-        match reader.read_to_end(&mut data) {
-            Ok(_) => Some(data),
-            Err(e) => {
-                log::warn!(
-                    "Could not read http response for {} to buffer. Reason:\r\n{}",
-                    tile_id,
-                    e
-                );
-                None
+    if let Ok(response) = response {
+        if response.status() == 200 {
+            let mut reader = response.into_reader();
+            let mut data = vec![];
+            match reader.read_to_end(&mut data) {
+                Ok(_) => Some(data),
+                Err(e) => {
+                    log::warn!(
+                        "Could not read http response for {} to buffer. Reason:\r\n{}",
+                        tile_id,
+                        e
+                    );
+                    None
+                }
             }
+        } else {
+            log::warn!(
+                "Http request for {} failed. Reason:\r\n{:?}",
+                tile_id,
+                response.status()
+            );
+            None
         }
     } else {
-        log::warn!(
-            "Http request for {} failed. Reason:\r\n{:?}",
-            tile_id,
-            response.status()
-        );
+        log::warn!("Error");
         None
     }
 }

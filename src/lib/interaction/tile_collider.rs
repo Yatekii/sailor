@@ -79,6 +79,12 @@ impl TileCollider {
     }
 }
 
+impl Default for TileCollider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub trait TileColliderLoader {
     fn load(&mut self, tile: Arc<RwLock<Tile>>);
 }

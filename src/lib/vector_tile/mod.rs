@@ -26,7 +26,7 @@ pub struct Layer {
     pub features: Vec<(u32, Range<u32>)>,
 }
 
-fn area(path: &Path) -> f32 {
+fn _area(path: &Path) -> f32 {
     let mut points = path.points().to_vec();
     points.push(*points.first().expect("Path contains no points!"));
     let mut area = 0f32;

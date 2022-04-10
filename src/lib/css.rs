@@ -110,7 +110,7 @@ impl RulesCache {
                 kind: EventKind::Modify(ModifyKind::Data(_)),
                 paths,
                 ..
-            })) => self.try_reload_from_file(&paths[0].as_path()),
+            })) => self.try_reload_from_file(paths[0].as_path()),
             // Everything is alright but file wasn't actually changed.
             Ok(Ok(_)) => false,
             Ok(Err(err)) => {
@@ -164,7 +164,7 @@ pub struct Rule {
 }
 
 /// A single CSS selector.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, malloc_size_of_derive::MallocSizeOf)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, malloc_size_of_derive::MallocSizeOf, Default)]
 pub struct Selector {
     /// The type a selector matches.
     /// E.g. `"layer"`.
@@ -180,17 +180,6 @@ pub struct Selector {
     pub any: BTreeMap<String, String>,
 }
 
-impl Default for Selector {
-    fn default() -> Self {
-        Self {
-            typ: None,
-            id: None,
-            classes: vec![],
-            any: BTreeMap::new(),
-        }
-    }
-}
-
 impl std::fmt::Display for Selector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut selector = self.typ.clone().unwrap_or_default();
@@ -201,13 +190,13 @@ impl std::fmt::Display for Selector {
 
         for class in &self.classes {
             selector += ".";
-            selector += &class;
+            selector += class;
         }
         for (k, v) in &self.any {
             selector += "[";
-            selector += &k;
+            selector += k;
             selector += "=";
-            selector += &v;
+            selector += v;
             selector += "]";
         }
         write!(f, "({})", selector)

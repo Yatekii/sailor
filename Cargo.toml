@@ -3,6 +3,7 @@ name = "sailor"
 version = "0.1.0"
 authors = ["Noah Hüsser <yatekii@yatekii.ch>"]
 edition = "2018"
+resolver = "2"
 
 description = "A sailing navigation application."
 documentation = "https://docs.rs/sailor/"
@@ -26,8 +27,8 @@ path = "src/bin/main.rs"
 [dependencies]
 config = "0.10"
 crossbeam-channel = "0.5"
-imgui = "0.5"
-imgui-wgpu = "0.11"
+imgui = "0.8.2"
+imgui-wgpu = "0.19"
 log = { version = "0.4", features = ["serde"] }
 lyon = "0.13"
 malloc_size_of_derive = "0.1"
@@ -44,16 +45,17 @@ quick-protobuf = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 shaderc = "0.6"
-ureq = "1.5"
+ureq = "2.4"
 varint = "0.9"
-wgpu = "0.6"
-wgpu_glyph = "0.10"
-winit = "0.22"
+wgpu = { version = "0.12", features = ["spirv"] }
+wgpu_glyph = "0.16"
+winit = "0.26.1"
+core-foundation = "=0.9.3"
 
 [dependencies.imgui-winit-support]
-version = "0.5"
+version = "0.8.2"
 default-features = false
-features = ["winit-22"]
+features = ["winit-26"]
 
 [profile.release]
 debug = true

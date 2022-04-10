@@ -13,14 +13,14 @@ impl LoadedGPUTile {
             label: None,
             // size: tile.mesh().vertices.len() as u64 * 12,
             contents: as_byte_slice(&tile.mesh().vertices),
-            usage: wgpu::BufferUsage::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX,
         });
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             // size: tile.mesh().indices.len() as u64 * 4,
             contents: as_byte_slice(&tile.mesh().indices),
-            usage: wgpu::BufferUsage::INDEX,
+            usage: wgpu::BufferUsages::INDEX,
         });
 
         Self {

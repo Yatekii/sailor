@@ -23,7 +23,7 @@ pub struct Object {
     /// All the OSM tags that are attached to this object.
     tags: HashMap<String, String>,
     /// The object type.
-    object_type: ObjectType,
+    _object_type: ObjectType,
 }
 
 impl Object {
@@ -33,7 +33,7 @@ impl Object {
             selector,
             points,
             tags: HashMap::new(),
-            object_type,
+            _object_type: object_type,
         }
     }
 
@@ -48,7 +48,7 @@ impl Object {
             selector,
             points,
             tags,
-            object_type,
+            _object_type: object_type,
         }
     }
 

@@ -1,4 +1,7 @@
-use std::sync::{Arc, RwLock};
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use osm::*;
 
@@ -9,11 +12,12 @@ fn main() {
 
     let mut tiles = vec![];
     for _ in 0..60 {
-        let tile = Tile::from_mbvt(&tile_id, &data.to_vec(), feature_collection.clone(), vec![]);
+        let tile = Tile::from_mbvt(&tile_id, data, feature_collection.clone(), vec![]);
         tiles.push(tile);
     }
 
     loop {
         // dbg!(tile.stats().size);
+        std::thread::sleep(Duration::from_secs(1));
     }
 }

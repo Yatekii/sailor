@@ -7,7 +7,7 @@ pub enum ShaderStage {
     Compute,
 }
 
-pub fn load_glsl(code: &str, stage: ShaderStage) -> wgpu::ShaderModuleSource {
+pub fn load_glsl(code: &str, stage: ShaderStage) -> wgpu::ShaderSource {
     let ty = match stage {
         ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
         ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
@@ -20,5 +20,5 @@ pub fn load_glsl(code: &str, stage: ShaderStage) -> wgpu::ShaderModuleSource {
         .unwrap();
     let binary_result = binary_result.as_binary();
     let binary_result = binary_result.to_vec();
-    wgpu::ShaderModuleSource::SpirV(Cow::Owned(binary_result))
+    wgpu::ShaderSource::SpirV(Cow::Owned(binary_result))
 }

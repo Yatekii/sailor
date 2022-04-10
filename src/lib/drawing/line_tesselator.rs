@@ -21,7 +21,7 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, z: u32) {
         let third = points[2];
         let next_line = third.to_vector() - second.to_vector();
         let dot = normal.dot(last_line.normalize() + next_line.normalize());
-        if dot <= 1.0 && dot >= 0.0 {
+        if (0.0..=1.0).contains(&dot) {
             normal
         } else {
             -normal
@@ -67,7 +67,7 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, z: u32) {
             let normal = current_line.normalize() + next_line.normalize();
             let local_normal = vector(last_line.y, -last_line.x);
             let dot = local_normal.dot(last_normal);
-            let local_normal = if dot <= 1.0 && dot >= 0.0 {
+            let local_normal = if (0.0..=1.0).contains(&dot) {
                 local_normal
             } else {
                 -local_normal
@@ -130,7 +130,7 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, z: u32) {
 
     let dot = normal.dot(last_line.normalize() + line.normalize());
 
-    let normal = if dot <= 1.0 && dot >= 0.0 {
+    let normal = if (0.0..=1.0).contains(&dot) {
         normal
     } else {
         -normal

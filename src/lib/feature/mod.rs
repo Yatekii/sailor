@@ -99,7 +99,6 @@ impl Feature {
             match color {
                 CSSValue::Color(bg) => {
                     self.style.border_color = bg.clone().into();
-                    self.style.border_color; // TODO this is probably no intended to be this way
                 }
                 CSSValue::String(string) => {
                     match &string[..] {
@@ -165,7 +164,7 @@ impl Feature {
             match line_width {
                 CSSValue::Number(number) => match number {
                     Number::Px(px) => self.style.line_width = (*px as u32) << 1 | 0b01,
-                    Number::World(world) => self.style.line_width = ((*world as u32) << 1) | 0b00,
+                    Number::World(world) => self.style.line_width = (*world as u32) << 1,
                     value => log::info!(
                         "The value '{:?}' is currently not supported for 'line-width'.",
                         value

@@ -5,6 +5,7 @@ use std::sync::{Arc, RwLock};
 use std::thread::{spawn, JoinHandle};
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CacheStats {
     cached_tiles: usize,
     loading_tiles: usize,
@@ -76,7 +77,7 @@ impl TileCache {
         let loader = self.loaders.iter().find(|l| l.2 == *tile_id);
 
         // Check if tile is not in the cache yet and is not currently being loaded.
-        if !self.cache.contains_key(&tile_id) && loader.is_none() {
+        if !self.cache.contains_key(tile_id) && loader.is_none() {
             // Clone values to be moved into the thread.
             let tile_id_clone = *tile_id;
             let tx = self.channel.0.clone();
@@ -111,7 +112,7 @@ impl TileCache {
     /// Returns `None` if the tile is not in the cache.
     /// The user has to request the loading of the `Tile` on their own.
     pub fn try_get_tile(&self, tile_id: &TileId) -> Option<Arc<RwLock<Tile>>> {
-        self.cache.get(&tile_id).cloned()
+        self.cache.get(tile_id).cloned()
     }
 
     pub fn get_stats(&self) -> CacheStats {

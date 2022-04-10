@@ -7,7 +7,7 @@ use crate::config::CONFIG;
 use lyon::math::vector;
 use osm::*;
 use winit::{
-    dpi::LogicalPosition,
+    dpi::PhysicalPosition,
     event::{
         ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
         WindowEvent,
@@ -37,7 +37,7 @@ fn main() {
         app_state::AppState::new("config/style.css", zurich, width, height, z, hdpi_factor);
 
     let mut painter = drawing::Painter::init(&event_loop, width, height, &app_state);
-    let mut hud = drawing::ui::HUD::new(&painter.window, &mut painter.device, &mut painter.queue);
+    let mut hud = drawing::ui::Hud::new(&painter.window, &mut painter.device, &mut painter.queue);
 
     let mut mouse_down = false;
     let mut last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
@@ -99,7 +99,7 @@ fn main() {
                     if route_mouse {
                         match delta {
                             MouseScrollDelta::LineDelta(_, y) => app_state.zoom += 0.1 * y,
-                            MouseScrollDelta::PixelDelta(LogicalPosition { y, .. }) => {
+                            MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => {
                                 app_state.zoom += 0.001 * y as f32
                             }
                         }
