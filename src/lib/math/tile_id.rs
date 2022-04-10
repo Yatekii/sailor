@@ -23,7 +23,7 @@ impl From<TileCoordinate> for TileId {
 
 impl std::fmt::Display for TileId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}/{}/{}", self.z, self.x, self.y)
+        write!(f, "{:0>3}/{:0>3}/{:0>3}", self.z, self.x, self.y)
     }
 }
 

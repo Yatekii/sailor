@@ -174,7 +174,7 @@ impl Tile {
                         feature.0,
                         &feature.1,
                         layer.extent as f32,
-                        tile_id.z,
+                        tile_id,
                     );
                 }
 

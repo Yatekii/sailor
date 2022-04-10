@@ -122,7 +122,7 @@ pub fn paths_to_drawable(
     geometry_type: GeomType,
     paths: &[Path],
     extent: f32,
-    z: u32,
+    tile_id: &TileId,
 ) {
     for path in paths {
         if geometry_type == GeomType::POLYGON {
@@ -136,14 +136,14 @@ pub fn paths_to_drawable(
                     builder,
                 )
                 .map_err(|_e| {
-                    log::error!("Broken path.");
+                    log::error!("Broken path on tile {}.", tile_id);
                 });
         }
 
         if geometry_type == GeomType::LINESTRING {
             builder.set_current_vertex_type(VertexType::Line);
             builder.set_current_extent(extent);
-            tesselate_line2(path, builder, z);
+            tesselate_line2(path, builder, tile_id.z);
         }
     }
 }

@@ -206,7 +206,6 @@ impl Temperature {
         texture: &Texture,
         sampler: &Sampler,
     ) -> BindGroup {
-        dbg!(&sampler);
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: bind_group_layout,
