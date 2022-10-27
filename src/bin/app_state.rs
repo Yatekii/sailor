@@ -92,7 +92,7 @@ impl AppState {
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
                     let mut visible_tile = VisibleTile::new(tile);
 
-                    visible_tile.load_collider();
+                    // visible_tile.load_collider();
 
                     entry.insert(visible_tile);
 

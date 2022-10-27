@@ -92,7 +92,7 @@ impl Hud {
             .prepare_frame(self.imgui.io_mut(), window) // step 4
             .expect("Failed to prepare frame");
         self.imgui.io_mut().delta_time = app_state.stats.get_last_delta();
-        let ui = self.imgui.frame();
+        let ui = self.imgui.new_frame();
         let ruda = ui.push_font(self.ruda);
         {
             let mouse_pos = ui.io().mouse_pos;
@@ -100,7 +100,7 @@ impl Hud {
             // Draw menubar.
             ui.main_menu_bar(|| {
                 ui.menu("File", || {
-                    imgui::MenuItem::new("Quit").shortcut("Ctrl + Q").build(&ui);
+                    ui.menu_item_config("Quit").shortcut("Ctrl + Q").build();
                 });
 
                 ui.text(&format!(
@@ -116,14 +116,14 @@ impl Hud {
             });
 
             // Draw main window.
-            let window = imgui::Window::new("Main");
+            let window = ui.window("Main");
             window
                 .size([400.0, 600.0], imgui::Condition::FirstUseEver)
-                .build(&ui, || {
+                .build(|| {
                     let mut size = ui.window_size();
                     size[1] = 100.0;
-                    let window = imgui::ChildWindow::new("Hovered objects").size(size);
-                    window.build(&ui, || {
+                    let window = ui.child_window("Hovered objects").size(size);
+                    window.build(|| {
                         let objects = app_state
                             .hovered_objects
                             .iter()
@@ -196,11 +196,11 @@ impl Hud {
                     }
                 });
 
-            let window = imgui::Window::new("Stats");
+            let window = ui.window("Stats");
             window
                 .position([60.0, 720.0], imgui::Condition::FirstUseEver)
                 .size([400.0, 250.0], imgui::Condition::FirstUseEver)
-                .build(&ui, || {
+                .build(|| {
                     // Show cache stats
                     let head = CollapsingHeader::new("Cache Stats")
                         .default_open(true)
@@ -210,11 +210,11 @@ impl Hud {
                     }
                 });
 
-            let window = imgui::Window::new("Location Finder");
+            let window = ui.window("Location Finder");
             window
                 .position([520.0, 60.0], imgui::Condition::FirstUseEver)
                 .size([400.0, 100.0], imgui::Condition::FirstUseEver)
-                .build(&ui, || {
+                .build(|| {
                     // Show cache stats
                     imgui::InputText::new(
                         &ui,
@@ -250,19 +250,19 @@ impl Hud {
 
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Debug HUD"),
-            color_attachments: &[wgpu::RenderPassColorAttachment {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: true,
                 },
-            }],
+            })],
             depth_stencil_attachment: None,
         });
 
         self.renderer
-            .render(ui.render(), queue, device, &mut rpass)
+            .render(self.imgui.render(), queue, device, &mut rpass)
             .expect("Rendering failed");
     }
 
@@ -298,8 +298,7 @@ fn add_color_picker(ui: &Ui, rule: &mut Rule, attribute: &str) {
         _ => Color::TRANSPARENT, // This should never happen, but transparent should be a decent fallback
     };
     let mut color = [color.r, color.g, color.b, color.a];
-    let cp = ColorEdit::new(&attribute, EditableColor::Float4(&mut color));
-    cp.build(ui);
+    ui.color_edit4(&attribute, &mut color);
 
     rule.kvs.insert(
         attribute.to_string(),
@@ -324,7 +323,7 @@ fn add_slider_float(ui: &Ui, rule: &mut Rule, attribute: &str) {
         _ => 0.0,
     };
 
-    imgui::Slider::new(&attribute, 0.0, 10.0).build(ui, &mut value);
+    ui.slider(&attribute, 0.0, 10.0, &mut value);
 
     rule.kvs
         .insert(attribute.to_string(), CSSValue::Number(Number::Px(value)));

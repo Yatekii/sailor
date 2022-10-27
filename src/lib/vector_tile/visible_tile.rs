@@ -33,9 +33,12 @@ impl VisibleTile {
     }
 
     pub fn load_to_gpu(&self, device: &Device) {
+        println!("Loading tile ...");
         let read_tile = self.tile.read().unwrap();
+        println!("Read tile ...");
         let mut write_gpu_tile = self.gpu_tile.write().unwrap();
         *write_gpu_tile = Some(LoadedGPUTile::load(device, &read_tile));
+        println!("Wrote tile ...");
     }
 
     pub fn unload_from_gpu(&self) {

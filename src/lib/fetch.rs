@@ -89,14 +89,14 @@ fn is_in_cache(path: impl Into<String>) -> bool {
 fn ensure_cache_structure(root: impl AsRef<Path>, tile_id: &TileId) {
     let dir_path = root
         .as_ref()
-        .join(&format!("cache/{}/{}/", tile_id.z, tile_id.x));
+        .join(&format!("cache/{:0>3}/{:0>3}/", tile_id.z, tile_id.x));
     std::fs::create_dir_all(dir_path).expect("Could not create cache directories.");
 }
 
 #[test]
 fn test_ensure_cache_structure() {
     ensure_cache_structure("/tmp/sailor-test", &crate::TileId::new(8, 42, 42));
-    let md = std::fs::metadata("/tmp/sailor-test/cache/8/42");
+    let md = std::fs::metadata("/tmp/sailor-test/cache/008/042");
     assert!(md.is_ok());
     assert!(md.unwrap().is_dir());
 }

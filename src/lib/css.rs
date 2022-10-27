@@ -13,7 +13,7 @@ use nom::{
     AsChar, Err, IResult, InputTakeAtPosition,
 };
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::{collections::BTreeMap, num::ParseIntError};
+use std::{collections::BTreeMap, num::ParseIntError, path::Path};
 
 /// Tries to parse an entire stylesheet.
 pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
@@ -47,7 +47,7 @@ impl RulesCache {
 
         let (tx, rx) = unbounded();
         let mut watcher: RecommendedWatcher =
-            match Watcher::new_immediate(move |res| tx.send(res).unwrap()) {
+            match notify::recommended_watcher(move |res| tx.send(res).unwrap()) {
                 Ok(watcher) => watcher,
                 Err(err) => {
                     log::info!("Failed to create a watcher for the stylesheet:");
@@ -56,7 +56,7 @@ impl RulesCache {
                 }
             };
 
-        match watcher.watch(&filename, RecursiveMode::Recursive) {
+        match watcher.watch(Path::new(&filename), RecursiveMode::Recursive) {
             Ok(_) => {}
             Err(err) => {
                 log::info!("Failed to start watching {}:", filename);
@@ -560,17 +560,12 @@ fn from_hex(input: &str) -> Result<u8, std::num::ParseIntError> {
     u8::from_str_radix(input, 16)
 }
 
-/// `true` if `c` is a hexadecimal valid digit.
-fn is_hex_digit(c: char) -> bool {
-    c.is_digit(16)
-}
-
 /// Parse an actual hex code.
 fn hex_primary<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    map_res(take_while_m_n(2, 2, is_hex_digit), from_hex)(input)
+    map_res(take_while_m_n(2, 2, char::is_hex_digit), from_hex)(input)
 }
 
 /// Parse a single hex color code including the `#`.
@@ -597,7 +592,7 @@ where
     E: ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
     use std::str::FromStr;
-    map_res(take_while(|c: char| c.is_digit(10)), u8::from_str)(input)
+    map_res(take_while(|c: char| c.is_ascii_digit()), u8::from_str)(input)
 }
 
 /// Parse a single hex color code including the `#`.

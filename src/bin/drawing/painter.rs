@@ -1,4 +1,5 @@
 use std::num::NonZeroU64;
+use std::path::Path;
 
 use crossbeam_channel::{unbounded, TryRecvError};
 use nalgebra_glm::{vec2, vec4};
@@ -35,7 +36,7 @@ pub struct Painter {
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
     glyph_brush: GlyphBrush<()>,
-    temperature: crate::drawing::weather::Temperature,
+    // temperature: crate::drawing::weather::Temperature,
 }
 
 impl Painter {
@@ -60,10 +61,10 @@ impl Painter {
         }))
         .expect("Failed to find an appropiate adapter");
 
-        let (mut device, mut queue) = block_on(adapter.request_device(
+        let (device, queue) = block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("Main Device"),
-                features: wgpu::Features::empty(),
+                features: wgpu::Features::DEPTH32FLOAT_STENCIL8,
                 limits: wgpu::Limits {
                     max_uniform_buffer_binding_size: 1 << 16,
                     ..wgpu::Limits::default()
@@ -78,7 +79,7 @@ impl Painter {
         let (tx, rx) = unbounded();
 
         let mut watcher: RecommendedWatcher =
-            match Watcher::new_immediate(move |res| tx.send(res).unwrap()) {
+            match notify::recommended_watcher(move |res| tx.send(res).unwrap()) {
                 Ok(watcher) => watcher,
                 Err(err) => {
                     log::info!("Failed to create a watcher for the vertex shader:");
@@ -87,7 +88,10 @@ impl Painter {
                 }
             };
 
-        match watcher.watch(&CONFIG.renderer.vertex_shader, RecursiveMode::Recursive) {
+        match watcher.watch(
+            Path::new(&CONFIG.renderer.vertex_shader),
+            RecursiveMode::Recursive,
+        ) {
             Ok(_) => {}
             Err(err) => {
                 log::info!(
@@ -98,7 +102,10 @@ impl Painter {
             }
         };
 
-        match watcher.watch(&CONFIG.renderer.fragment_shader, RecursiveMode::Recursive) {
+        match watcher.watch(
+            Path::new(&CONFIG.renderer.fragment_shader),
+            RecursiveMode::Recursive,
+        ) {
             Ok(_) => {}
             Err(err) => {
                 log::info!(
@@ -145,6 +152,7 @@ impl Painter {
         let surface_config = SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: TextureFormat::Bgra8Unorm,
+            alpha_mode: CompositeAlphaMode::Auto,
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Immediate,
@@ -210,15 +218,15 @@ impl Painter {
         let glyph_brush =
             GlyphBrushBuilder::using_font(font).build(&device, TextureFormat::Bgra8Unorm);
 
-        let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
+        // let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
         let init_command_buf = init_encoder.finish();
         queue.submit(vec![init_command_buf]); // TODO this fix is bad
 
-        let width = 64 * 8;
-        let height = 64 * 8;
+        // let width = 64 * 8;
+        // let height = 64 * 8;
 
-        temperature.generate_texture(&mut device, &mut queue, width, height);
+        // temperature.generate_texture(&mut device, &mut queue, width, height);
 
         Self {
             window,
@@ -239,7 +247,7 @@ impl Painter {
             _watcher: watcher,
             rx,
             glyph_brush,
-            temperature,
+            // temperature,
         }
     }
 
@@ -289,14 +297,14 @@ impl Painter {
             fragment: Some(FragmentState {
                 module: fs_module,
                 entry_point: "main",
-                targets: &[ColorTargetState {
+                targets: &[Some(ColorTargetState {
                     format: TextureFormat::Bgra8Unorm,
                     blend: Some(BlendState {
                         color: color_blend,
                         alpha: alpha_blend,
                     }),
                     write_mask: ColorWrites::ALL,
-                }],
+                })],
             }),
             primitive: PrimitiveState {
                 topology: PrimitiveTopology::TriangleList,
@@ -308,7 +316,7 @@ impl Painter {
                 conservative: false,
             },
             depth_stencil: Some(DepthStencilState {
-                format: TextureFormat::Depth24PlusStencil8,
+                format: TextureFormat::Depth32FloatStencil8,
                 depth_write_enabled,
                 depth_compare: CompareFunction::Greater,
                 stencil: wgpu::StencilState {
@@ -451,27 +459,19 @@ impl Painter {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::Buffer(
-                        BufferBinding {
-                            buffer: uniform_buffer,
-                            offset: 0,
-                            size: NonZeroU64::new(Self::uniform_buffer_size()),
-                        }
-                        // uniform_buffer.as_entire_buffer_binding(),
-                        // uniform_buffer.slice(0..Self::uniform_buffer_size()),
-                    ),
+                    resource: BindingResource::Buffer(BufferBinding {
+                        buffer: uniform_buffer,
+                        offset: 0,
+                        size: NonZeroU64::new(Self::uniform_buffer_size()),
+                    }),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Buffer(
-                        BufferBinding {
-                            buffer: &tile_transform_buffer.0,
-                            offset: 0,
-                            size: NonZeroU64::new(tile_transform_buffer.1),
-                        }
-                        // tile_transform_buffer.0.as_entire_buffer_binding(),
-                        // tile_transform_buffer.0.slice(0..tile_transform_buffer.1),
-                    ),
+                    resource: BindingResource::Buffer(BufferBinding {
+                        buffer: &tile_transform_buffer.0,
+                        offset: 0,
+                        size: NonZeroU64::new(tile_transform_buffer.1),
+                    }),
                 },
             ],
         })
@@ -485,14 +485,14 @@ impl Painter {
     ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
         let vertex_shader = std::fs::read_to_string(vertex_shader)?;
         let vs_bytes = load_glsl(&vertex_shader, ShaderStage::Vertex);
-        let vs_module = device.create_shader_module(&ShaderModuleDescriptor {
+        let vs_module = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("VertexShader"),
             source: vs_bytes,
         });
 
         let fragment_shader = std::fs::read_to_string(fragment_shader)?;
         let fs_bytes = load_glsl(&fragment_shader, ShaderStage::Fragment);
-        let fs_module = device.create_shader_module(&ShaderModuleDescriptor {
+        let fs_module = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("FragmentShader"),
             source: fs_bytes,
         });
@@ -502,7 +502,7 @@ impl Painter {
 
     /// Reloads the shader if the file watcher has detected any change to the shader files.
     pub fn update_shader(&mut self) -> bool {
-        self.temperature.update_shader(&self.device);
+        // self.temperature.update_shader(&self.device);
         match self.rx.try_recv() {
             Ok(Ok(notify::event::Event {
                 kind: EventKind::Modify(ModifyKind::Data(_)),
@@ -639,7 +639,7 @@ impl Painter {
             mip_level_count: 1,
             sample_count: CONFIG.renderer.msaa_samples,
             dimension: TextureDimension::D2,
-            format: TextureFormat::Depth24PlusStencil8,
+            format: TextureFormat::Depth32FloatStencil8,
             // usage: TextureUsages::OUTPUT_ATTACHMENT | TextureUsages::SAMPLED,
             usage: TextureUsages::RENDER_ATTACHMENT,
         };
@@ -650,29 +650,39 @@ impl Painter {
     }
 
     pub fn paint(&mut self, hud: &mut super::ui::Hud, app_state: &mut AppState) {
-        let mut encoder = self
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor { label: None });
-
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
-        self.update_uniforms(&mut encoder, app_state, &feature_collection);
-        self.bind_group = Self::create_blend_bind_group(
-            &self.device,
-            &self.bind_group_layout,
-            &self.uniform_buffer,
-            &self.tile_transform_buffer,
-        );
-        let num_tiles = app_state.visible_tiles().len();
+        let num_tiles = app_state
+            .visible_tiles()
+            .iter()
+            .filter(|(_, v)| v.is_loaded_to_gpu())
+            .count();
+        let any_loaded = app_state
+            .visible_tiles()
+            .iter()
+            .any(|(_, v)| v.is_loaded_to_gpu());
+
+        // println!("Rendering {num_tiles} tiles ...");
+
         let features = feature_collection.get_features();
-        if !features.is_empty() && num_tiles > 0 {
+        if !features.is_empty() && any_loaded {
             if let Ok(frame) = self.surface.get_current_texture() {
+                let mut encoder = self
+                    .device
+                    .create_command_encoder(&CommandEncoderDescriptor { label: None });
+                self.update_uniforms(&mut encoder, app_state, &feature_collection);
+                self.bind_group = Self::create_blend_bind_group(
+                    &self.device,
+                    &self.bind_group_layout,
+                    &self.uniform_buffer,
+                    &self.tile_transform_buffer,
+                );
                 {
                     let view = frame
                         .texture
                         .create_view(&wgpu::TextureViewDescriptor::default());
                     let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                         label: Some("Tiles"),
-                        color_attachments: &[RenderPassColorAttachment {
+                        color_attachments: &[Some(RenderPassColorAttachment {
                             view: if CONFIG.renderer.msaa_samples > 1 {
                                 &self.multisampled_framebuffer
                             } else {
@@ -687,7 +697,7 @@ impl Painter {
                                 load: LoadOp::Clear(wgpu::Color::TRANSPARENT),
                                 store: true,
                             },
-                        }],
+                        })],
                         depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                             view: &self.stencil,
                             depth_ops: Some(Operations::<f32> {
@@ -758,12 +768,12 @@ impl Painter {
                             },
                         );
 
-                        render_pass.set_scissor_rect(
-                            s.x as u32,
-                            s.y as u32,
-                            (e.x - s.x) as u32,
-                            (e.y - s.y) as u32,
-                        );
+                        // render_pass.set_scissor_rect(
+                        //     s.x as u32,
+                        //     s.y as u32,
+                        //     (e.x - s.x) as u32,
+                        //     (e.y - s.y) as u32,
+                        // );
 
                         unsafe {
                             let gpu_tile = vt.gpu_tile();
@@ -806,7 +816,7 @@ impl Painter {
                     app_state.screen.height,
                 );
 
-                self.temperature.paint(&mut encoder, view);
+                // self.temperature.paint(&mut encoder, view);
 
                 hud.paint(
                     app_state,
@@ -817,9 +827,10 @@ impl Painter {
                     &frame,
                 );
                 self.staging_belt.finish();
-                self.queue.submit(vec![encoder.finish()]);
 
                 frame.present();
+
+                self.queue.submit(vec![encoder.finish()]);
             }
         }
     }

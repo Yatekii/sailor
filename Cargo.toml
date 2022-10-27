@@ -27,8 +27,8 @@ path = "src/bin/main.rs"
 [dependencies]
 config = "0.10"
 crossbeam-channel = "0.5"
-imgui = "0.8.2"
-imgui-wgpu = "0.19"
+imgui = { version = "0.8.1-alpha.0", git = "https://github.com/imgui-rs/imgui-rs" }
+imgui-wgpu = { version = "0.20", path = "../imgui-wgpu-rs" }
 log = { version = "0.4", features = ["serde"] }
 lyon = "0.13"
 malloc_size_of_derive = "0.1"
@@ -47,15 +47,17 @@ serde_derive = "1.0"
 shaderc = "0.6"
 ureq = "2.4"
 varint = "0.9"
-wgpu = { version = "0.12", features = ["spirv"] }
-wgpu_glyph = "0.16"
-winit = "0.26.1"
+web-sys = "=0.3.60"
+wgpu = { version = "0.14", features = ["spirv"] }
+wgpu_glyph = { version = "0.17", path = "../wgpu_glyph" }
+winit = "0.27"
 core-foundation = "=0.9.3"
 
-[dependencies.imgui-winit-support]
-version = "0.8.2"
-default-features = false
-features = ["winit-26"]
+imgui-winit-support = { version = "0.8.1-alpha.0", default-features = false, git = "https://github.com/imgui-rs/imgui-rs" }
 
+# features = ["winit-27"]
 [profile.release]
 debug = true
+
+[patch.crates-io]
+imgui-winit-support = { git = "https://github.com/imgui-rs/imgui-rs" }

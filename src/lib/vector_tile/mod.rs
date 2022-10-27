@@ -125,6 +125,8 @@ pub fn paths_to_drawable(
     tile_id: &TileId,
 ) {
     for path in paths {
+        println!("{geometry_type:?}");
+        println!("{path:?}");
         if geometry_type == GeomType::POLYGON {
             builder.set_current_extent(extent);
             builder.set_current_vertex_type(VertexType::Polygon);
@@ -135,8 +137,9 @@ pub fn paths_to_drawable(
                     &FillOptions::tolerance(0.0001).with_normals(true),
                     builder,
                 )
-                .map_err(|_e| {
+                .map_err(|e| {
                     log::error!("Broken path on tile {}.", tile_id);
+                    log::error!("{e:#?}");
                 });
         }
 
