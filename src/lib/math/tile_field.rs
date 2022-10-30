@@ -51,7 +51,7 @@ impl<'a> Iterator for TileIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // TODO: FIX
-        if (self.current_tile.x..self.tile_field.bottomright.x + 1)
+        if (self.current_tile.x..=self.tile_field.bottomright.x)
             .next()
             .is_some()
         {
@@ -65,10 +65,10 @@ impl<'a> Iterator for TileIterator<'a> {
         if self.current_tile.y < self.tile_field.bottomright.y {
             self.current_tile = TileId::new(
                 self.current_tile.z,
-                self.tile_field.topleft.x + 1,
+                self.tile_field.topleft.x,
                 self.current_tile.y + 1,
             );
-            let c = self.current_tile - TileId::new(self.current_tile.z, 1, 0);
+            let c = self.current_tile;
             Some(c)
         } else {
             None

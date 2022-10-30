@@ -651,21 +651,21 @@ impl Painter {
 
     pub fn paint(&mut self, hud: &mut super::ui::Hud, app_state: &mut AppState) {
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
-        let num_tiles = app_state
+        let num_tiles = app_state.visible_tiles().len();
+        let num_visible_tiles = app_state
             .visible_tiles()
             .iter()
-            .filter(|(_, v)| v.is_loaded_to_gpu())
-            .count();
-        let any_loaded = app_state.visible_tiles().iter().any(|(_, vt)| {
-            if !vt.is_loaded_to_gpu() {
+            .filter(|(_, vt)| {
                 vt.load_to_gpu(&self.device);
-                false
-            } else {
-                true
-            }
-        });
+                vt.is_loaded_to_gpu()
+            })
+            .count();
+        let any_loaded = app_state
+            .visible_tiles()
+            .iter()
+            .any(|(_, vt)| vt.is_loaded_to_gpu());
 
-        // println!("Rendering {num_tiles} tiles ...");
+        println!("Rendering {num_visible_tiles}/{num_tiles} tiles ...");
 
         let features = feature_collection.get_features();
         if !features.is_empty() && any_loaded {
@@ -721,34 +721,21 @@ impl Painter {
                         app_state.screen.height as f32,
                     ) / 2.0;
 
-                    for (i, vt) in app_state
-                        .visible_tiles()
-                        .values()
-                        .filter(|vt| vt.is_loaded_to_gpu())
-                        .enumerate()
-                    {
+                    for (i, vt) in app_state.visible_tiles().values().enumerate() {
                         let tile_id = vt.tile_id();
                         let matrix = app_state
                             .screen
                             .tile_to_global_space(app_state.zoom, &tile_id);
                         let start = (matrix * vec).xy() + vec2(1.0, 1.0);
                         let s = vec2(
-                            {
-                                let x = (start.x * screen_dimensions.x).round();
-                                if x < 0.0 {
-                                    0.0
-                                } else {
-                                    x
-                                }
-                            },
-                            {
-                                let y = (start.y * screen_dimensions.y).round();
-                                if y < 0.0 {
-                                    0.0
-                                } else {
-                                    y
-                                }
-                            },
+                            (start.x * screen_dimensions.x)
+                                .round()
+                                .max(0.0)
+                                .min(screen_dimensions.x * 2.0),
+                            (start.y * screen_dimensions.y)
+                                .round()
+                                .max(0.0)
+                                .min(screen_dimensions.y * 2.0),
                         );
                         let matrix = app_state.screen.tile_to_global_space(
                             app_state.zoom,
@@ -756,30 +743,23 @@ impl Painter {
                         );
                         let end = (matrix * vec).xy() + vec2(1.0, 1.0);
                         let e = vec2(
-                            {
-                                let x = (end.x * screen_dimensions.x).round();
-                                if x < 0.0 {
-                                    0.0
-                                } else {
-                                    x
-                                }
-                            },
-                            {
-                                let y = (end.y * screen_dimensions.y).round();
-                                if y < 0.0 {
-                                    0.0
-                                } else {
-                                    y
-                                }
-                            },
+                            (end.x * screen_dimensions.x)
+                                .round()
+                                .max(0.0)
+                                .min(screen_dimensions.x * 2.0),
+                            (end.y * screen_dimensions.y)
+                                .round()
+                                .max(0.0)
+                                .min(screen_dimensions.y * 2.0),
                         );
+                        let width = (e.x - s.x) as u32;
+                        let height = (e.y - s.y) as u32;
 
-                        // render_pass.set_scissor_rect(
-                        //     s.x as u32,
-                        //     s.y as u32,
-                        //     (e.x - s.x) as u32,
-                        //     (e.y - s.y) as u32,
-                        // );
+                        println!("{}/{} {}/{}", s.x as u32, s.y as u32, width, height);
+
+                        if width > 0 && height > 0 {
+                            render_pass.set_scissor_rect(s.x as u32, s.y as u32, width, height);
+                        }
 
                         unsafe {
                             let gpu_tile = vt.gpu_tile();
@@ -834,9 +814,8 @@ impl Painter {
                 );
                 self.staging_belt.finish();
 
-                frame.present();
-
                 self.queue.submit(vec![encoder.finish()]);
+                frame.present();
             }
         }
     }

@@ -63,7 +63,7 @@ impl AppState {
 
     pub fn load_tiles(&mut self) {
         let tile_field = self.screen.get_tile_boundaries_for_zoom_level(self.zoom, 1);
-
+        dbg!(&tile_field);
         // Remove old bigger tiles which are not in the FOV anymore.
         let old_tile_field = self
             .screen

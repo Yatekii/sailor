@@ -2,7 +2,6 @@ use lyon::{
     lyon_tessellation::{FillGeometryBuilder, GeometryBuilder},
     math::*,
     path::Path,
-    tessellation::FillVertex,
 };
 
 use crate::*;
@@ -87,13 +86,13 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, z: u32) {
             let vertex_left = builder.add_vertex(vl.0, vl.1).unwrap();
             let vertex_right = builder.add_vertex(vr.0, vr.1).unwrap();
 
-            FillGeometryBuilder::add_triangle(
+            <dyn FillGeometryBuilder>::add_triangle(
                 builder,
                 last_vertex_left,
                 last_vertex_right,
                 vertex_left,
             );
-            FillGeometryBuilder::add_triangle(
+            <dyn FillGeometryBuilder>::add_triangle(
                 builder,
                 last_vertex_right,
                 vertex_right,
@@ -134,7 +133,12 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, z: u32) {
 
     let vertex_right = builder.add_vertex(vr.0, vr.1).unwrap();
 
-    FillGeometryBuilder::add_triangle(builder, last_vertex_left, last_vertex_right, vertex_left);
-    FillGeometryBuilder::add_triangle(builder, last_vertex_right, vertex_right, vertex_left);
+    <dyn FillGeometryBuilder>::add_triangle(
+        builder,
+        last_vertex_left,
+        last_vertex_right,
+        vertex_left,
+    );
+    <dyn FillGeometryBuilder>::add_triangle(builder, last_vertex_right, vertex_right, vertex_left);
     builder.end_geometry();
 }
