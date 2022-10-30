@@ -1,6 +1,6 @@
 use crate::*;
 use lyon::{
-    path::Path,
+    path::{ControlPointId, Path},
     tessellation::{geometry_builder::VertexBuffers, FillOptions, FillTessellator},
 };
 use quick_protobuf::{BytesReader, MessageRead};
@@ -130,7 +130,7 @@ impl Tile {
                 let paths = geometry_commands_to_paths(feature.type_pb, &feature.geometry);
 
                 if let Some(tag) = tags.get("name:en") {
-                    let point = paths[0].points()[0];
+                    let point = paths[0][ControlPointId(0)];
                     text.push((
                         (point.x / extent as f32, point.y / extent as f32),
                         tag.clone(),
@@ -219,6 +219,7 @@ impl Tile {
             }
         };
 
+        // TODO:
         // spawn(move|| {
         //     if let Ok(objects) = objects_keep.read() {
         //         match collider_keep.write() {
@@ -292,7 +293,8 @@ impl Tile {
 
         // Create a rectangular path.
         let mut path_builder = Path::builder();
-        path_builder.move_to((-10.0, -10.0).into());
+        // path_builder.end(false);
+        path_builder.begin((-10.0, -10.0).into());
         path_builder.line_to((-10.0, extent as f32 + 10.0).into());
         path_builder.line_to((extent as f32 + 10.0, extent as f32 + 10.0).into());
         path_builder.line_to((extent as f32 + 10.0, -10.0).into());
@@ -312,11 +314,7 @@ impl Tile {
 
         // Tesselate path.
         FillTessellator::new()
-            .tessellate_path(
-                &path,
-                &FillOptions::tolerance(0.0001).with_normals(true),
-                builder,
-            )
+            .tessellate_path(&path, &FillOptions::tolerance(0.0001), builder)
             .expect("This is a bug. Please report it.");
 
         let object = Object::new(selector, path.points().to_vec(), ObjectType::Polygon);

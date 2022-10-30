@@ -30,7 +30,7 @@ crossbeam-channel = "0.5"
 imgui = { version = "0.8.1-alpha.0", git = "https://github.com/imgui-rs/imgui-rs" }
 imgui-wgpu = { version = "0.20", path = "../imgui-wgpu-rs" }
 log = { version = "0.4", features = ["serde"] }
-lyon = "0.13"
+lyon = { version = "1", path = "../lyon/crates/lyon" }
 malloc_size_of_derive = "0.1"
 nalgebra = "0.23"
 nalgebra-glm = "0.9"

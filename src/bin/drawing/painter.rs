@@ -656,10 +656,14 @@ impl Painter {
             .iter()
             .filter(|(_, v)| v.is_loaded_to_gpu())
             .count();
-        let any_loaded = app_state
-            .visible_tiles()
-            .iter()
-            .any(|(_, v)| v.is_loaded_to_gpu());
+        let any_loaded = app_state.visible_tiles().iter().any(|(_, vt)| {
+            if !vt.is_loaded_to_gpu() {
+                vt.load_to_gpu(&self.device);
+                false
+            } else {
+                true
+            }
+        });
 
         // println!("Rendering {num_tiles} tiles ...");
 
@@ -717,10 +721,12 @@ impl Painter {
                         app_state.screen.height as f32,
                     ) / 2.0;
 
-                    for (i, vt) in app_state.visible_tiles().values().enumerate() {
-                        if !vt.is_loaded_to_gpu() {
-                            vt.load_to_gpu(&self.device);
-                        }
+                    for (i, vt) in app_state
+                        .visible_tiles()
+                        .values()
+                        .filter(|vt| vt.is_loaded_to_gpu())
+                        .enumerate()
+                    {
                         let tile_id = vt.tile_id();
                         let matrix = app_state
                             .screen

@@ -1,5 +1,9 @@
 use crate::*;
-use lyon::tessellation::{self, geometry_builder::VertexConstructor};
+use lyon::{
+    lyon_tessellation::{FillVertexConstructor, StrokeVertexConstructor},
+    math::{Point, Vector},
+    tessellation::{self},
+};
 
 #[derive(Copy, Clone, Debug)]
 pub enum VertexType {
@@ -32,42 +36,64 @@ impl LayerVertexCtor {
             vertex_type: VertexType::Polygon,
         }
     }
-}
 
-impl VertexConstructor<tessellation::FillVertex, Vertex> for LayerVertexCtor {
-    fn new_vertex(&mut self, vertex: tessellation::FillVertex) -> Vertex {
-        assert!(!vertex.position.x.is_nan());
-        assert!(!vertex.position.y.is_nan());
+    pub fn new_osm_vertex(&mut self, point: Point, normal: Vector) -> Vertex {
+        assert!(!point.x.is_nan());
+        assert!(!point.y.is_nan());
         const LIMIT: f32 = 3.0;
-        let normal = if vertex.normal.length() > LIMIT {
-            vertex.normal.normalize() * LIMIT
-        } else {
-            vertex.normal
-        } * self.extent;
+        // let normal = if vertex.normal.length() > LIMIT {
+        //     vertex.normal.normalize() * LIMIT
+        // } else {
+        //     vertex.normal
+        // } * self.extent;
 
         let meta: u16 = self.vertex_type as u16;
 
         Vertex {
-            position: [vertex.position.x as i16, vertex.position.y as i16],
-            normal: [normal.x.round() as i16, normal.y.round() as i16],
+            position: [point.x as i16, point.y as i16],
+            // normal: [normal.x.round() as i16, normal.y.round() as i16],
+            normal: [normal.x as i16, normal.y as i16],
             feature_id: ((meta as u32) << 16) | self.feature_id,
         }
     }
 }
 
-impl VertexConstructor<tessellation::StrokeVertex, Vertex> for LayerVertexCtor {
-    fn new_vertex(&mut self, vertex: tessellation::StrokeVertex) -> Vertex {
-        assert!(!vertex.position.x.is_nan());
-        assert!(!vertex.position.y.is_nan());
-        let normal = if vertex.normal.length() > 8.0 {
-            vertex.normal.normalize() * 8.0
-        } else {
-            vertex.normal
-        } * self.extent;
+impl FillVertexConstructor<Vertex> for LayerVertexCtor {
+    fn new_vertex(&mut self, vertex: tessellation::FillVertex) -> Vertex {
+        assert!(!vertex.position().x.is_nan());
+        assert!(!vertex.position().y.is_nan());
+        const LIMIT: f32 = 3.0;
+        // let normal = if vertex.normal.length() > LIMIT {
+        //     vertex.normal.normalize() * LIMIT
+        // } else {
+        //     vertex.normal
+        // } * self.extent;
+
+        let meta: u16 = self.vertex_type as u16;
 
         Vertex {
-            position: [vertex.position.x as i16, vertex.position.y as i16],
-            normal: [normal.x.round() as i16, normal.y.round() as i16],
+            position: [vertex.position().x as i16, vertex.position().y as i16],
+            // normal: [normal.x.round() as i16, normal.y.round() as i16],
+            normal: [1, 1],
+            feature_id: ((meta as u32) << 16) | self.feature_id,
+        }
+    }
+}
+
+impl StrokeVertexConstructor<Vertex> for LayerVertexCtor {
+    fn new_vertex(&mut self, vertex: tessellation::StrokeVertex) -> Vertex {
+        assert!(!vertex.position().x.is_nan());
+        assert!(!vertex.position().y.is_nan());
+        // let normal = if vertex.normal.length() > 8.0 {
+        //     vertex.normal.normalize() * 8.0
+        // } else {
+        //     vertex.normal
+        // } * self.extent;
+
+        Vertex {
+            position: [vertex.position().x as i16, vertex.position().y as i16],
+            // normal: [normal.x.round() as i16, normal.y.round() as i16],
+            normal: [1, 1],
             feature_id: self.feature_id,
         }
     }

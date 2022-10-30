@@ -1,4 +1,8 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::{
+    sync::{Arc, RwLock, RwLockReadGuard},
+    thread,
+    time::Duration,
+};
 
 use wgpu::*;
 use wgpu_glyph::{GlyphBrush, Section, Text};

@@ -26,18 +26,18 @@ pub struct Layer {
     pub features: Vec<(u32, Range<u32>)>,
 }
 
-fn _area(path: &Path) -> f32 {
-    let mut points = path.points().to_vec();
-    points.push(*points.first().expect("Path contains no points!"));
-    let mut area = 0f32;
-    for i in 0..points.len() - 1 {
-        area += points[i].x * points[i + 1].y;
-    }
-    for i in 0..points.len() - 1 {
-        area -= points[i + 1].x * points[i].y;
-    }
-    area + points[points.len() - 1].x * points[1].y - points[points.len() - 1].y * points[1].x
-}
+// fn _area(path: &Path) -> f32 {
+//     let mut points = path.points().to_vec();
+//     points.push(*points.first().expect("Path contains no points!"));
+//     let mut area = 0f32;
+//     for i in 0..points.len() - 1 {
+//         area += points[i].x * points[i + 1].y;
+//     }
+//     for i in 0..points.len() - 1 {
+//         area -= points[i + 1].x * points[i].y;
+//     }
+//     area + points[points.len() - 1].x * points[1].y - points[points.len() - 1].y * points[1].x
+// }
 
 fn parse_one_to_path(
     geometry_type: GeomType,
@@ -60,10 +60,12 @@ fn parse_one_to_path(
                     let dy = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32;
                     *cursor += 1;
                     *gcursor += vector(dx, dy);
-                    builder.move_to(*gcursor);
+                    // builder.end(false);
+                    builder.begin(*gcursor);
                 }
 
                 if let GeomType::POINT = geometry_type {
+                    builder.end(false);
                     return builder.build();
                 }
             }
@@ -78,7 +80,10 @@ fn parse_one_to_path(
                 }
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),
-                    GeomType::LINESTRING => return builder.build(),
+                    GeomType::LINESTRING => {
+                        builder.end(false);
+                        return builder.build();
+                    }
                     _ => {}
                 }
             }
@@ -125,18 +130,13 @@ pub fn paths_to_drawable(
     tile_id: &TileId,
 ) {
     for path in paths {
-        println!("{geometry_type:?}");
-        println!("{path:?}");
+        // println!("{path:?}");
         if geometry_type == GeomType::POLYGON {
             builder.set_current_extent(extent);
             builder.set_current_vertex_type(VertexType::Polygon);
             let mut tessellator = FillTessellator::new();
             let _ = tessellator
-                .tessellate_path(
-                    path,
-                    &FillOptions::tolerance(0.0001).with_normals(true),
-                    builder,
-                )
+                .tessellate_path(path, &FillOptions::tolerance(0.0001), builder)
                 .map_err(|e| {
                     log::error!("Broken path on tile {}.", tile_id);
                     log::error!("{e:#?}");

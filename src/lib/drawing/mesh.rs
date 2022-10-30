@@ -1,17 +1,19 @@
 use crate::drawing::vertex::VertexType;
 use crate::drawing::vertex::{LayerVertexCtor, Vertex};
-use lyon::{
-    path::{Index, VertexId},
-    tessellation::{
-        geometry_builder::{Count, GeometryBuilderError, MaxIndex},
-        FillVertex, GeometryBuilder, StrokeVertex, VertexBuffers, VertexConstructor,
-    },
+use lyon::lyon_tessellation::{
+    FillGeometryBuilder, FillVertexConstructor, StrokeGeometryBuilder, StrokeVertexConstructor,
+    VertexId,
+};
+use lyon::math::{Point, Vector};
+use lyon::tessellation::{
+    geometry_builder::GeometryBuilderError, FillVertex, GeometryBuilder, StrokeVertex,
+    VertexBuffers,
 };
 
 pub struct MeshBuilder<'l> {
     pub buffers: &'l mut VertexBuffers<Vertex, u32>,
-    vertex_offset: Index,
-    index_offset: Index,
+    vertex_offset: u32,
+    index_offset: u32,
     vertex_constructor: LayerVertexCtor,
 }
 
@@ -20,8 +22,8 @@ impl<'l> MeshBuilder<'l> {
         buffers: &'l mut VertexBuffers<Vertex, u32>,
         vertex_constructor: LayerVertexCtor,
     ) -> Self {
-        let vertex_offset = buffers.vertices.len() as Index;
-        let index_offset = buffers.indices.len() as Index;
+        let vertex_offset = buffers.vertices.len() as u32;
+        let index_offset = buffers.indices.len() as u32;
         Self {
             buffers,
             vertex_offset,
@@ -45,30 +47,34 @@ impl<'l> MeshBuilder<'l> {
     pub fn set_current_vertex_type(&mut self, vertex_type: VertexType) {
         self.vertex_constructor.vertex_type = vertex_type;
     }
-}
 
-impl<'l> GeometryBuilder<FillVertex> for MeshBuilder<'l> {
-    fn begin_geometry(&mut self) {
-        self.vertex_offset = self.buffers.vertices.len() as Index;
-        self.index_offset = self.buffers.indices.len() as Index;
-    }
-
-    fn end_geometry(&mut self) -> Count {
-        Count {
-            vertices: self.buffers.vertices.len() as u32 - self.vertex_offset,
-            indices: self.buffers.indices.len() as u32 - self.index_offset,
-        }
-    }
-
-    fn add_vertex(&mut self, v: FillVertex) -> Result<VertexId, GeometryBuilderError> {
+    pub fn add_vertex(
+        &mut self,
+        vertex: Point,
+        normal: Vector,
+    ) -> Result<VertexId, GeometryBuilderError> {
         self.buffers
             .vertices
-            .push(self.vertex_constructor.new_vertex(v));
+            .push(self.vertex_constructor.new_osm_vertex(vertex, normal));
         let len = self.buffers.vertices.len();
-        if len > u32::max_index() {
+        if len > u32::MAX as usize {
             return Err(GeometryBuilderError::TooManyVertices);
         }
-        Ok(VertexId((len - 1) as Index - self.vertex_offset))
+        Ok(VertexId((len - 1) as u32 - self.vertex_offset))
+    }
+}
+
+impl<'l> GeometryBuilder for MeshBuilder<'l> {
+    fn begin_geometry(&mut self) {
+        self.vertex_offset = self.buffers.vertices.len() as u32;
+        self.index_offset = self.buffers.indices.len() as u32;
+    }
+
+    fn end_geometry(&mut self) {
+        // Count {
+        //     vertices: self.buffers.vertices.len() as u32 - self.vertex_offset,
+        //     indices: self.buffers.indices.len() as u32 - self.index_offset,
+        // }
     }
 
     fn add_triangle(&mut self, a: VertexId, b: VertexId, c: VertexId) {
@@ -83,38 +89,40 @@ impl<'l> GeometryBuilder<FillVertex> for MeshBuilder<'l> {
     }
 }
 
-impl<'l> GeometryBuilder<StrokeVertex> for MeshBuilder<'l> {
-    fn begin_geometry(&mut self) {
-        self.vertex_offset = self.buffers.vertices.len() as Index;
-        self.index_offset = self.buffers.indices.len() as Index;
-    }
-
-    fn end_geometry(&mut self) -> Count {
-        Count {
-            vertices: self.buffers.vertices.len() as u32 - self.vertex_offset,
-            indices: self.buffers.indices.len() as u32 - self.index_offset,
-        }
-    }
-
-    fn add_vertex(&mut self, v: StrokeVertex) -> Result<VertexId, GeometryBuilderError> {
+impl<'l> FillGeometryBuilder for MeshBuilder<'l> {
+    fn add_fill_vertex(
+        &mut self,
+        vertex: FillVertex,
+    ) -> Result<lyon::lyon_tessellation::VertexId, GeometryBuilderError> {
         self.buffers
             .vertices
-            .push(self.vertex_constructor.new_vertex(v));
+            .push(FillVertexConstructor::new_vertex(
+                &mut self.vertex_constructor,
+                vertex,
+            ));
         let len = self.buffers.vertices.len();
-        if len > u32::max_index() {
+        if len > u32::MAX as usize {
             return Err(GeometryBuilderError::TooManyVertices);
         }
-        Ok(VertexId((len - 1) as Index - self.vertex_offset))
+        Ok(VertexId((len - 1) as u32 - self.vertex_offset))
     }
+}
 
-    fn add_triangle(&mut self, a: VertexId, b: VertexId, c: VertexId) {
-        self.buffers.indices.push((a + self.vertex_offset).into());
-        self.buffers.indices.push((b + self.vertex_offset).into());
-        self.buffers.indices.push((c + self.vertex_offset).into());
-    }
-
-    fn abort_geometry(&mut self) {
-        self.buffers.vertices.truncate(self.vertex_offset as usize);
-        self.buffers.indices.truncate(self.index_offset as usize);
+impl<'l> StrokeGeometryBuilder for MeshBuilder<'l> {
+    fn add_stroke_vertex(
+        &mut self,
+        vertex: StrokeVertex,
+    ) -> Result<lyon::lyon_tessellation::VertexId, GeometryBuilderError> {
+        self.buffers
+            .vertices
+            .push(StrokeVertexConstructor::new_vertex(
+                &mut self.vertex_constructor,
+                vertex,
+            ));
+        let len = self.buffers.vertices.len();
+        if len > u32::MAX as usize {
+            return Err(GeometryBuilderError::TooManyVertices);
+        }
+        Ok(VertexId((len - 1) as u32 - self.vertex_offset))
     }
 }
