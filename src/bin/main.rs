@@ -23,8 +23,8 @@ fn main() {
     let tile_coordinate = deg2num(47.3769, 8.5417, z as u32);
     let zurich = num_to_global_space(&tile_coordinate);
 
-    let width = 1600;
-    let height = 1000;
+    let width = 1200;
+    let height = 800;
 
     let event_loop = winit::event_loop::EventLoop::new();
     let hdpi_factor = event_loop
@@ -37,7 +37,11 @@ fn main() {
         app_state::AppState::new("config/style.css", zurich, width, height, z, hdpi_factor);
 
     let mut painter = drawing::Painter::init(&event_loop, width, height, &app_state);
-    let mut hud = drawing::ui::Hud::new(&painter.window, &mut painter.device, &mut painter.queue);
+    let mut hud = drawing::ui::Hud::new(
+        &painter.window,
+        &mut painter.device,
+        &painter.surface_config,
+    );
 
     let mut mouse_down = false;
     let mut last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
@@ -48,7 +52,7 @@ fn main() {
         } else {
             ControlFlow::Poll
         };
-        let (route_mouse, route_keyboard) = hud.interact(&painter.window, &event);
+        let ui_event = hud.interact(&event);
         match event {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Destroyed => {
@@ -67,7 +71,7 @@ fn main() {
                         },
                     ..
                 } => {
-                    if route_keyboard {
+                    if !ui_event {
                         match keycode {
                             VirtualKeyCode::Escape => {
                                 *control_flow = ControlFlow::Exit;
@@ -81,7 +85,7 @@ fn main() {
                     *control_flow = ControlFlow::Exit;
                 }
                 WindowEvent::MouseInput { state, button, .. } => {
-                    if route_mouse {
+                    if !ui_event {
                         if let MouseButton::Left = button {
                             match state {
                                 ElementState::Pressed => {
@@ -96,7 +100,7 @@ fn main() {
                     }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {
-                    if route_mouse {
+                    if !ui_event {
                         match delta {
                             MouseScrollDelta::LineDelta(_, y) => app_state.zoom += 0.1 * y,
                             MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => {
@@ -129,7 +133,7 @@ fn main() {
 
                     last_pos = logical_position;
 
-                    if route_mouse {
+                    if !ui_event {
                         if mouse_down {
                             app_state.screen.center -= delta;
                         }

@@ -31,7 +31,7 @@ impl Stats {
         self.last_frametimes.iter().sum::<u64>() as f64 / 30.0
     }
 
-    pub fn get_last_delta(&self) -> f32 {
+    pub fn _get_last_delta(&self) -> f32 {
         (self.last_frametimes[29] as f64 / 1_000_000f64) as f32
     }
 }

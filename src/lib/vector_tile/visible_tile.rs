@@ -5,6 +5,7 @@ use wgpu_glyph::{GlyphBrush, Section, Text};
 
 use crate::*;
 
+#[derive(Clone)]
 pub struct VisibleTile {
     tile: Arc<RwLock<Tile>>,
     gpu_tile: Arc<RwLock<Option<LoadedGPUTile>>>,

@@ -132,6 +132,8 @@ pub fn paths_to_drawable(
     for path in paths {
         // println!("{path:?}");
         if geometry_type == GeomType::POLYGON {
+            continue;
+            let offset = builder.buffers.vertices.len();
             builder.set_current_extent(extent);
             builder.set_current_vertex_type(VertexType::Polygon);
             let mut tessellator = FillTessellator::new();
@@ -141,12 +143,53 @@ pub fn paths_to_drawable(
                     log::error!("Broken path on tile {}.", tile_id);
                     log::error!("{e:#?}");
                 });
+            set_normals(&mut builder.buffers.vertices[offset..], path);
         }
 
         if geometry_type == GeomType::LINESTRING {
+            let offset = builder.buffers.vertices.len();
             builder.set_current_vertex_type(VertexType::Line);
             builder.set_current_extent(extent);
             tesselate_line2(path, builder, tile_id.z);
+            set_normals(&mut builder.buffers.vertices[offset..], path);
         }
     }
+}
+
+fn set_normals(vertices: &mut [Vertex], path: &Path) {
+    let points = path.points();
+    let len = points.len();
+    // TODO: fix this. We can calculate a normal for a path with just two points.
+    if len < 3 {
+        return;
+    }
+
+    let normal = calculate_normals(&points[len - 1], &points[0], &points[1]);
+    set_normal(vertices, &points[0], normal);
+
+    for point_tuple in path.points().windows(3) {
+        let normal = calculate_normals(&point_tuple[0], &point_tuple[1], &point_tuple[2]);
+        set_normal(vertices, &point_tuple[1], normal);
+    }
+
+    let normal = calculate_normals(&points[len - 2], &points[len - 1], &points[0]);
+    set_normal(vertices, &points[len - 1], normal);
+}
+
+fn set_normal(vertices: &mut [Vertex], position: &Point, normal: Vector) {
+    let vertex = vertices
+        .iter_mut()
+        .find(|v| v.position[0] == position.x as i16 && v.position[1] == position.y as i16);
+    if let Some(vertex) = vertex {
+        vertex.normal = [normal.x as i16, normal.y as i16];
+    } else {
+        println!("not found");
+    }
+}
+
+fn calculate_normals(p1: &Point, p2: &Point, p3: &Point) -> Vector {
+    let v1 = *p2 - *p1;
+    let v2 = *p2 - *p3;
+
+    (v1 + v2).normalize()
 }

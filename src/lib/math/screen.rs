@@ -1,6 +1,7 @@
 use super::*;
 use nalgebra_glm as glm;
 
+#[derive(Debug, Clone)]
 pub struct Screen {
     pub center: Point,
     pub width: u32,

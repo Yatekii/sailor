@@ -24,7 +24,7 @@ pub struct Painter {
     pub queue: Queue,
     surface: Surface,
     staging_belt: StagingBelt,
-    surface_config: SurfaceConfiguration,
+    pub surface_config: SurfaceConfiguration,
     blend_pipeline: RenderPipeline,
     noblend_pipeline: RenderPipeline,
     multisampled_framebuffer: TextureView,
@@ -755,8 +755,6 @@ impl Painter {
                         let width = (e.x - s.x) as u32;
                         let height = (e.y - s.y) as u32;
 
-                        println!("{}/{} {}/{}", s.x as u32, s.y as u32, width, height);
-
                         if width > 0 && height > 0 {
                             render_pass.set_scissor_rect(s.x as u32, s.y as u32, width, height);
                         }
@@ -772,16 +770,6 @@ impl Painter {
                                 i as u32,
                             );
                         }
-
-                        // hud.paint(
-                        //     app_state,
-                        //     &self.window,
-                        //     &mut self.device,
-                        //     &mut render_pass,
-                        //     &self.queue,
-                        // );
-
-                        // TODO put hwd.paint here?
                     }
                 }
 
