@@ -9,8 +9,8 @@ use osm::math::{deg2num, num_to_global_space};
 use winit::{
     dpi::PhysicalPosition,
     event::{
-        ElementState, Event, KeyboardInput, MouseButton, MouseScrollDelta, VirtualKeyCode,
-        WindowEvent,
+        ElementState, Event, KeyboardInput, ModifiersState, MouseButton, MouseScrollDelta,
+        VirtualKeyCode, WindowEvent,
     },
     event_loop::ControlFlow,
 };
@@ -52,6 +52,8 @@ fn main() {
     let mut mouse_down = false;
     let mut last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
 
+    let mut modifiers_state = ModifiersState::default();
+
     event_loop.run(move |event, _, control_flow| {
         let ui_event = hud.interact(&event);
         match event {
@@ -72,6 +74,10 @@ fn main() {
                         },
                     ..
                 } => {
+                    if keycode == VirtualKeyCode::Q && modifiers_state.logo() {
+                        *control_flow = ControlFlow::Exit;
+                        return;
+                    }
                     if !ui_event {
                         match keycode {
                             VirtualKeyCode::Escape => {
@@ -81,6 +87,9 @@ fn main() {
                             _ => {}
                         }
                     }
+                }
+                WindowEvent::ModifiersChanged(state) => {
+                    modifiers_state = state;
                 }
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit;
