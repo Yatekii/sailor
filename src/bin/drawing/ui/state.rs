@@ -17,7 +17,7 @@ pub struct LocationFinderState {
 impl LocationFinderState {
     pub fn new() -> Self {
         Self {
-            input: String::new(),
+            input: "47.3769 8.5417".into(),
         }
     }
 }

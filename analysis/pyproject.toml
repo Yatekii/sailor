@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "analysis"
+version = "0.1.0"
+description = ""
+authors = ["Noah Hüsser <noah@huesser.dev>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+matplotlib = "^3.6.2"
+numpy = "^1.23.5"
+pywavefront = "^1.3.3"
+
+[tool.poetry.scripts]
+analysis = "analysis:run"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -40,18 +40,11 @@ impl LayerVertexCtor {
     pub fn new_osm_vertex(&mut self, point: Point, normal: Vector) -> Vertex {
         assert!(!point.x.is_nan());
         assert!(!point.y.is_nan());
-        const LIMIT: f32 = 3.0;
-        // let normal = if vertex.normal.length() > LIMIT {
-        //     vertex.normal.normalize() * LIMIT
-        // } else {
-        //     vertex.normal
-        // } * self.extent;
 
         let meta: u16 = self.vertex_type as u16;
 
         Vertex {
             position: [point.x as i16, point.y as i16],
-            // normal: [normal.x.round() as i16, normal.y.round() as i16],
             normal: [normal.x as i16, normal.y as i16],
             feature_id: ((meta as u32) << 16) | self.feature_id,
         }
@@ -62,7 +55,8 @@ impl FillVertexConstructor<Vertex> for LayerVertexCtor {
     fn new_vertex(&mut self, vertex: tessellation::FillVertex) -> Vertex {
         assert!(!vertex.position().x.is_nan());
         assert!(!vertex.position().y.is_nan());
-        const LIMIT: f32 = 3.0;
+        // TODO:
+        const _LIMIT: f32 = 3.0;
         // let normal = if vertex.normal.length() > LIMIT {
         //     vertex.normal.normalize() * LIMIT
         // } else {
@@ -84,16 +78,15 @@ impl StrokeVertexConstructor<Vertex> for LayerVertexCtor {
     fn new_vertex(&mut self, vertex: tessellation::StrokeVertex) -> Vertex {
         assert!(!vertex.position().x.is_nan());
         assert!(!vertex.position().y.is_nan());
-        // let normal = if vertex.normal.length() > 8.0 {
-        //     vertex.normal.normalize() * 8.0
-        // } else {
-        //     vertex.normal
-        // } * self.extent;
+        let normal = if vertex.normal().length() > 8.0 {
+            vertex.normal().normalize() * 8.0
+        } else {
+            vertex.normal()
+        } * self.extent;
 
         Vertex {
             position: [vertex.position().x as i16, vertex.position().y as i16],
-            // normal: [normal.x.round() as i16, normal.y.round() as i16],
-            normal: [1, 1],
+            normal: [normal.x.round() as i16, normal.y.round() as i16],
             feature_id: self.feature_id,
         }
     }

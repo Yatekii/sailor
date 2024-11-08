@@ -4,7 +4,8 @@ use lyon::math::Point;
 use stats::Stats;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
+use std::thread;
 
 pub struct AppState {
     pub tile_cache: TileCache,
@@ -12,7 +13,7 @@ pub struct AppState {
     pub screen: Screen,
     pub tile_field: TileField,
     pub zoom: f32,
-    pub hovered_objects: Vec<Object>,
+    pub hovered_objects: Arc<Mutex<Vec<Object>>>,
     pub selected_objects: Vec<EditableObject>,
     pub stats: Stats,
     pub ui: UIState,
@@ -42,7 +43,7 @@ impl AppState {
             ),
             tile_field: TileField::new(TileId::new(8, 0, 0), TileId::new(8, 0, 0)),
             zoom,
-            hovered_objects: vec![],
+            hovered_objects: Arc::new(Mutex::new(Vec::new())),
             selected_objects: vec![],
             stats: Stats::new(),
             ui: UIState::new(),
@@ -63,7 +64,7 @@ impl AppState {
 
     pub fn load_tiles(&mut self) {
         let tile_field = self.screen.get_tile_boundaries_for_zoom_level(self.zoom, 1);
-        dbg!(&tile_field);
+
         // Remove old bigger tiles which are not in the FOV anymore.
         let old_tile_field = self
             .screen
@@ -90,11 +91,12 @@ impl AppState {
 
                 let tile_cache = &mut self.tile_cache;
                 if let Some(tile) = tile_cache.try_get_tile(&tile_id) {
-                    let mut visible_tile = VisibleTile::new(tile);
+                    let mut _visible_tile = VisibleTile::new(tile);
 
-                    // visible_tile.load_collider();
+                    // TODO:
+                    _visible_tile.load_collider();
 
-                    entry.insert(visible_tile);
+                    entry.insert(_visible_tile);
 
                     // Remove old bigger tile when all 4 smaller tiles are loaded.
                     let mut count = 0;
@@ -142,14 +144,21 @@ impl AppState {
         }
     }
 
-    pub fn update_hovered_objects(&mut self, point: (f32, f32)) {
-        self.hovered_objects =
-            Collider::get_hovered_objects(&self.visible_tiles, &self.screen, self.zoom, point);
+    pub fn update_hovered_objects(&self, point: (f32, f32)) {
+        let hovered_objects = self.hovered_objects.clone();
+        let screen = self.screen.clone();
+        let zoom = self.zoom;
+        let visible_tiles = self.visible_tiles.clone();
+        thread::spawn(move || {
+            let objects = Collider::get_hovered_objects(&visible_tiles, &screen, zoom, point);
+            let mut hovered_objects = hovered_objects.lock().unwrap();
+            *hovered_objects = objects;
+        });
     }
 
     pub fn update_selected_hover_objects(&mut self) {
-        self.selected_objects = self
-            .hovered_objects
+        let hovered_objects = self.hovered_objects.lock().unwrap();
+        self.selected_objects = hovered_objects
             .iter()
             .map(|o| EditableObject::new(o.clone()))
             .collect();

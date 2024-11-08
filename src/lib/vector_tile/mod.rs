@@ -132,21 +132,115 @@ pub fn paths_to_drawable(
     for path in paths {
         // println!("{path:?}");
         if geometry_type == GeomType::POLYGON {
+            let offset = builder.buffers.vertices.len();
             builder.set_current_extent(extent);
             builder.set_current_vertex_type(VertexType::Polygon);
             let mut tessellator = FillTessellator::new();
             let _ = tessellator
-                .tessellate_path(path, &FillOptions::tolerance(0.0001), builder)
+                .tessellate_path(path, &FillOptions::tolerance(0.0000001), builder)
                 .map_err(|e| {
                     log::error!("Broken path on tile {}.", tile_id);
                     log::error!("{e:#?}");
                 });
+            set_normals(&mut builder.buffers.vertices[offset..], path, extent);
         }
 
         if geometry_type == GeomType::LINESTRING {
+            let offset = builder.buffers.vertices.len();
             builder.set_current_vertex_type(VertexType::Line);
             builder.set_current_extent(extent);
             tesselate_line2(path, builder, tile_id.z);
+            set_normals(&mut builder.buffers.vertices[offset..], path, extent);
         }
     }
+}
+
+fn set_normals(vertices: &mut [Vertex], path: &Path, extent: f32) {
+    let points = path.points();
+    let len = points.len();
+    if len < 3 {
+        let first_vector = points[1] - points[0];
+        let normal = Vector::new(-first_vector.y, first_vector.x);
+        set_normal(vertices, &points[0], normal);
+
+        let normal = Vector::new(-first_vector.y, first_vector.x);
+        set_normal(vertices, &points[1], normal);
+        return;
+    }
+
+    let first_vector = points[1] - points[0];
+    let mut previous_normal = Vector::new(first_vector.y, -first_vector.x).normalize();
+
+    let normal = calculate_normals(
+        &points[len - 1],
+        &points[0],
+        &points[1],
+        &previous_normal,
+        extent,
+    );
+    set_normal(vertices, &points[0], normal);
+
+    for point_tuple in points.windows(3) {
+        let normal = calculate_normals(
+            &point_tuple[0],
+            &point_tuple[1],
+            &point_tuple[2],
+            &previous_normal,
+            extent,
+        );
+        previous_normal = normal;
+        set_normal(vertices, &point_tuple[1], normal);
+    }
+
+    let normal = calculate_normals(
+        &points[len - 2],
+        &points[len - 1],
+        &points[0],
+        &previous_normal,
+        extent,
+    );
+    set_normal(vertices, &points[len - 1], normal);
+}
+
+fn set_normal(vertices: &mut [Vertex], position: &Point, normal: Vector) {
+    let vertex = vertices
+        .iter_mut()
+        .find(|v| v.position[0] == position.x as i16 && v.position[1] == position.y as i16);
+    if let Some(vertex) = vertex {
+        vertex.normal = [normal.x as i16, normal.y as i16];
+    } else {
+        println!("not found");
+    }
+}
+
+fn calculate_normals(
+    p1: &Point,
+    p2: &Point,
+    p3: &Point,
+    previous_normal: &Vector,
+    extent: f32,
+) -> Vector {
+    let v1 = *p1 - *p2;
+    let v2 = *p3 - *p2;
+
+    let normal1 = (v1.normalize() + v2.normalize()).normalize();
+
+    let normal = if normal1.dot(*previous_normal) < 0.0 {
+        -normal1
+    } else {
+        normal1
+    } * extent;
+
+    if normal.x as i16 == 3125
+        && normal.y as i16 == -2647
+        && p2.x as i16 == 3585
+        && p2.y as i16 == 2773
+    {
+        println!("{v1:?}");
+        println!("{v2:?}");
+        println!("{normal1:?}");
+        println!("{p1:?}");
+        println!("{p3:?}");
+    }
+    normal
 }

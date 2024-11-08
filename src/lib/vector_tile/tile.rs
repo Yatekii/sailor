@@ -4,9 +4,9 @@ use lyon::{
     tessellation::{geometry_builder::VertexBuffers, FillOptions, FillTessellator},
 };
 use quick_protobuf::{BytesReader, MessageRead};
-use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::{Arc, RwLock};
+use std::{collections::HashMap, thread::spawn};
 use vector_tile::mod_Tile::GeomType;
 
 #[derive(Clone, Copy, Debug)]
@@ -220,21 +220,23 @@ impl Tile {
         };
 
         // TODO:
-        // spawn(move|| {
-        //     if let Ok(objects) = objects_keep.read() {
-        //         match collider_keep.write() {
-        //             Ok(mut collider) => {
-        //                 for object_id in 0..objects.len() {
-        //                     if objects[object_id].points().len() >= 2 {
-        //                         collider.add_object(object_id, &objects[object_id]);
-        //                     }
-        //                 }
-        //                 collider.update();
-        //             },
-        //             Err(_e) => log::error!("Could not aquire collider lock. Not loading the objects of this tile."),
-        //         }
-        //     }
-        // });
+        spawn(move || {
+            if let Ok(objects) = _objects_keep.read() {
+                match _collider_keep.write() {
+                    Ok(mut collider) => {
+                        for object_id in 0..objects.len() {
+                            if objects[object_id].points().len() >= 2 {
+                                collider.add_object(object_id, &objects[object_id]);
+                            }
+                        }
+                        collider.update();
+                    }
+                    Err(_e) => log::error!(
+                        "Could not aquire collider lock. Not loading the objects of this tile."
+                    ),
+                }
+            }
+        });
 
         Self {
             tile_id: *tile_id,
