@@ -148,17 +148,19 @@ fn main() {
                 _ => (),
             },
             Event::MainEventsCleared => {
-                painter.update_shader();
-                app_state.load_tiles();
-                painter.paint(&mut hud, &mut app_state);
+                if !matches!(control_flow, ControlFlow::ExitWithCode(_)) {
+                    painter.update_shader();
+                    app_state.load_tiles();
+                    painter.paint(&mut hud, &mut app_state);
 
-                app_state.stats.capture_frame();
-                if CONFIG.general.display_framerate {
-                    println!(
-                        "Frametime {:.2?} at zoom {:.2}",
-                        app_state.stats.get_average(),
-                        app_state.zoom
-                    );
+                    app_state.stats.capture_frame();
+                    if CONFIG.general.display_framerate {
+                        println!(
+                            "Frametime {:.2?} at zoom {:.2}",
+                            app_state.stats.get_average(),
+                            app_state.zoom
+                        );
+                    }
                 }
             }
             _ => (),
