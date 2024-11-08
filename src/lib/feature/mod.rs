@@ -1,8 +1,6 @@
-mod collection;
+use crate::css::{CSSValue, Color, Number, RulesCache, Selector};
 
-pub use collection::*;
-
-use crate::*;
+pub mod collection;
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct DrawableColor {

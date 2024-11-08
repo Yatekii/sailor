@@ -1,4 +1,3 @@
-pub use crate::*;
 use ncollide2d::{
     math::{Isometry, Point, Vector},
     pipeline::object::{CollisionGroups, GeometricQueryType},
@@ -10,6 +9,8 @@ use std::{
     sync::{Arc, RwLock},
     thread::spawn,
 };
+
+use crate::{object::Object, vector_tile::tile::Tile};
 
 pub struct TileCollider {
     world: CollisionWorld<f32, usize>,

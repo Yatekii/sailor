@@ -1,4 +1,5 @@
-use super::*;
+use super::css::Selector;
+
 use lyon::math::Point;
 use std::collections::HashMap;
 

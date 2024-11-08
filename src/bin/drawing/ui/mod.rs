@@ -1,4 +1,4 @@
-mod state;
+pub mod state;
 use std::sync::Arc;
 
 use egui::color_picker::Alpha;
@@ -9,12 +9,14 @@ use egui::WidgetText;
 use egui_wgpu_backend::RenderPass;
 use egui_wgpu_backend::ScreenDescriptor;
 use egui_winit_platform::PlatformDescriptor;
-pub use state::*;
+use osm::css::CSSValue;
+use osm::css::Color;
+use osm::css::Number;
+use osm::css::Rule;
 use wgpu::SurfaceConfiguration;
 
 use crate::app_state::AppState;
 use crate::app_state::EditableObject;
-use crate::*;
 
 pub struct Hud {
     platform: egui_winit_platform::Platform,

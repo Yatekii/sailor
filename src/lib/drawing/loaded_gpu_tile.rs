@@ -1,6 +1,8 @@
-use crate::*;
-use wgpu::util::DeviceExt;
-use wgpu::*;
+use wgpu::{util::DeviceExt, Buffer, Device};
+
+use crate::vector_tile::tile::Tile;
+
+use super::as_byte_slice;
 
 pub struct LoadedGPUTile {
     pub vertex_buffer: Buffer,

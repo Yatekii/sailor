@@ -1,17 +1,24 @@
-use crate::drawing::ui::*;
-use crate::*;
 use lyon::math::Point;
-use stats::Stats;
+use osm::cache::TileCache;
+use osm::css::RulesCache;
+use osm::feature::collection::FeatureCollection;
+use osm::interaction::collider::Collider;
+use osm::math::{deg2num, num_to_global_space, Screen, TileId};
+use osm::object::Object;
+use osm::vector_tile::visible_tile::VisibleTile;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
+use crate::config::CONFIG;
+use crate::drawing::ui::state::UIState;
+use crate::stats::Stats;
+
 pub struct AppState {
     pub tile_cache: TileCache,
     pub css_cache: RulesCache,
     pub screen: Screen,
-    pub tile_field: TileField,
     pub zoom: f32,
     pub hovered_objects: Arc<Mutex<Vec<Object>>>,
     pub selected_objects: Vec<EditableObject>,
@@ -41,7 +48,6 @@ impl AppState {
                 CONFIG.renderer.tile_size,
                 hidpi_factor,
             ),
-            tile_field: TileField::new(TileId::new(8, 0, 0), TileId::new(8, 0, 0)),
             zoom,
             hovered_objects: Arc::new(Mutex::new(Vec::new())),
             selected_objects: vec![],

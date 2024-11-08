@@ -1,9 +1,15 @@
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-use wgpu::*;
 use wgpu_glyph::{GlyphBrush, Section, Text};
 
+use crate::vector_tile::tile::Tile;
 use crate::*;
+
+use self::drawing::loaded_gpu_tile::LoadedGPUTile;
+use self::feature::collection::FeatureCollection;
+use self::interaction::tile_collider::{TileCollider, TileColliderLoader};
+use self::math::{Screen, TileId};
+use self::object::Object;
 
 #[derive(Clone)]
 pub struct VisibleTile {
@@ -33,7 +39,7 @@ impl VisibleTile {
         self.tile.read().unwrap().objects()
     }
 
-    pub fn load_to_gpu(&self, device: &Device) {
+    pub fn load_to_gpu(&self, device: &wgpu::Device) {
         let read_tile = self.tile.read().unwrap();
         let mut write_gpu_tile = self.gpu_tile.write().unwrap();
         *write_gpu_tile = Some(LoadedGPUTile::load(device, &read_tile));
@@ -62,8 +68,8 @@ impl VisibleTile {
 
     pub fn paint<'a>(
         &'a self,
-        render_pass: &mut RenderPass<'a>,
-        blend_pipeline: &'a RenderPipeline,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        blend_pipeline: &'a wgpu::RenderPipeline,
         data: Option<&'a LoadedGPUTile>,
         feature_collection: &'a FeatureCollection,
         tile_id: u32,

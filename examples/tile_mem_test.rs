@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use osm::*;
+use osm::{feature::collection::FeatureCollection, math::TileId, vector_tile::tile::Tile};
 
 fn main() {
     let tile_id = TileId::new(8, 142, 93);

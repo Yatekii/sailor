@@ -321,7 +321,7 @@ enum SelectorPart {
 }
 
 /// Parses an entire set of rules.
-fn rules<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Vec<Rule>, E>
+fn rules<'a, E>(input: &'a str) -> IResult<&'a str, Vec<Rule>, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
@@ -341,7 +341,7 @@ where
 
 /// Parse a single rule.
 /// E.g. `layer[name=water]{ background-color: #FF0000; }`.
-fn rule<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Rule, E>
+fn rule<'a, E>(input: &'a str) -> IResult<&'a str, Rule, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
@@ -413,9 +413,7 @@ fn any<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorP
 
 /// Parses the body of a CSS rule.
 /// E.g. `{}`.
-fn body<'a, E: ParseError<&'a str>>(
-    input: &'a str,
-) -> IResult<&'a str, std::collections::BTreeMap<String, CSSValue>, E>
+fn body<'a, E>(input: &'a str) -> IResult<&'a str, std::collections::BTreeMap<String, CSSValue>, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
@@ -430,7 +428,7 @@ where
 
 /// Parses a single CSS k/v pair.
 /// E.g. `background-color: #FF0000;`.
-fn kv<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (&'a str, CSSValue), E>
+fn kv<'a, E>(input: &'a str) -> IResult<&'a str, (&'a str, CSSValue), E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
@@ -561,7 +559,7 @@ fn from_hex(input: &str) -> Result<u8, std::num::ParseIntError> {
 }
 
 /// Parse an actual hex code.
-fn hex_primary<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, u8, E>
+fn hex_primary<'a, E>(input: &'a str) -> IResult<&'a str, u8, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
@@ -569,7 +567,7 @@ where
 }
 
 /// Parse a single hex color code including the `#`.
-fn hex_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E>
+fn hex_color<'a, E>(input: &'a str) -> IResult<&'a str, CSSValue, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
@@ -623,7 +621,7 @@ where
 }
 
 /// Parse a single hex color code including the `#`.
-fn rgb_color<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E>
+fn rgb_color<'a, E>(input: &'a str) -> IResult<&'a str, CSSValue, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
@@ -644,6 +642,6 @@ where
 
 #[test]
 fn selector_size() {
-    let selector = super::Selector::default();
+    let selector = Selector::default();
     assert_eq!(selector.size(), 96);
 }

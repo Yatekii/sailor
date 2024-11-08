@@ -1,4 +1,6 @@
-use crate::*;
+use crate::css::{RulesCache, Selector};
+
+use super::{Feature, FeatureStyle};
 
 #[derive(Debug, Clone)]
 pub struct FeatureCollection {

@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read, path::Path};
 
-use super::*;
+use crate::math::TileId;
 
 pub fn fetch_tile_data(cache_location: impl AsRef<Path>, tile_id: &TileId) -> Option<Vec<u8>> {
     let zxy: String = format!("{}", tile_id);
@@ -95,7 +95,7 @@ fn ensure_cache_structure(root: impl AsRef<Path>, tile_id: &TileId) {
 
 #[test]
 fn test_ensure_cache_structure() {
-    ensure_cache_structure("/tmp/sailor-test", &crate::TileId::new(8, 42, 42));
+    ensure_cache_structure("/tmp/sailor-test", &TileId::new(8, 42, 42));
     let md = std::fs::metadata("/tmp/sailor-test/cache/008/042");
     assert!(md.is_ok());
     assert!(md.unwrap().is_dir());

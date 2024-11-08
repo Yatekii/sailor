@@ -1,9 +1,10 @@
-use crate::*;
 use lyon::{
     lyon_tessellation::{FillVertexConstructor, StrokeVertexConstructor},
     math::{Point, Vector},
     tessellation::{self},
 };
+
+use crate::math::TileId;
 
 #[derive(Copy, Clone, Debug)]
 pub enum VertexType {
@@ -21,7 +22,7 @@ pub struct Vertex {
 
 // A very simple vertex constructor that only outputs the vertex position
 pub struct LayerVertexCtor {
-    pub tile_id: math::TileId,
+    pub tile_id: TileId,
     pub feature_id: u32,
     pub extent: f32,
     pub vertex_type: VertexType,

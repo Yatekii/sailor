@@ -1,3 +1,1 @@
-mod temperature;
-
-pub use temperature::*;
+pub mod temperature;

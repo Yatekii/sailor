@@ -5,7 +5,7 @@ mod stats;
 
 use crate::config::CONFIG;
 use lyon::math::vector;
-use osm::*;
+use osm::math::{deg2num, num_to_global_space};
 use winit::{
     dpi::PhysicalPosition,
     event::{
@@ -33,8 +33,14 @@ fn main() {
         .expect("No monitors found")
         .scale_factor();
 
-    let mut app_state =
-        app_state::AppState::new("config/style.css", zurich, width, height, z, hdpi_factor);
+    let mut app_state = app_state::AppState::new(
+        CONFIG.renderer.css.clone(),
+        zurich,
+        width,
+        height,
+        z,
+        hdpi_factor,
+    );
 
     let mut painter = drawing::Painter::init(&event_loop, width, height, &app_state);
     let mut hud = drawing::ui::Hud::new(
@@ -47,11 +53,8 @@ fn main() {
     let mut last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = if cfg!(feature = "metal-auto-capture") {
-            ControlFlow::Exit
-        } else {
-            ControlFlow::Poll
-        };
+        *control_flow = ControlFlow::Poll;
+
         let ui_event = hud.interact(&event);
         match event {
             Event::WindowEvent { event, .. } => match event {

@@ -4,7 +4,12 @@ use std::path::Path;
 use crossbeam_channel::{unbounded, TryRecvError};
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use osm::*;
+use osm::drawing::as_byte_slice;
+use osm::drawing::loaded_gpu_tile::LoadedGPUTile;
+use osm::drawing::vertex::Vertex;
+use osm::feature::collection::FeatureCollection;
+use osm::math::{Screen, TileId};
+use osm::vector_tile::visible_tile::VisibleTile;
 use pollster::block_on;
 use util::StagingBelt;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
@@ -332,8 +337,8 @@ impl Painter {
                         depth_fail_op: StencilOperation::Replace,
                         pass_op: StencilOperation::Replace,
                     },
-                    read_mask: std::u32::MAX,
-                    write_mask: std::u32::MAX,
+                    read_mask: u32::MAX,
+                    write_mask: u32::MAX,
                 },
                 bias: DepthBiasState {
                     constant: 0,
@@ -651,8 +656,8 @@ impl Painter {
 
     pub fn paint(&mut self, hud: &mut super::ui::Hud, app_state: &mut AppState) {
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
-        let num_tiles = app_state.visible_tiles().len();
-        let num_visible_tiles = app_state
+        let _num_tiles = app_state.visible_tiles().len();
+        let _num_visible_tiles = app_state
             .visible_tiles()
             .iter()
             .filter(|(_, vt)| {
@@ -759,7 +764,10 @@ impl Painter {
 
                         unsafe {
                             let gpu_tile = vt.gpu_tile();
-                            let gpu_tile2 = std::mem::transmute(gpu_tile.as_ref());
+                            let gpu_tile2 = std::mem::transmute::<
+                                Option<&LoadedGPUTile>,
+                                Option<&LoadedGPUTile>,
+                            >(gpu_tile.as_ref());
                             vt.paint(
                                 &mut render_pass,
                                 &self.blend_pipeline,
@@ -771,7 +779,7 @@ impl Painter {
                     }
                 }
 
-                for (_i, vt) in app_state.visible_tiles().values().enumerate() {
+                for vt in app_state.visible_tiles().values() {
                     vt.queue_text(&mut self.glyph_brush, &app_state.screen, app_state.zoom);
                 }
 

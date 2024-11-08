@@ -4,7 +4,7 @@ use lyon::{
     path::Path,
 };
 
-use crate::*;
+use super::mesh::MeshBuilder;
 
 pub fn get_side(a: &Point, b: &Point, c: &Point) -> i32 {
     ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)).signum() as i32

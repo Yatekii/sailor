@@ -1,8 +1,12 @@
-use super::*;
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
 use std::thread::{spawn, JoinHandle};
+
+use crate::feature::collection::FeatureCollection;
+use crate::fetch::fetch_tile_data;
+use crate::math::TileId;
+use crate::vector_tile::tile::{Tile, TileStats};
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]

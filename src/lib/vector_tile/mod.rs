@@ -1,14 +1,8 @@
-mod tile;
-mod tile_id;
-mod vector_tile;
-mod visible_tile;
+pub mod tile;
+pub mod tile_id;
+pub mod vector_tile;
+pub mod visible_tile;
 
-pub use tile::*;
-pub use tile_id::*;
-pub use vector_tile::*;
-pub use visible_tile::*;
-
-use super::*;
 use core::ops::Range;
 use lyon::{
     math::*,
@@ -17,6 +11,15 @@ use lyon::{
 };
 use varint::ZigZag;
 use vector_tile::mod_Tile::*;
+
+use crate::{
+    drawing::{
+        line_tesselator::tesselate_line2,
+        mesh::MeshBuilder,
+        vertex::{Vertex, VertexType},
+    },
+    math::TileId,
+};
 
 #[derive(Debug, Clone)]
 pub struct Layer {

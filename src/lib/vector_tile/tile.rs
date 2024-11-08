@@ -4,10 +4,24 @@ use lyon::{
     tessellation::{geometry_builder::VertexBuffers, FillOptions, FillTessellator},
 };
 use quick_protobuf::{BytesReader, MessageRead};
-use std::ops::Range;
 use std::sync::{Arc, RwLock};
 use std::{collections::HashMap, thread::spawn};
-use vector_tile::mod_Tile::GeomType;
+use std::{fmt::Display, ops::Range};
+use vector_tile::vector_tile::mod_Tile::{Feature, GeomType, Layer, Value};
+
+use self::{
+    css::Selector,
+    drawing::{
+        mesh::MeshBuilder,
+        vertex::{LayerVertexCtor, Vertex},
+    },
+    feature::collection::FeatureCollection,
+    interaction::tile_collider::TileCollider,
+    math::TileId,
+    object::{Object, ObjectType},
+};
+
+use super::{geometry_commands_to_paths, paths_to_drawable};
 
 #[derive(Clone, Copy, Debug)]
 pub struct TileStats {
@@ -330,8 +344,8 @@ impl Tile {
 
     /// Create a selector and a list of tags form MBVT information.
     fn classify(
-        layer: &vector_tile::mod_Tile::Layer,
-        feature: &vector_tile::mod_Tile::Feature,
+        layer: &Layer,
+        feature: &Feature,
         selection_tags: &[String],
     ) -> (Selector, HashMap<String, String>) {
         let mut selector = Selector::new()
@@ -363,18 +377,27 @@ impl Tile {
     }
 }
 
-impl<'a> std::string::ToString for vector_tile::mod_Tile::Value<'a> {
-    fn to_string(&self) -> String {
+impl<'a> Display for Value<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // We can make the safe assumption that only ever one property is Some(_).
         // So we just unwrap all the strings and concat it into one.
-        self.string_value
-            .clone()
-            .map_or(String::new(), |v| v.to_string())
-            + &self.float_value.map_or(String::new(), |v| v.to_string())
-            + &self.double_value.map_or(String::new(), |v| v.to_string())
-            + &self.int_value.map_or(String::new(), |v| v.to_string())
-            + &self.uint_value.map_or(String::new(), |v| v.to_string())
-            + &self.sint_value.map_or(String::new(), |v| v.to_string())
-            + &self.bool_value.map_or(String::new(), |v| v.to_string())
+        match (
+            &self.string_value,
+            self.float_value,
+            self.double_value,
+            self.int_value,
+            self.uint_value,
+            self.sint_value,
+            self.bool_value,
+        ) {
+            (Some(v), None, None, None, None, None, None) => f.write_str(v),
+            (None, Some(v), None, None, None, None, None) => f.write_fmt(format_args!("{}", &v)),
+            (None, None, Some(v), None, None, None, None) => f.write_fmt(format_args!("{}", &v)),
+            (None, None, None, Some(v), None, None, None) => f.write_fmt(format_args!("{}", &v)),
+            (None, None, None, None, Some(v), None, None) => f.write_fmt(format_args!("{}", &v)),
+            (None, None, None, None, None, Some(v), None) => f.write_fmt(format_args!("{}", &v)),
+            (None, None, None, None, None, None, Some(v)) => f.write_fmt(format_args!("{}", &v)),
+            _ => Ok(()),
+        }
     }
 }

@@ -2,7 +2,11 @@ use nalgebra::base::Vector4;
 use ncollide2d::math::Point;
 use std::collections::BTreeMap;
 
-use crate::*;
+use crate::{
+    math::{Screen, TileId},
+    object::Object,
+    vector_tile::visible_tile::VisibleTile,
+};
 
 pub struct Collider {}
 

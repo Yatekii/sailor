@@ -13,7 +13,6 @@ pub struct Renderer {
     pub tile_size: u32,
     pub msaa_samples: u32,
     pub selection_tags: Vec<String>,
-    pub ui_font: String,
     pub temperature: Temperature,
 }
 

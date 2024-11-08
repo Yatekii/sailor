@@ -5,6 +5,7 @@ use std::path::Path;
 
 use crossbeam_channel::{unbounded, TryRecvError};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use osm::drawing::as_byte_slice;
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayout, Device, RenderPipeline, Sampler, ShaderModule,
     Texture,
@@ -18,7 +19,6 @@ use wgpu::{
 use crate::drawing::helpers::{load_glsl, ShaderStage};
 
 use crate::config::CONFIG;
-use osm::as_byte_slice;
 
 pub struct Temperature {
     pipeline: RenderPipeline,

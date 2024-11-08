@@ -1,5 +1,2 @@
-mod collider;
-mod tile_collider;
-
-pub use collider::*;
-pub use tile_collider::*;
+pub mod collider;
+pub mod tile_collider;
