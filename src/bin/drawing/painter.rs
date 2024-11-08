@@ -5,7 +5,6 @@ use crossbeam_channel::{unbounded, TryRecvError};
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use osm::drawing::as_byte_slice;
-use osm::drawing::loaded_gpu_tile::LoadedGPUTile;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
 use osm::math::{Screen, TileId};
@@ -657,14 +656,12 @@ impl Painter {
     pub fn paint(&mut self, hud: &mut super::ui::Hud, app_state: &mut AppState) {
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
         let _num_tiles = app_state.visible_tiles().len();
-        let _num_visible_tiles = app_state
-            .visible_tiles()
-            .iter()
-            .filter(|(_, vt)| {
+        app_state
+            .visible_tiles_mut()
+            .iter_mut()
+            .for_each(|(_, vt)| {
                 vt.load_to_gpu(&self.device);
-                vt.is_loaded_to_gpu()
-            })
-            .count();
+            });
         let any_loaded = app_state
             .visible_tiles()
             .iter()
@@ -762,20 +759,15 @@ impl Painter {
                             render_pass.set_scissor_rect(s.x as u32, s.y as u32, width, height);
                         }
 
-                        unsafe {
-                            let gpu_tile = vt.gpu_tile();
-                            let gpu_tile2 = std::mem::transmute::<
-                                Option<&LoadedGPUTile>,
-                                Option<&LoadedGPUTile>,
-                            >(gpu_tile.as_ref());
-                            vt.paint(
-                                &mut render_pass,
-                                &self.blend_pipeline,
-                                gpu_tile2,
-                                &feature_collection,
-                                i as u32,
-                            );
-                        }
+                        let gpu_tile = vt.gpu_tile();
+                        let gpu_tile2 = gpu_tile.as_ref();
+                        vt.paint(
+                            &mut render_pass,
+                            &self.blend_pipeline,
+                            gpu_tile2,
+                            &feature_collection,
+                            i as u32,
+                        );
                     }
                 }
 

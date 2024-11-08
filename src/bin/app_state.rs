@@ -64,6 +64,10 @@ impl AppState {
         &self.visible_tiles
     }
 
+    pub fn visible_tiles_mut(&mut self) -> &mut BTreeMap<TileId, VisibleTile> {
+        &mut self.visible_tiles
+    }
+
     pub fn feature_collection(&self) -> Arc<RwLock<FeatureCollection>> {
         self.feature_collection.clone()
     }
@@ -154,7 +158,11 @@ impl AppState {
         let hovered_objects = self.hovered_objects.clone();
         let screen = self.screen.clone();
         let zoom = self.zoom;
-        let visible_tiles = self.visible_tiles.clone();
+        let visible_tiles = self
+            .visible_tiles
+            .iter()
+            .map(|(k, v)| (*k, (v.extent() as f32, v.collider(), v.objects())))
+            .collect();
         thread::spawn(move || {
             let objects = Collider::get_hovered_objects(&visible_tiles, &screen, zoom, point);
             let mut hovered_objects = hovered_objects.lock().unwrap();

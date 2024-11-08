@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::sync::{Arc, RwLock};
 
 use wgpu_glyph::{GlyphBrush, Section, Text};
 
@@ -11,10 +11,9 @@ use self::interaction::tile_collider::{TileCollider, TileColliderLoader};
 use self::math::{Screen, TileId};
 use self::object::Object;
 
-#[derive(Clone)]
 pub struct VisibleTile {
     tile: Arc<RwLock<Tile>>,
-    gpu_tile: Arc<RwLock<Option<LoadedGPUTile>>>,
+    gpu_tile: Option<LoadedGPUTile>,
     tile_collider: Arc<RwLock<TileCollider>>,
 }
 
@@ -22,7 +21,7 @@ impl VisibleTile {
     pub fn new(tile: Arc<RwLock<Tile>>) -> Self {
         Self {
             tile,
-            gpu_tile: Arc::new(RwLock::new(None)),
+            gpu_tile: None,
             tile_collider: Arc::new(RwLock::new(TileCollider::new())),
         }
     }
@@ -39,19 +38,17 @@ impl VisibleTile {
         self.tile.read().unwrap().objects()
     }
 
-    pub fn load_to_gpu(&self, device: &wgpu::Device) {
+    pub fn load_to_gpu(&mut self, device: &wgpu::Device) {
         let read_tile = self.tile.read().unwrap();
-        let mut write_gpu_tile = self.gpu_tile.write().unwrap();
-        *write_gpu_tile = Some(LoadedGPUTile::load(device, &read_tile));
+        self.gpu_tile = Some(LoadedGPUTile::load(device, &read_tile));
     }
 
-    pub fn unload_from_gpu(&self) {
-        let mut write_gpu_tile = self.gpu_tile.write().unwrap();
-        *write_gpu_tile = None;
+    pub fn unload_from_gpu(&mut self) {
+        self.gpu_tile = None;
     }
 
     pub fn is_loaded_to_gpu(&self) -> bool {
-        self.gpu_tile.read().unwrap().is_some()
+        self.gpu_tile.is_some()
     }
 
     pub fn load_collider(&mut self) {
@@ -62,15 +59,15 @@ impl VisibleTile {
         self.tile_collider.clone()
     }
 
-    pub fn gpu_tile(&self) -> RwLockReadGuard<Option<LoadedGPUTile>> {
-        self.gpu_tile.try_read().unwrap()
+    pub fn gpu_tile(&self) -> &Option<LoadedGPUTile> {
+        &self.gpu_tile
     }
 
-    pub fn paint<'a>(
+    pub fn paint<'a, 'b>(
         &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        blend_pipeline: &'a wgpu::RenderPipeline,
-        data: Option<&'a LoadedGPUTile>,
+        render_pass: &mut wgpu::RenderPass<'b>,
+        blend_pipeline: &'b wgpu::RenderPipeline,
+        data: Option<&'b LoadedGPUTile>,
         feature_collection: &'a FeatureCollection,
         tile_id: u32,
     ) {
