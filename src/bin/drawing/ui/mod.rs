@@ -197,14 +197,14 @@ impl HudUi {
                     });
 
                     ui.label(&format!(
-                        "Mouse Position: ({:.1},{:.1})",
-                        pointer_position[0], pointer_position[1]
+                        "Frametime {:.2?} at zoom {:.2}",
+                        app_state.stats.get_average(),
+                        app_state.zoom
                     ));
 
                     ui.label(&format!(
-                        "Frametime {:.2} at zoom {:.2}",
-                        app_state.stats.get_average(),
-                        app_state.zoom
+                        "Mouse Position: ({:.1},{:.1})",
+                        pointer_position[0], pointer_position[1]
                     ));
                 });
             });

@@ -53,8 +53,6 @@ fn main() {
     let mut last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
-
         let ui_event = hud.interact(&event);
         match event {
             Event::WindowEvent { event, .. } => match event {
@@ -157,7 +155,7 @@ fn main() {
                 app_state.stats.capture_frame();
                 if CONFIG.general.display_framerate {
                     println!(
-                        "Frametime {:.2} at zoom {:.2}",
+                        "Frametime {:.2?} at zoom {:.2}",
                         app_state.stats.get_average(),
                         app_state.zoom
                     );
