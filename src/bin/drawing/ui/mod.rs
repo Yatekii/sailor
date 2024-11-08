@@ -103,7 +103,7 @@ impl Hud {
 
     pub fn interact(&mut self, event: &winit::event::Event<()>) -> bool {
         self.platform.handle_event(event);
-        self.platform.captures_event(event)
+        self.platform.captures_event(event) || self.platform.context().is_pointer_over_area()
     }
 }
 
