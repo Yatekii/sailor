@@ -1,3 +1,4 @@
+/// The id of a tile within a grid of 2^z tiles in both x and y direction.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct TileId {
     pub z: u32,
@@ -65,6 +66,8 @@ impl std::ops::SubAssign for TileId {
     }
 }
 
+/// A specific point within a tile with the number before the comma representing the tile ID
+/// and the number after the comma representing the location within the specified Tile coordinate space.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TileCoordinate {
     pub z: u32,

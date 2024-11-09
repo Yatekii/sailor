@@ -656,6 +656,7 @@ impl Painter {
     pub fn paint(&mut self, hud: &mut super::ui::Hud, app_state: &mut AppState) {
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
         let _num_tiles = app_state.visible_tiles().len();
+        dbg!(_num_tiles);
         app_state
             .visible_tiles_mut()
             .iter_mut()

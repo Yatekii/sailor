@@ -26,7 +26,7 @@ impl Collider {
         point: (f32, f32),
     ) -> Vec<Object> {
         let mut return_objects = vec![];
-        let tile_field = screen.get_tile_boundaries_for_zoom_level(zoom, 1);
+        let tile_field = screen.get_tile_boundaries_for_zoom_level(zoom, 2);
 
         for tile_id in tile_field.iter() {
             if let Some((extent, collider, objects)) = visible_tiles.get(&tile_id) {

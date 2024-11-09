@@ -3,7 +3,7 @@ use osm::cache::TileCache;
 use osm::css::RulesCache;
 use osm::feature::collection::FeatureCollection;
 use osm::interaction::collider::Collider;
-use osm::math::{deg2num, num_to_global_space, Screen, TileId};
+use osm::math::{deg2num, tile_to_world_space, Screen, TileId};
 use osm::object::Object;
 use osm::vector_tile::visible_tile::VisibleTile;
 use std::collections::btree_map::Entry;
@@ -190,7 +190,7 @@ impl AppState {
 
     pub fn set_center(&mut self, center: (f32, f32)) {
         let tile_coordinate = deg2num(center.0, center.1, self.zoom as u32);
-        self.screen.center = num_to_global_space(&tile_coordinate);
+        self.screen.center = tile_to_world_space(&tile_coordinate);
     }
 }
 

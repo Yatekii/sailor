@@ -5,7 +5,7 @@ mod stats;
 
 use crate::config::CONFIG;
 use lyon::math::vector;
-use osm::math::{deg2num, num_to_global_space};
+use osm::math::{deg2num, tile_to_world_space};
 use winit::{
     dpi::PhysicalPosition,
     event::{
@@ -21,7 +21,7 @@ fn main() {
 
     let z = 8.0;
     let tile_coordinate = deg2num(47.3769, 8.5417, z as u32);
-    let zurich = num_to_global_space(&tile_coordinate);
+    let zurich = tile_to_world_space(&tile_coordinate);
 
     let width = 1200;
     let height = 800;

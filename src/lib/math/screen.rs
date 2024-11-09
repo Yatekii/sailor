@@ -37,10 +37,10 @@ impl Screen {
             / scale as f32;
 
         let top_left: TileId =
-            global_to_num_space(&(self.center - vector(px_to_world, py_to_world)), z as u32).into();
+            world_to_tile_space(&(self.center - vector(px_to_world, py_to_world)), z as u32).into();
         let bottom_right: TileId =
-            global_to_num_space(&(self.center + vector(px_to_world, py_to_world)), z as u32).into();
-        TileField::new(top_left, bottom_right)
+            world_to_tile_space(&(self.center + vector(px_to_world, py_to_world)), z as u32).into();
+        TileField::new(top_left, bottom_right + TileId::new(z as u32, 1, 0))
     }
 
     pub fn tile_to_global_space(&self, z: f32, coordinate: &TileId) -> glm::TMat4<f32> {

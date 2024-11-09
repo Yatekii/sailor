@@ -51,7 +51,7 @@ impl<'a> Iterator for TileIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         // TODO: FIX
-        if (self.current_tile.x..=self.tile_field.bottomright.x)
+        if (self.current_tile.x..self.tile_field.bottomright.x)
             .next()
             .is_some()
         {
@@ -62,6 +62,7 @@ impl<'a> Iterator for TileIterator<'a> {
             //    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#never_loop
             return Some(c);
         }
+
         if self.current_tile.y < self.tile_field.bottomright.y {
             self.current_tile = TileId::new(
                 self.current_tile.z,
@@ -69,6 +70,8 @@ impl<'a> Iterator for TileIterator<'a> {
                 self.current_tile.y + 1,
             );
             let c = self.current_tile;
+            // Since we return this tile here, we cannot return it again, so increase the index by one.
+            self.current_tile.x += 1;
             Some(c)
         } else {
             None
