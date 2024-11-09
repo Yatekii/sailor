@@ -27,6 +27,6 @@ pub fn num_to_global_space(coordinate: &TileCoordinate) -> Point {
 }
 
 pub fn global_to_num_space(point: &Point, z: u32) -> TileCoordinate {
-    let p = *point / 2f32.powi(-(z as i32));
+    let p = *point * 2f32.powi(z as i32);
     TileCoordinate::new(z, p.x, p.y)
 }

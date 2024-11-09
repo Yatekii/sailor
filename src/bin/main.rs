@@ -130,14 +130,12 @@ fn main() {
                         / size
                         / 2f32.powf(app_state.zoom)
                         / size
-                        / 2.0
-                        / 1.3;
+                        / 1.5;
                     let zoom_y = (app_state.screen.height as f32)
                         / size
                         / 2f32.powf(app_state.zoom)
                         / size
-                        / 2.0
-                        / 1.3;
+                        / 1.5;
                     delta.x *= zoom_x;
                     delta.y *= zoom_y;
 
