@@ -11,14 +11,14 @@ use self::interaction::tile_collider::{TileCollider, TileColliderLoader};
 use self::math::{Screen, TileId};
 use self::object::Object;
 
-pub struct VisibleTile {
-    tile: Arc<RwLock<Tile>>,
+pub struct VisibleTile<'t> {
+    tile: &'t Tile,
     gpu_tile: Option<LoadedGPUTile>,
     tile_collider: Arc<RwLock<TileCollider>>,
 }
 
-impl VisibleTile {
-    pub fn new(tile: Arc<RwLock<Tile>>) -> Self {
+impl<'t> VisibleTile<'t> {
+    pub fn new(tile: &'t Tile) -> Self {
         Self {
             tile,
             gpu_tile: None,
@@ -27,20 +27,19 @@ impl VisibleTile {
     }
 
     pub fn tile_id(&self) -> TileId {
-        self.tile.read().unwrap().tile_id()
+        self.tile.tile_id()
     }
 
     pub fn extent(&self) -> u16 {
-        self.tile.read().unwrap().extent()
+        self.tile.extent()
     }
 
     pub fn objects(&self) -> Arc<RwLock<Vec<Object>>> {
-        self.tile.read().unwrap().objects()
+        self.tile.objects()
     }
 
     pub fn load_to_gpu(&mut self, device: &wgpu::Device) {
-        let read_tile = self.tile.read().unwrap();
-        self.gpu_tile = Some(LoadedGPUTile::load(device, &read_tile));
+        self.gpu_tile = Some(LoadedGPUTile::load(device, self.tile));
     }
 
     pub fn unload_from_gpu(&mut self) {
@@ -52,7 +51,7 @@ impl VisibleTile {
     }
 
     pub fn load_collider(&mut self) {
-        self.tile_collider.load(self.tile.clone());
+        self.tile_collider.load(self.objects());
     }
 
     pub fn collider(&self) -> Arc<RwLock<TileCollider>> {
@@ -76,8 +75,7 @@ impl VisibleTile {
             render_pass.set_vertex_buffer(0, data.vertex_buffer.slice(..));
 
             let features = {
-                let read_tile = self.tile.read().unwrap();
-                let mut features = read_tile.features().clone();
+                let mut features = self.tile.features().clone();
                 features.sort_by(|a, b| {
                     feature_collection
                         .get_zindex(a.0)
@@ -107,9 +105,8 @@ impl VisibleTile {
     }
 
     pub fn queue_text(&self, glyph_brush: &mut GlyphBrush<()>, screen: &Screen, z: f32) {
-        let read_tile = self.tile.read().unwrap();
-        let matrix = screen.tile_to_global_space(z, &read_tile.tile_id());
-        for text in read_tile.text() {
+        let matrix = screen.tile_to_global_space(z, &self.tile.tile_id());
+        for text in self.tile.text() {
             let position = matrix * glm::vec4((text.0).0, (text.0).1, 0.0, 1.0);
             let section = Section::default()
                 .add_text(Text::new(&text.1))

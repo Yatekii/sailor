@@ -2,30 +2,26 @@ use std::{fs::File, io::Read, path::Path};
 
 use crate::math::TileId;
 
-pub fn fetch_tile_data(cache_location: impl AsRef<Path>, tile_id: &TileId) -> Option<Vec<u8>> {
-    let zxy: String = format!("{}", tile_id);
-    let pbf = format!("cache/{}.pbf", zxy);
+pub fn fetch_tile_data(cache_location: &Path, tile_id: &TileId) -> Option<Vec<u8>> {
+    let pbf = format!("cache/{}.pbf", tile_id);
     if !is_in_cache(pbf.clone()) {
-        if let Some(data) = fetch_tile_from_server(tile_id) {
-            ensure_cache_structure(cache_location, tile_id);
-            match File::create(&pbf) {
-                Ok(mut file) => {
-                    use std::io::Write;
-                    match file.write_all(&data[..]) {
-                        Ok(_) => Some(data),
-                        Err(e) => {
-                            log::error!("Unable to write pbf {}. Reason:\r\n{}", pbf, e);
-                            None
-                        }
+        let data = fetch_tile_from_server(tile_id)?;
+        ensure_cache_structure(cache_location, tile_id);
+        match File::create(&pbf) {
+            Ok(mut file) => {
+                use std::io::Write;
+                match file.write_all(&data[..]) {
+                    Ok(_) => Some(data),
+                    Err(e) => {
+                        log::error!("Unable to write pbf {}. Reason:\r\n{}", pbf, e);
+                        None
                     }
                 }
-                Err(e) => {
-                    log::error!("Could not create pbf {}. Reason:\r\n{}", pbf, e);
-                    None
-                }
             }
-        } else {
-            None
+            Err(e) => {
+                log::error!("Could not create pbf {}. Reason:\r\n{}", pbf, e);
+                None
+            }
         }
     } else {
         match File::open(&pbf) {
@@ -86,16 +82,15 @@ fn is_in_cache(path: impl Into<String>) -> bool {
     Path::new(&path.into()).exists()
 }
 
-fn ensure_cache_structure(root: impl AsRef<Path>, tile_id: &TileId) {
-    let dir_path = root
-        .as_ref()
-        .join(&format!("cache/{:0>3}/{:0>3}/", tile_id.z, tile_id.x));
+/// Creates all necessary directories on disk to store the PBF file of the given `tile_id`.
+fn ensure_cache_structure(root: &Path, tile_id: &TileId) {
+    let dir_path = root.join(&format!("cache/{:0>3}/{:0>3}/", tile_id.z, tile_id.x));
     std::fs::create_dir_all(dir_path).expect("Could not create cache directories.");
 }
 
 #[test]
 fn test_ensure_cache_structure() {
-    ensure_cache_structure("/tmp/sailor-test", &TileId::new(8, 42, 42));
+    ensure_cache_structure(Path::new("/tmp/sailor-test"), &TileId::new(8, 42, 42));
     let md = std::fs::metadata("/tmp/sailor-test/cache/008/042");
     assert!(md.is_ok());
     assert!(md.unwrap().is_dir());

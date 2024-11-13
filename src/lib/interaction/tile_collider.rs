@@ -10,7 +10,7 @@ use std::{
     thread::spawn,
 };
 
-use crate::{object::Object, vector_tile::tile::Tile};
+use crate::object::Object;
 
 pub struct TileCollider {
     world: CollisionWorld<f32, usize>,
@@ -87,28 +87,26 @@ impl Default for TileCollider {
 }
 
 pub trait TileColliderLoader {
-    fn load(&mut self, tile: Arc<RwLock<Tile>>);
+    fn load(&mut self, objects: Arc<RwLock<Vec<Object>>>);
 }
 
 impl TileColliderLoader for Arc<RwLock<TileCollider>> {
-    fn load(&mut self, tile: Arc<RwLock<Tile>>) {
+    fn load(&mut self, objects: Arc<RwLock<Vec<Object>>>) {
         let collider_clone = self.clone();
         spawn(move || {
-            if let Ok(tile) = tile.read() {
-                if let Ok(objects) = tile.objects().read() {
-                    match collider_clone.write() {
-                        Ok(mut collider) => {
-                            for object_id in 0..objects.len() {
-                                if objects[object_id].points().len() >= 2 {
-                                    collider.add_object(object_id, &objects[object_id]);
-                                }
+            if let Ok(objects) = objects.read() {
+                match collider_clone.write() {
+                    Ok(mut collider) => {
+                        for object_id in 0..objects.len() {
+                            if objects[object_id].points().len() >= 2 {
+                                collider.add_object(object_id, &objects[object_id]);
                             }
-                            collider.update();
                         }
-                        Err(_e) => log::error!(
-                            "Could not aquire collider lock. Not loading the objects of this tile."
-                        ),
+                        collider.update();
                     }
+                    Err(_e) => log::error!(
+                        "Could not aquire collider lock. Not loading the objects of this tile."
+                    ),
                 }
             }
         });

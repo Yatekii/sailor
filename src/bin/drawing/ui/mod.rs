@@ -1,4 +1,6 @@
+pub mod fps;
 pub mod state;
+
 use std::sync::Arc;
 
 use egui::color_picker::Alpha;
@@ -17,6 +19,8 @@ use wgpu::SurfaceConfiguration;
 
 use crate::app_state::AppState;
 use crate::app_state::EditableObject;
+
+use self::fps::FpsGraph;
 
 pub struct Hud {
     platform: egui_winit_platform::Platform,
@@ -39,6 +43,7 @@ impl Hud {
             font_definitions: FontDefinitions::default(),
             style: Default::default(),
         });
+
         // We use the egui_wgpu_backend crate as the render backend.
         let rpass = RenderPass::new(device, surface_config.format, 1);
 
@@ -46,6 +51,7 @@ impl Hud {
             main_window: MainWindow { open: true },
             stats_window: StatsWindow { open: true },
             location_finder_window: LocationFinderWindow { open: true },
+            fps_graph: FpsGraph { open: true },
         };
 
         Self {
@@ -68,6 +74,7 @@ impl Hud {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
+        self.platform.context().set_pixels_per_point(4.0);
         // Begin to draw the UI frame.
         self.platform.begin_frame();
 
@@ -76,7 +83,7 @@ impl Hud {
 
         // End the UI frame. We could now handle the output and draw the UI with the backend.
         let full_output = self.platform.end_frame(Some(window));
-        let paint_jobs = self.platform.context().tessellate(full_output.shapes);
+        let paint_jobs = self.platform.context().tessellate(full_output.shapes, 4.0);
 
         // Upload all resources for the GPU.
         let size = window.inner_size();
@@ -101,7 +108,7 @@ impl Hud {
             .expect("remove texture ok");
     }
 
-    pub fn interact(&mut self, event: &winit::event::Event<()>) -> bool {
+    pub fn interact(&mut self, event: &winit::event::WindowEvent) -> bool {
         self.platform.handle_event(event);
         self.platform.captures_event(event) || self.platform.context().is_pointer_over_area()
     }
@@ -180,12 +187,13 @@ struct HudUi {
     main_window: MainWindow,
     stats_window: StatsWindow,
     location_finder_window: LocationFinderWindow,
+    fps_graph: FpsGraph,
 }
 
 impl HudUi {
     pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
         {
-            let pointer_position = ctx.input().pointer.hover_pos().unwrap_or_default();
+            let pointer_position = ctx.input(|i| i.pointer.hover_pos()).unwrap_or_default();
 
             // Draw menubar.
             egui::TopBottomPanel::top("Main Menu Bar").show(ctx, |ui| {
@@ -214,6 +222,8 @@ impl HudUi {
             self.stats_window.ui(ctx, app_state);
 
             self.location_finder_window.ui(ctx, app_state);
+
+            self.fps_graph.ui(ctx, app_state);
         }
     }
 }

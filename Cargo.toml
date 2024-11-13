@@ -45,15 +45,15 @@ serde_derive = "1.0"
 shaderc = "0.6"
 ureq = "2.4"
 varint = "0.9"
-web-sys = "=0.3.60"
-wgpu = { version = "0.14", features = ["spirv"] }
-wgpu_glyph = { version = "0.17", path = "../wgpu_glyph" }
-winit = "0.27"
-core-foundation = "=0.9.3"
-egui = "0.19.0"
-egui_wgpu_backend = "0.20"
-egui_winit_platform = "0.16.0"
-egui_demo_lib = "0.19.0"
+web-sys = "0.3.72"
+wgpu = { version = "22", features = ["spirv"] }
+glyphon = { version = "0.6" }
+winit = "0.30"
+core-foundation = "0.10.0"
+egui = "0.29"
+egui_wgpu_backend = "0.31"
+egui_winit_platform = "0.24"
+egui_demo_lib = "0.29"
 
 [profile.release]
 debug = true

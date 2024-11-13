@@ -1,19 +1,21 @@
 use std::num::NonZeroU64;
 use std::path::Path;
+use std::sync::Arc;
 
 use crossbeam_channel::{unbounded, TryRecvError};
+use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
 use osm::math::{Screen, TileId};
-use osm::vector_tile::visible_tile::VisibleTile;
+use osm::vector_tile::tile::Tile;
 use pollster::block_on;
 use util::StagingBelt;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
-use wgpu_glyph::{ab_glyph::FontArc, GlyphBrush, GlyphBrushBuilder};
+use winit::window::WindowAttributes;
 use winit::{dpi::LogicalSize, event_loop::EventLoop, window::Window};
 
 use crate::app_state::AppState;
@@ -22,11 +24,11 @@ use crate::drawing::helpers::{load_glsl, ShaderStage};
 use crate::config::CONFIG;
 
 pub struct Painter {
-    pub window: Window,
+    pub window: Arc<Window>,
     hidpi_factor: f64,
     pub device: Device,
     pub queue: Queue,
-    surface: Surface,
+    surface: Surface<'static>,
     staging_belt: StagingBelt,
     pub surface_config: SurfaceConfiguration,
     blend_pipeline: RenderPipeline,
@@ -39,23 +41,32 @@ pub struct Painter {
     bind_group: BindGroup,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
-    glyph_brush: GlyphBrush<()>,
+
+    font_system: FontSystem,
+    swash_cache: SwashCache,
+    viewport: glyphon::Viewport,
+    atlas: glyphon::TextAtlas,
+    text_renderer: glyphon::TextRenderer,
     // temperature: crate::drawing::weather::Temperature,
 }
 
 impl Painter {
     /// Initializes the entire draw machinery.
     pub fn init(event_loop: &EventLoop<()>, width: u32, height: u32, app_state: &AppState) -> Self {
-        let window = Window::new(event_loop).unwrap();
-        window.set_inner_size(LogicalSize {
-            width: width as f64,
-            height: height as f64,
-        });
+        #[allow(deprecated)]
+        let window = Arc::new(
+            event_loop
+                .create_window(WindowAttributes::default().with_inner_size(LogicalSize {
+                    width: width as f64,
+                    height: height as f64,
+                }))
+                .unwrap(),
+        );
         let factor = window.scale_factor();
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
-        let surface = unsafe { instance.create_surface(&window) };
+        let instance = wgpu::Instance::new(InstanceDescriptor::default());
+        let surface = instance.create_surface(window.clone()).unwrap();
 
         let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
@@ -68,17 +79,20 @@ impl Painter {
         let (device, queue) = block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("Main Device"),
-                features: wgpu::Features::DEPTH32FLOAT_STENCIL8,
-                limits: wgpu::Limits {
+                required_features: Features::DEPTH32FLOAT_STENCIL8,
+                required_limits: wgpu::Limits {
                     max_uniform_buffer_binding_size: 1 << 16,
                     ..wgpu::Limits::default()
                 },
+                memory_hints: MemoryHints::Performance,
             },
             None,
         ))
         .expect("Failed to create device");
 
-        let init_encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
+        let init_encoder = device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("initial command encoder (loading font atlas, etc)"),
+        });
 
         let (tx, rx) = unbounded();
 
@@ -128,7 +142,7 @@ impl Painter {
         .expect("Fatal Error. Unable to load shaders.");
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: None,
+            label: Some("tile vertex stage bindings"),
             entries: &[
                 BindGroupLayoutEntry {
                     binding: 0,
@@ -160,6 +174,8 @@ impl Painter {
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Immediate,
+            desired_maximum_frame_latency: 2,
+            view_formats: vec![TextureFormat::Bgra8Unorm],
         };
 
         surface.configure(&device, &surface_config);
@@ -176,7 +192,7 @@ impl Painter {
             &device,
             &app_state.screen,
             app_state.zoom,
-            std::iter::empty::<&VisibleTile>(),
+            std::iter::empty::<&Tile>(),
         );
 
         let blend_pipeline = Self::create_layer_render_pipeline(
@@ -216,11 +232,19 @@ impl Painter {
             &tile_transform_buffer,
         );
 
-        let font =
-            FontArc::try_from_slice(include_bytes!("../../../config/Ruda-Bold.ttf")).unwrap();
+        let font_system = FontSystem::new();
+        let swash_cache = SwashCache::new();
+        let cache = Cache::new(&device);
+        let viewport = Viewport::new(&device, &cache);
+        let mut atlas = TextAtlas::new(&device, &queue, &cache, TextureFormat::Bgra8Unorm);
+        let text_renderer =
+            TextRenderer::new(&mut atlas, &device, MultisampleState::default(), None);
 
-        let glyph_brush =
-            GlyphBrushBuilder::using_font(font).build(&device, TextureFormat::Bgra8Unorm);
+        // let font =
+        //     FontArc::try_from_slice(include_bytes!("../../../config/Ruda-Bold.ttf")).unwrap();
+
+        // let glyph_brush =
+        //     GlyphBrushBuilder::using_font(font).build(&device, TextureFormat::Bgra8Unorm);
 
         // let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
@@ -250,7 +274,11 @@ impl Painter {
             bind_group,
             _watcher: watcher,
             rx,
-            glyph_brush,
+            font_system,
+            swash_cache,
+            viewport,
+            atlas,
+            text_renderer,
             // temperature,
         }
     }
@@ -265,13 +293,13 @@ impl Painter {
         depth_write_enabled: bool,
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: None,
+            label: Some("osm layer render pipeline layout"),
             bind_group_layouts: &[bind_group_layout],
             push_constant_ranges: &[],
         });
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some("Map"),
+            label: Some("osm layer render pipeline"),
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: vs_module,
@@ -297,6 +325,7 @@ impl Painter {
                         },
                     ],
                 }],
+                compilation_options: PipelineCompilationOptions::default(),
             },
             fragment: Some(FragmentState {
                 module: fs_module,
@@ -309,6 +338,7 @@ impl Painter {
                     }),
                     write_mask: ColorWrites::ALL,
                 })],
+                compilation_options: PipelineCompilationOptions::default(),
             }),
             primitive: PrimitiveState {
                 topology: PrimitiveTopology::TriangleList,
@@ -351,6 +381,7 @@ impl Painter {
                 alpha_to_coverage_enabled: false,
             },
             multiview: None,
+            cache: None,
         })
     }
 
@@ -362,7 +393,7 @@ impl Painter {
     ) -> Vec<(Buffer, usize)> {
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
+            label: Some("map canvas size data"),
             contents: as_byte_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_SRC,
         });
@@ -371,7 +402,7 @@ impl Painter {
         let len = buffer.len();
         let layer_data_len = len.max(1) * 12 * 4;
         let layer_data_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
+            label: Some("feature style data"),
             contents: if len == 0 {
                 &[0; 48]
             } else {
@@ -389,7 +420,7 @@ impl Painter {
     fn create_uniform_buffer(device: &Device) -> Buffer {
         let data = vec![0; Self::uniform_buffer_size() as usize];
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
+            label: Some("tile data"),
             contents: as_byte_slice(&data),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
@@ -403,7 +434,7 @@ impl Painter {
         device: &Device,
         screen: &Screen,
         z: f32,
-        visible_tiles: impl Iterator<Item = &'a VisibleTile>,
+        visible_tiles: impl Iterator<Item = &'a Tile>,
     ) -> (Buffer, u64) {
         const TILE_DATA_SIZE: usize = 20;
         let tile_data_buffer_byte_size = TILE_DATA_SIZE * 4 * CONFIG.renderer.max_tiles;
@@ -425,7 +456,7 @@ impl Painter {
         (
             {
                 let buffer = device.create_buffer_init(&BufferInitDescriptor {
-                    label: None,
+                    label: Some("tile transforms buffer"),
                     contents: as_byte_slice(data.as_slice()),
                     usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
                 });
@@ -458,7 +489,7 @@ impl Painter {
         tile_transform_buffer: &(Buffer, u64),
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
-            label: None,
+            label: Some("bind vertex stage buffers"),
             layout: bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -602,7 +633,10 @@ impl Painter {
             &self.device,
             &app_state.screen,
             app_state.zoom,
-            app_state.visible_tiles().values(),
+            app_state
+                .visible_tiles()
+                .iter()
+                .map(|tile_id| app_state.tile_cache.get_tile(tile_id)),
         );
     }
 
@@ -617,13 +651,14 @@ impl Painter {
             depth_or_array_layers: 1,
         };
         let multisampled_frame_descriptor = &TextureDescriptor {
-            label: None,
+            label: Some("MSAA texture render target"),
             size: multisampled_texture_extent,
             mip_level_count: 1,
             sample_count,
             dimension: TextureDimension::D2,
             format: surface_config.format,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_DST,
+            view_formats: &[surface_config.format],
         };
 
         device
@@ -638,7 +673,7 @@ impl Painter {
             depth_or_array_layers: 1,
         };
         let frame_descriptor = &TextureDescriptor {
-            label: None,
+            label: Some("tile cutoff stencil"),
             size: texture_extent,
             mip_level_count: 1,
             sample_count: CONFIG.renderer.msaa_samples,
@@ -646,6 +681,7 @@ impl Painter {
             format: TextureFormat::Depth32FloatStencil8,
             // usage: TextureUsages::OUTPUT_ATTACHMENT | TextureUsages::SAMPLED,
             usage: TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[TextureFormat::Depth32FloatStencil8],
         };
 
         device
@@ -655,25 +691,20 @@ impl Painter {
 
     pub fn paint(&mut self, hud: &mut super::ui::Hud, app_state: &mut AppState) {
         let feature_collection = app_state.feature_collection().read().unwrap().clone();
-        let _num_tiles = app_state.visible_tiles().len();
-        dbg!(_num_tiles);
-        app_state
-            .visible_tiles_mut()
-            .iter_mut()
-            .for_each(|(_, vt)| {
-                vt.load_to_gpu(&self.device);
-            });
-        let any_loaded = app_state
-            .visible_tiles()
-            .iter()
-            .any(|(_, vt)| vt.is_loaded_to_gpu());
+
+        for tile_id in &mut app_state.visible_tiles {
+            let tile = app_state.tile_cache.try_get_tile_mut(tile_id).unwrap();
+            tile.load_to_gpu(&self.device);
+        }
 
         let features = feature_collection.get_features();
-        if !features.is_empty() && any_loaded {
+        if !features.is_empty() {
             if let Ok(frame) = self.surface.get_current_texture() {
                 let mut encoder = self
                     .device
-                    .create_command_encoder(&CommandEncoderDescriptor { label: None });
+                    .create_command_encoder(&CommandEncoderDescriptor {
+                        label: Some("tile polygon encoder"),
+                    });
                 self.update_uniforms(&mut encoder, app_state, &feature_collection);
                 self.bind_group = Self::create_blend_bind_group(
                     &self.device,
@@ -686,7 +717,7 @@ impl Painter {
                         .texture
                         .create_view(&wgpu::TextureViewDescriptor::default());
                     let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                        label: Some("Tiles"),
+                        label: Some("tile polygons"),
                         color_attachments: &[Some(RenderPassColorAttachment {
                             view: if CONFIG.renderer.msaa_samples > 1 {
                                 &self.multisampled_framebuffer
@@ -700,20 +731,22 @@ impl Painter {
                             },
                             ops: Operations::<wgpu::Color> {
                                 load: LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                                store: true,
+                                store: StoreOp::Store,
                             },
                         })],
                         depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                             view: &self.stencil,
                             depth_ops: Some(Operations::<f32> {
                                 load: LoadOp::Clear(0.0),
-                                store: true,
+                                store: StoreOp::Store,
                             }),
                             stencil_ops: Some(Operations::<u32> {
                                 load: LoadOp::Clear(255),
-                                store: true,
+                                store: StoreOp::Store,
                             }),
                         }),
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
                     });
                     render_pass.set_bind_group(0, &self.bind_group, &[]);
                     let vec = vec4(0.0, 0.0, 0.0, 1.0);
@@ -722,11 +755,10 @@ impl Painter {
                         app_state.screen.height as f32,
                     ) / 2.0;
 
-                    for (i, vt) in app_state.visible_tiles().values().enumerate() {
-                        let tile_id = vt.tile_id();
+                    for (i, tile_id) in app_state.visible_tiles().iter().enumerate() {
                         let matrix = app_state
                             .screen
-                            .tile_to_global_space(app_state.zoom, &tile_id);
+                            .tile_to_global_space(app_state.zoom, tile_id);
                         let start = (matrix * vec).xy() + vec2(1.0, 1.0);
                         let s = vec2(
                             (start.x * screen_dimensions.x)
@@ -740,7 +772,7 @@ impl Painter {
                         );
                         let matrix = app_state.screen.tile_to_global_space(
                             app_state.zoom,
-                            &(tile_id + TileId::new(tile_id.z, 1, 1)),
+                            &(*tile_id + TileId::new(tile_id.z, 1, 1)),
                         );
                         let end = (matrix * vec).xy() + vec2(1.0, 1.0);
                         let e = vec2(
@@ -760,34 +792,74 @@ impl Painter {
                             render_pass.set_scissor_rect(s.x as u32, s.y as u32, width, height);
                         }
 
-                        let gpu_tile = vt.gpu_tile();
-                        let gpu_tile2 = gpu_tile.as_ref();
-                        vt.paint(
+                        let tile = app_state.tile_cache.try_get_tile(tile_id).unwrap();
+                        let gpu_tile = tile.gpu_tile();
+                        tile.paint(
                             &mut render_pass,
                             &self.blend_pipeline,
-                            gpu_tile2,
+                            gpu_tile,
                             &feature_collection,
                             i as u32,
                         );
                     }
                 }
 
-                for vt in app_state.visible_tiles().values() {
-                    vt.queue_text(&mut self.glyph_brush, &app_state.screen, app_state.zoom);
+                self.viewport.update(
+                    &self.queue,
+                    Resolution {
+                        width: self.surface_config.width,
+                        height: self.surface_config.height,
+                    },
+                );
+
+                let tile_cache = &mut app_state.tile_cache;
+                let screen = &app_state.screen;
+                let zoom = app_state.zoom;
+                for tile_id in &app_state.visible_tiles {
+                    let tile = tile_cache.get_tile_mut(tile_id);
+                    tile.prepare_text(&mut self.font_system);
                 }
+                let text_areas = app_state.visible_tiles.iter().flat_map(|tile_id| {
+                    let tile = tile_cache.get_tile(tile_id);
+                    tile.queue_text(screen, zoom)
+                });
+
+                self.text_renderer
+                    .prepare(
+                        &self.device,
+                        &self.queue,
+                        &mut self.font_system,
+                        &mut self.atlas,
+                        &self.viewport,
+                        text_areas,
+                        &mut self.swash_cache,
+                    )
+                    .unwrap();
 
                 let view = &frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
 
-                let _ = self.glyph_brush.draw_queued(
-                    &self.device,
-                    &mut self.staging_belt,
-                    &mut encoder,
-                    view,
-                    app_state.screen.width,
-                    app_state.screen.height,
-                );
+                let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                    label: Some("tile text pass"),
+                    color_attachments: &[Some(RenderPassColorAttachment {
+                        view,
+                        resolve_target: None,
+                        ops: Operations {
+                            load: LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+
+                self.text_renderer
+                    .render(&self.atlas, &self.viewport, &mut pass)
+                    .unwrap();
+
+                drop(pass);
 
                 // self.temperature.paint(&mut encoder, view);
 

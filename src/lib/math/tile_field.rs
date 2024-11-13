@@ -50,7 +50,6 @@ impl<'a> Iterator for TileIterator<'a> {
     type Item = TileId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // TODO: FIX
         if (self.current_tile.x..self.tile_field.bottomright.x)
             .next()
             .is_some()

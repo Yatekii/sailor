@@ -1,4 +1,7 @@
 use crate::*;
+use glyphon::{
+    Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, TextArea, TextBounds, Weight,
+};
 use lyon::{
     path::{ControlPointId, Path},
     tessellation::{geometry_builder::VertexBuffers, FillOptions, FillTessellator},
@@ -12,12 +15,13 @@ use vector_tile::vector_tile::mod_Tile::{Feature, GeomType, Layer, Value};
 use self::{
     css::Selector,
     drawing::{
+        loaded_gpu_tile::LoadedGPUTile,
         mesh::MeshBuilder,
         vertex::{LayerVertexCtor, Vertex},
     },
     feature::collection::FeatureCollection,
-    interaction::tile_collider::TileCollider,
-    math::TileId,
+    interaction::tile_collider::{TileCollider, TileColliderLoader},
+    math::{Screen, TileId},
     object::{Object, ObjectType},
 };
 
@@ -77,8 +81,10 @@ pub struct Tile {
     objects: Arc<RwLock<Vec<Object>>>,
     features: Vec<(u32, Range<u32>)>,
     collider: Arc<RwLock<TileCollider>>,
+    gpu_tile: Option<LoadedGPUTile>,
     text: Vec<((f32, f32), String)>,
     stats: TileStats,
+    text_buffers: Vec<Buffer>,
 }
 
 pub fn layer_num(name: &str) -> u32 {
@@ -259,8 +265,10 @@ impl Tile {
             objects,
             features,
             collider,
+            gpu_tile: None,
             text,
             stats,
+            text_buffers: vec![],
         }
     }
 
@@ -374,6 +382,123 @@ impl Tile {
         }
 
         (selector, tags)
+    }
+
+    pub fn load_to_gpu(&mut self, device: &wgpu::Device) {
+        self.gpu_tile = Some(LoadedGPUTile::load(device, self));
+    }
+
+    pub fn unload_from_gpu(&mut self) {
+        self.gpu_tile = None;
+    }
+
+    pub fn is_loaded_to_gpu(&self) -> bool {
+        self.gpu_tile.is_some()
+    }
+
+    pub fn load_collider(&mut self) {
+        self.collider.load(self.objects.clone());
+    }
+
+    pub fn gpu_tile(&self) -> Option<&LoadedGPUTile> {
+        self.gpu_tile.as_ref()
+    }
+
+    pub fn paint<'a, 'b>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'b>,
+        blend_pipeline: &'b wgpu::RenderPipeline,
+        data: Option<&'b LoadedGPUTile>,
+        feature_collection: &'a FeatureCollection,
+        tile_id: u32,
+    ) {
+        if let Some(data) = data {
+            render_pass.set_index_buffer(data.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.set_vertex_buffer(0, data.vertex_buffer.slice(..));
+
+            let features = {
+                let mut features = self.features().clone();
+                features.sort_by(|a, b| {
+                    feature_collection
+                        .get_zindex(a.0)
+                        .partial_cmp(&feature_collection.get_zindex(b.0))
+                        .unwrap()
+                });
+                features
+            };
+
+            let mut i = 0;
+            render_pass.set_pipeline(blend_pipeline);
+            for (id, range) in &features {
+                if !range.is_empty() && feature_collection.is_visible(*id) {
+                    render_pass.set_stencil_reference(i as u32);
+                    i += 1;
+
+                    let range_start = (tile_id << 1) | 1;
+                    render_pass.draw_indexed(range.clone(), 0, range_start..1 + range_start);
+
+                    if feature_collection.has_outline(*id) {
+                        let range_start = tile_id << 1;
+                        render_pass.draw_indexed(range.clone(), 0, range_start..1 + range_start);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn queue_text<'a>(
+        &'a self,
+        screen: &'a Screen,
+        z: f32,
+    ) -> impl Iterator<Item = TextArea<'a>> {
+        let matrix = screen.tile_to_global_space(z, &self.tile_id());
+        self.text
+            .iter()
+            .zip(self.text_buffers.iter())
+            .map(move |(((x, y), _), buffer)| {
+                let position = matrix * glm::vec4(*x, *y, 0.0, 1.0);
+
+                let left = (position.x + 1.0) * screen.width as f32 / 2.0;
+                let top = (position.y + 1.0) * screen.height as f32 / 2.0;
+
+                TextArea {
+                    buffer,
+                    left,
+                    top,
+                    scale: 2.0,
+                    bounds: TextBounds {
+                        left: left as i32,
+                        top: top.floor() as i32,
+                        right: left as i32 + 1000,
+                        bottom: top.floor() as i32 + screen.height as i32,
+                    },
+                    default_color: Color::rgb(0, 0, 0),
+                    custom_glyphs: &[],
+                }
+            })
+    }
+
+    pub fn prepare_text(&mut self, font_system: &mut FontSystem) {
+        if !self.text_buffers.is_empty() {
+            return;
+        }
+
+        let attrs = Attrs::new()
+            .family(Family::SansSerif)
+            .weight(Weight::NORMAL);
+        let shaping = Shaping::Advanced;
+
+        self.text_buffers = self
+            .text
+            .iter()
+            .map(|text| {
+                let mut buffer = Buffer::new(font_system, Metrics::relative(12.0, 1.15));
+
+                buffer.set_text(font_system, &text.1, attrs, shaping);
+                buffer.shape_until_scroll(font_system, false);
+                buffer
+            })
+            .collect();
     }
 }
 

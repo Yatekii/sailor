@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use std::num::NonZeroU32;
 use std::path::Path;
 
 use crossbeam_channel::{unbounded, TryRecvError};
@@ -12,8 +11,8 @@ use wgpu::{
 };
 use wgpu::{
     BlendState, ColorTargetState, ColorWrites, FragmentState, FrontFace, MultisampleState,
-    PolygonMode, PrimitiveState, PrimitiveTopology, SamplerBindingType, ShaderModuleDescriptor,
-    TextureFormat, VertexState,
+    PipelineCompilationOptions, PolygonMode, PrimitiveState, PrimitiveTopology, SamplerBindingType,
+    ShaderModuleDescriptor, TextureFormat, VertexState,
 };
 
 use crate::drawing::helpers::{load_glsl, ShaderStage};
@@ -31,8 +30,9 @@ pub struct Temperature {
 
 impl Temperature {
     pub fn init(device: &mut wgpu::Device, queue: &mut wgpu::Queue) -> Self {
-        let init_encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        let init_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("temperature overlay encoder"),
+        });
 
         let (tx, rx) = unbounded();
 
@@ -121,7 +121,7 @@ impl Temperature {
             lod_min_clamp: -100.0,
             lod_max_clamp: 100.0,
             compare: Some(wgpu::CompareFunction::Always),
-            anisotropy_clamp: None,
+            anisotropy_clamp: 0,
             border_color: None,
         });
 
@@ -141,6 +141,7 @@ impl Temperature {
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R32Float,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[wgpu::TextureFormat::R32Float],
         });
 
         let bind_group = Self::create_bind_group(device, &bind_group_layout, &texture, &sampler);
@@ -177,6 +178,7 @@ impl Temperature {
                 module: vs_module,
                 entry_point: "main",
                 buffers: &[],
+                compilation_options: PipelineCompilationOptions::default(),
             },
             fragment: Some(FragmentState {
                 module: fs_module,
@@ -197,6 +199,7 @@ impl Temperature {
                     }),
                     write_mask: ColorWrites::ALL,
                 })],
+                compilation_options: PipelineCompilationOptions::default(),
             }),
             primitive: PrimitiveState {
                 topology: PrimitiveTopology::TriangleList,
@@ -214,6 +217,7 @@ impl Temperature {
                 alpha_to_coverage_enabled: false,
             },
             multiview: None,
+            cache: None,
         })
     }
 
@@ -271,8 +275,8 @@ impl Temperature {
             wgpu::ImageCopyBuffer {
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: NonZeroU32::new(width * 4),
-                    rows_per_image: NonZeroU32::new(height),
+                    bytes_per_row: Some(width * 4),
+                    rows_per_image: Some(height),
                 },
                 buffer,
             },
@@ -372,10 +376,12 @@ impl Temperature {
                         b: 0.3,
                         a: 1.0,
                     }),
-                    store: true,
+                    store: wgpu::StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self._bind_group, &[]);

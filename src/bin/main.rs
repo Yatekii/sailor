@@ -7,12 +7,12 @@ use crate::config::CONFIG;
 use lyon::math::vector;
 use osm::math::{deg2num, tile_to_world_space};
 use winit::{
-    dpi::PhysicalPosition,
-    event::{
-        ElementState, Event, KeyboardInput, ModifiersState, MouseButton, MouseScrollDelta,
-        VirtualKeyCode, WindowEvent,
-    },
-    event_loop::ControlFlow,
+    application::ApplicationHandler,
+    dpi::{LogicalPosition, PhysicalPosition},
+    event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
+    event_loop::ActiveEventLoop,
+    keyboard::{Key, ModifiersState, NamedKey},
+    window::WindowId,
 };
 
 fn main() {
@@ -26,151 +26,168 @@ fn main() {
     let width = 1200;
     let height = 800;
 
-    let event_loop = winit::event_loop::EventLoop::new();
-    let hdpi_factor = event_loop
-        .available_monitors()
-        .next()
-        .expect("No monitors found")
-        .scale_factor();
+    let event_loop = winit::event_loop::EventLoop::new().unwrap();
 
-    let mut app_state = app_state::AppState::new(
-        CONFIG.renderer.css.clone(),
-        zurich,
-        width,
-        height,
-        z,
-        hdpi_factor,
-    );
+    let app_state =
+        app_state::AppState::new(CONFIG.renderer.css.clone(), zurich, width, height, z, 2.0);
 
     let mut painter = drawing::Painter::init(&event_loop, width, height, &app_state);
-    let mut hud = drawing::ui::Hud::new(
+    let hud = drawing::ui::Hud::new(
         &painter.window,
         &mut painter.device,
         &painter.surface_config,
     );
 
-    let mut mouse_down = false;
-    let mut last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
+    let mouse_down = false;
+    let last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
 
-    let mut modifiers_state = ModifiersState::default();
+    let modifiers_state = ModifiersState::default();
 
-    event_loop.run(move |event, _, control_flow| {
-        let ui_event = hud.interact(&event);
+    let mut application = Application {
+        hud,
+        painter,
+        app_state,
+        modifiers_state,
+        mouse_down,
+        last_pos,
+    };
+
+    event_loop.run_app(&mut application).unwrap();
+}
+
+pub struct Application {
+    hud: drawing::ui::Hud,
+    painter: drawing::Painter,
+    app_state: app_state::AppState,
+    modifiers_state: ModifiersState,
+    mouse_down: bool,
+    last_pos: LogicalPosition<f64>,
+}
+
+impl ApplicationHandler for Application {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let _ = event_loop;
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        let ui_event = self.hud.interact(&event);
         match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::Destroyed => {
-                    *control_flow = ControlFlow::Exit;
-                }
-                WindowEvent::Resized(physical_size) => {
-                    app_state.screen.width = physical_size.width.min(8192);
-                    app_state.screen.height = physical_size.height.min(8192);
-                    painter.resize(app_state.screen.width, app_state.screen.height);
-                }
-                WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            virtual_keycode: Some(keycode),
-                            ..
-                        },
-                    ..
-                } => {
-                    if keycode == VirtualKeyCode::Q && modifiers_state.logo() {
-                        *control_flow = ControlFlow::Exit;
-                        return;
-                    }
-                    if !ui_event {
-                        match keycode {
-                            VirtualKeyCode::Escape => {
-                                *control_flow = ControlFlow::Exit;
+            WindowEvent::Destroyed => event_loop.exit(),
+            WindowEvent::Resized(physical_size) => {
+                self.app_state.screen.width = physical_size.width.min(8192);
+                self.app_state.screen.height = physical_size.height.min(8192);
+                self.painter
+                    .resize(self.app_state.screen.width, self.app_state.screen.height);
+            }
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                self.app_state.scale_factor_updated(scale_factor)
+            }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        logical_key: keycode,
+                        ..
+                    },
+                ..
+            } => {
+                if !ui_event {
+                    match keycode {
+                        Key::Character(character) => {
+                            if character == "Q" && self.modifiers_state.super_key() {
+                                event_loop.exit()
                             }
-                            VirtualKeyCode::Tab => app_state.advance_selected_object(),
-                            _ => {}
                         }
+                        Key::Named(NamedKey::Escape) => event_loop.exit(),
+                        Key::Named(NamedKey::Tab) => self.app_state.advance_selected_object(),
+                        _ => {}
                     }
                 }
-                WindowEvent::ModifiersChanged(state) => {
-                    modifiers_state = state;
-                }
-                WindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit;
-                }
-                WindowEvent::MouseInput { state, button, .. } => {
-                    if !ui_event {
-                        if let MouseButton::Left = button {
-                            match state {
-                                ElementState::Pressed => {
-                                    mouse_down = true;
-                                }
-                                ElementState::Released => {
-                                    mouse_down = false;
-                                    app_state.update_selected_hover_objects();
-                                }
+            }
+            WindowEvent::ModifiersChanged(state) => {
+                self.modifiers_state = state.state();
+            }
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::MouseInput { state, button, .. } => {
+                if !ui_event {
+                    if let MouseButton::Left = button {
+                        match state {
+                            ElementState::Pressed => {
+                                self.mouse_down = true;
+                            }
+                            ElementState::Released => {
+                                self.mouse_down = false;
+                                self.app_state.update_selected_hover_objects();
                             }
                         }
                     }
                 }
-                WindowEvent::MouseWheel { delta, .. } => {
-                    if !ui_event {
-                        match delta {
-                            MouseScrollDelta::LineDelta(_, y) => app_state.zoom += 0.1 * y,
-                            MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => {
-                                app_state.zoom += 0.001 * y as f32
-                            }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                if !ui_event {
+                    match delta {
+                        MouseScrollDelta::LineDelta(_, y) => self.app_state.zoom += 0.1 * y,
+                        MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => {
+                            self.app_state.zoom += 0.001 * y as f32
                         }
                     }
                 }
-                WindowEvent::CursorMoved { position, .. } => {
-                    let logical_position = position.to_logical(painter.get_hidpi_factor());
-                    let size = app_state.screen.get_tile_size() as f32;
-                    let mut delta = vector(
-                        (logical_position.x - last_pos.x) as f32,
-                        (logical_position.y - last_pos.y) as f32,
-                    );
-                    let zoom_x = (app_state.screen.width as f32)
-                        / size
-                        / 2f32.powf(app_state.zoom)
-                        / size
-                        / 1.5;
-                    let zoom_y = (app_state.screen.height as f32)
-                        / size
-                        / 2f32.powf(app_state.zoom)
-                        / size
-                        / 1.5;
-                    delta.x *= zoom_x;
-                    delta.y *= zoom_y;
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                let logical_position = position.to_logical(self.painter.get_hidpi_factor());
+                let size = self.app_state.screen.tile_size() as f32;
+                let mut delta = vector(
+                    (logical_position.x - self.last_pos.x) as f32,
+                    (logical_position.y - self.last_pos.y) as f32,
+                );
+                let zoom_x = (self.app_state.screen.width as f32)
+                    / size
+                    / 2f32.powf(self.app_state.zoom)
+                    / size
+                    / 1.5;
+                let zoom_y = (self.app_state.screen.height as f32)
+                    / size
+                    / 2f32.powf(self.app_state.zoom)
+                    / size
+                    / 1.5;
+                delta.x *= zoom_x;
+                delta.y *= zoom_y;
 
-                    last_pos = logical_position;
+                self.last_pos = logical_position;
 
-                    if !ui_event {
-                        if mouse_down {
-                            app_state.screen.center -= delta;
-                        }
-
-                        app_state.update_hovered_objects((
-                            logical_position.x as f32,
-                            logical_position.y as f32,
-                        ))
+                if !ui_event {
+                    if self.mouse_down {
+                        self.app_state.screen.center -= delta;
                     }
-                }
-                _ => (),
-            },
-            Event::MainEventsCleared => {
-                if !matches!(control_flow, ControlFlow::ExitWithCode(_)) {
-                    painter.update_shader();
-                    app_state.load_tiles();
-                    painter.paint(&mut hud, &mut app_state);
 
-                    app_state.stats.capture_frame();
+                    self.app_state.update_hovered_objects((
+                        logical_position.x as f32,
+                        logical_position.y as f32,
+                    ))
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                if !event_loop.exiting() {
+                    self.painter.update_shader();
+                    self.app_state.load_tiles();
+                    self.painter.paint(&mut self.hud, &mut self.app_state);
+
+                    self.app_state.stats.capture_frame();
                     if CONFIG.general.display_framerate {
                         println!(
                             "Frametime {:.2?} at zoom {:.2}",
-                            app_state.stats.get_average(),
-                            app_state.zoom
+                            self.app_state.stats.get_average(),
+                            self.app_state.zoom
                         );
                     }
                 }
             }
             _ => (),
         }
-    });
+        self.painter.window.request_redraw();
+    }
 }
