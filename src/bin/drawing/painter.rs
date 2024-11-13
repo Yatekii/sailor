@@ -13,13 +13,14 @@ use osm::math::{Screen, TileId};
 use osm::vector_tile::tile::Tile;
 use pollster::block_on;
 use util::StagingBelt;
+use wgpu::naga::ShaderStage;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
 use winit::window::WindowAttributes;
 use winit::{dpi::LogicalSize, event_loop::EventLoop, window::Window};
 
 use crate::app_state::AppState;
-use crate::drawing::helpers::{load_glsl, ShaderStage};
+use crate::drawing::helpers::load_glsl;
 
 use crate::config::CONFIG;
 

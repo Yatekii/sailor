@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use serde_derive::Deserialize;
+use serde::Deserialize;
 
 pub static CONFIG: Lazy<Config> = Lazy::new(|| Config::new().expect("Config could not be loaded."));
 
@@ -37,16 +37,11 @@ pub struct Config {
 
 impl Config {
     pub fn new() -> Result<Self, config::ConfigError> {
-        let mut s = config::Config::new();
+        let config = config::Config::builder()
+            .add_source(config::File::with_name("config/default"))
+            .add_source(config::File::with_name("config/local").required(false))
+            .build()?;
 
-        // Start off by merging in the "default" configuration file
-        s.merge(config::File::with_name("config/default"))?;
-
-        // Add in a local configuration file
-        // This file shouldn't be checked in to git
-        s.merge(config::File::with_name("config/local").required(false))?;
-
-        // You can deserialize (and thus freeze) the entire configuration as
-        s.try_into()
+        config.try_deserialize()
     }
 }

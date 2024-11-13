@@ -4,9 +4,12 @@ pub mod state;
 use std::sync::Arc;
 
 use egui::color_picker::Alpha;
+use egui::Color32;
 use egui::FontDefinitions;
 use egui::Rgba;
+use egui::Style;
 use egui::Ui;
+use egui::Visuals;
 use egui::WidgetText;
 use egui_wgpu_backend::RenderPass;
 use egui_wgpu_backend::ScreenDescriptor;
@@ -43,6 +46,15 @@ impl Hud {
             font_definitions: FontDefinitions::default(),
             style: Default::default(),
         });
+
+        let style = Style {
+            visuals: Visuals {
+                override_text_color: Some(Color32::WHITE),
+                ..Visuals::dark()
+            },
+            ..Style::default()
+        };
+        platform.context().set_style(style);
 
         // We use the egui_wgpu_backend crate as the render backend.
         let rpass = RenderPass::new(device, surface_config.format, 1);

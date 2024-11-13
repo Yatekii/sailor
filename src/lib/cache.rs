@@ -47,7 +47,6 @@ impl TileCache {
     pub fn finalize_loaded_tiles(&mut self) {
         // Get all pending messages and work them.
         for id in self.channel.1.try_iter() {
-            println!("Loaded {id}");
             let potential_loader = self.loaders.iter().enumerate().find(|(_, l)| l.0 == id);
 
             // Try finalizing the complete loader.
@@ -97,7 +96,6 @@ impl TileCache {
             let handle = {
                 let tile_id = *tile_id;
                 let tx = self.channel.0.clone();
-                println!("Load {tile_id}");
                 spawn(move || {
                     // Try fetch and work the tile data.
                     let data = fetch_tile_data(Path::new(&cache_location), &tile_id)?;

@@ -5,6 +5,7 @@ use std::path::Path;
 use crossbeam_channel::{unbounded, TryRecvError};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use osm::drawing::as_byte_slice;
+use wgpu::naga::ShaderStage;
 use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayout, Device, RenderPipeline, Sampler, ShaderModule,
     Texture,
@@ -15,7 +16,7 @@ use wgpu::{
     ShaderModuleDescriptor, TextureFormat, VertexState,
 };
 
-use crate::drawing::helpers::{load_glsl, ShaderStage};
+use crate::drawing::helpers::load_glsl;
 
 use crate::config::CONFIG;
 

@@ -15,7 +15,7 @@ impl Stats {
             last_frametimes: {
                 let mut dq = std::collections::VecDeque::new();
                 for _ in 0..FPS_SAMPLES {
-                    dq.push_back(Duration::default());
+                    dq.push_back(Duration::from_millis(2));
                 }
                 dq
             },
