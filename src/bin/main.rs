@@ -3,16 +3,18 @@ mod config;
 mod drawing;
 mod stats;
 
+use std::sync::Arc;
+
 use crate::config::CONFIG;
 use lyon::math::vector;
 use osm::math::{deg2num, tile_to_world_space};
 use winit::{
     application::ApplicationHandler,
-    dpi::{LogicalPosition, PhysicalPosition},
+    dpi::{LogicalPosition, LogicalSize, PhysicalPosition},
     event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{Key, ModifiersState, NamedKey},
-    window::WindowId,
+    window::{WindowAttributes, WindowId},
 };
 
 fn main() {
@@ -26,21 +28,31 @@ fn main() {
     );
     let initial_center = tile_to_world_space(&tile_coordinate);
 
-    let width = 1200;
-    let height = 800;
-
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
+
+    let attributes = WindowAttributes::default();
+    let window_attributes = match CONFIG.window.size {
+        config::WindowSize::Windowed { width, height } => attributes
+            .with_inner_size(LogicalSize { width, height })
+            .with_decorations(false),
+        config::WindowSize::Fullscreen => {
+            attributes.with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
+        }
+    };
+
+    #[allow(deprecated)]
+    let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+    let size = window.inner_size();
 
     let app_state = app_state::AppState::new(
         CONFIG.renderer.css.clone(),
         initial_center,
-        width,
-        height,
+        size,
         CONFIG.map.initial.zoom,
         2.0,
     );
 
-    let mut painter = drawing::Painter::init(&event_loop, width, height, &app_state);
+    let mut painter = drawing::Painter::init(window, size, &app_state);
     let hud = drawing::ui::Hud::new(
         &painter.window,
         &mut painter.device,

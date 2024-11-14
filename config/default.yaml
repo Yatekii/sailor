@@ -1,0 +1,32 @@
+general:
+  display-framerate: false
+  data-root: ""
+  log:
+    level: "WARN"
+
+window:
+  size:
+    windowed:
+      width: 1200
+      height: 800
+
+renderer:
+  vertex-shader: "config/shader.vert"
+  fragment-shader: "config/shader.frag"
+  css: "config/style.css"
+  ui-font: "config/Ruda-Bold.ttf"
+  max-tiles: 200
+  max-features: 1000
+  tile-size: 384
+  msaa-samples: 4
+  selection-tags: []
+  temperature:
+    vertex-shader: "config/temperature/shader.vert"
+    fragment-shader: "config/temperature/shader.frag"
+
+map:
+  initial:
+    zoom: 13.0
+    center:
+      latitude: 47.3769
+      longitude: 8.5417

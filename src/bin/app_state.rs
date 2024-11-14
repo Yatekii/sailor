@@ -7,6 +7,7 @@ use osm::math::{deg2num, tile_to_world_space, Screen, TileId};
 use osm::object::Object;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
+use winit::dpi::PhysicalSize;
 
 use crate::config::CONFIG;
 use crate::drawing::ui::state::UIState;
@@ -29,8 +30,7 @@ impl AppState {
     pub fn new(
         style: impl Into<String>,
         center: Point,
-        width: u32,
-        height: u32,
+        size: PhysicalSize<u32>,
         zoom: f32,
         hidpi_factor: f64,
     ) -> Self {
@@ -40,8 +40,8 @@ impl AppState {
                 .expect("Unable to load the style file. Please consult the log."),
             screen: Screen::new(
                 center,
-                width,
-                height,
+                size.width,
+                size.height,
                 CONFIG.renderer.tile_size,
                 hidpi_factor,
             ),

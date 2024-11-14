@@ -9,6 +9,20 @@ pub struct Config {
     pub general: General,
     pub map: MapState,
     pub renderer: Renderer,
+    pub window: Window,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Window {
+    pub size: WindowSize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WindowSize {
+    Windowed { width: f64, height: f64 },
+    Fullscreen,
 }
 
 #[derive(Debug, Deserialize)]

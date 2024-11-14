@@ -16,8 +16,8 @@ use util::StagingBelt;
 use wgpu::naga::ShaderStage;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
-use winit::window::WindowAttributes;
-use winit::{dpi::LogicalSize, event_loop::EventLoop, window::Window};
+use winit::dpi::PhysicalSize;
+use winit::window::Window;
 
 use crate::app_state::AppState;
 use crate::drawing::helpers::load_glsl;
@@ -53,18 +53,8 @@ pub struct Painter {
 
 impl Painter {
     /// Initializes the entire draw machinery.
-    pub fn init(event_loop: &EventLoop<()>, width: u32, height: u32, app_state: &AppState) -> Self {
-        #[allow(deprecated)]
-        let window = Arc::new(
-            event_loop
-                .create_window(WindowAttributes::default().with_inner_size(LogicalSize {
-                    width: width as f64,
-                    height: height as f64,
-                }))
-                .unwrap(),
-        );
+    pub fn init(window: Arc<Window>, size: PhysicalSize<u32>, app_state: &AppState) -> Self {
         let factor = window.scale_factor();
-        let size = window.inner_size();
 
         let instance = wgpu::Instance::new(InstanceDescriptor::default());
         let surface = instance.create_surface(window.clone()).unwrap();
