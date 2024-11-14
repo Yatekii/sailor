@@ -11,6 +11,7 @@ pub use tile_id::*;
 
 pub type Vector2 = nalgebra::Vector2<f32>;
 pub type Point2 = nalgebra::Point2<f32>;
+pub type Rotation2 = nalgebra::Rotation2<f32>;
 
 pub trait EuclidVsNalgebra {
     type Value;

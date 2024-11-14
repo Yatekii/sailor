@@ -16,19 +16,20 @@ pub struct Collider {}
 
 impl Collider {
     pub fn get_hovered_objects(
-        visible_tiles: &[(
-            TileId,
-            f32,
-            Arc<RwLock<TileCollider>>,
-            Arc<RwLock<Vec<Object>>>,
-        )],
+        visible_tiles: &[VisibleTile],
         screen: &Screen,
         zoom: f32,
         point: (f32, f32),
     ) -> Vec<Object> {
         let mut return_objects = vec![];
 
-        for (tile_id, extent, collider, objects) in visible_tiles {
+        for VisibleTile {
+            tile_id,
+            extent,
+            collider,
+            objects,
+        } in visible_tiles
+        {
             let matrix = screen.tile_to_global_space(zoom, tile_id);
             let matrix = nalgebra_glm::inverse(&matrix);
             let screen_point = Point::new(
@@ -57,4 +58,11 @@ impl Collider {
 
         return_objects
     }
+}
+
+pub struct VisibleTile {
+    pub tile_id: TileId,
+    pub extent: f32,
+    pub collider: Arc<RwLock<TileCollider>>,
+    pub objects: Arc<RwLock<Vec<Object>>>,
 }

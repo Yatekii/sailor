@@ -1,10 +1,10 @@
 use crate::drawing::vertex::VertexType;
 use crate::drawing::vertex::{LayerVertexCtor, Vertex};
+use crate::math::{EuclidVsNalgebra, Point2, Vector2};
 use lyon::lyon_tessellation::{
     FillGeometryBuilder, FillVertexConstructor, StrokeGeometryBuilder, StrokeVertexConstructor,
     VertexId,
 };
-use lyon::math::{Point, Vector};
 use lyon::tessellation::{
     geometry_builder::GeometryBuilderError, FillVertex, GeometryBuilder, StrokeVertex,
     VertexBuffers,
@@ -50,12 +50,13 @@ impl<'l> MeshBuilder<'l> {
 
     pub fn add_vertex(
         &mut self,
-        vertex: Point,
-        normal: Vector,
+        vertex: Point2,
+        normal: Vector2,
     ) -> Result<VertexId, GeometryBuilderError> {
-        self.buffers
-            .vertices
-            .push(self.vertex_constructor.new_osm_vertex(vertex, normal));
+        self.buffers.vertices.push(
+            self.vertex_constructor
+                .new_osm_vertex(vertex.convert(), normal.convert()),
+        );
         let len = self.buffers.vertices.len();
         if len > u32::MAX as usize {
             return Err(GeometryBuilderError::TooManyVertices);

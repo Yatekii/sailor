@@ -2,7 +2,7 @@ use lyon::math::Point;
 use osm::cache::TileCache;
 use osm::css::RulesCache;
 use osm::feature::collection::FeatureCollection;
-use osm::interaction::collider::Collider;
+use osm::interaction::collider::{Collider, VisibleTile};
 use osm::math::{deg2num, tile_to_world_space, Screen, TileId};
 use osm::object::Object;
 use std::sync::{Arc, Mutex, RwLock};
@@ -156,12 +156,12 @@ impl AppState {
             .iter()
             .map(|tile_id| {
                 let tile = self.tile_cache.try_get_tile(tile_id).unwrap();
-                (
-                    *tile_id,
-                    tile.extent() as f32,
-                    tile.collider(),
-                    tile.objects(),
-                )
+                VisibleTile {
+                    tile_id: *tile_id,
+                    extent: tile.extent() as f32,
+                    collider: tile.collider(),
+                    objects: tile.objects(),
+                }
             })
             .collect::<Vec<_>>();
         thread::spawn(move || {
