@@ -2905,7 +2905,6 @@ dependencies = [
  "serde",
  "ureq",
  "varint",
- "web-sys",
  "wgpu",
  "winit",
 ]

@@ -32,12 +32,12 @@ fn main() {
 
     let attributes = WindowAttributes::default();
     let window_attributes = match CONFIG.window.size {
-        config::WindowSize::Windowed { width, height } => attributes
-            .with_inner_size(LogicalSize { width, height })
-            .with_decorations(false),
-        config::WindowSize::Fullscreen => {
-            attributes.with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
+        config::WindowSize::Windowed { width, height } => {
+            attributes.with_inner_size(LogicalSize { width, height })
         }
+        config::WindowSize::Fullscreen => attributes
+            .with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
+            .with_decorations(false),
     };
 
     #[allow(deprecated)]

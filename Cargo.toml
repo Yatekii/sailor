@@ -43,7 +43,6 @@ quick-protobuf = "0.8"
 serde = { version = "1", features = ["derive"] }
 ureq = "2"
 varint = "0.9"
-web-sys = "0.3.72"
 wgpu = { version = "22", features = ["glsl"] }
 glyphon = { version = "0.6" }
 winit = "0.30"

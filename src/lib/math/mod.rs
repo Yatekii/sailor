@@ -9,6 +9,38 @@ pub use screen::*;
 pub use tile_field::*;
 pub use tile_id::*;
 
+pub type Vector2 = nalgebra::Vector2<f32>;
+pub type Point2 = nalgebra::Point2<f32>;
+
+pub trait EuclidVsNalgebra {
+    type Value;
+    fn convert(self) -> Self::Value;
+}
+
+impl EuclidVsNalgebra for lyon::math::Point {
+    type Value = Point2;
+
+    fn convert(self) -> Self::Value {
+        Point2::new(self.x, self.y)
+    }
+}
+
+impl EuclidVsNalgebra for Point2 {
+    type Value = lyon::math::Point;
+
+    fn convert(self) -> Self::Value {
+        point(self.x, self.y)
+    }
+}
+
+impl EuclidVsNalgebra for Vector2 {
+    type Value = lyon::math::Vector;
+
+    fn convert(self) -> Self::Value {
+        vector(self.x, self.y)
+    }
+}
+
 fn deg2rad(deg: f32) -> f32 {
     2.0 * PI * deg / 360.0
 }

@@ -6,9 +6,10 @@ general:
 
 window:
   size:
-    windowed:
-      width: 1200
-      height: 800
+    # windowed:
+    #   width: 1200
+    #   height: 800
+    Fullscreen:
 
 renderer:
   vertex-shader: "config/shader.vert"

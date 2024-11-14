@@ -1,7 +1,6 @@
 pub mod tile;
 pub mod tile_id;
 pub mod vector_tile;
-// pub mod visible_tile;
 
 use core::ops::Range;
 use lyon::{
@@ -152,7 +151,7 @@ pub fn paths_to_drawable(
             let offset = builder.buffers.vertices.len();
             builder.set_current_vertex_type(VertexType::Line);
             builder.set_current_extent(extent);
-            tesselate_line2(path, builder, tile_id.z);
+            tesselate_line2(path, builder);
             set_normals(&mut builder.buffers.vertices[offset..], path, extent);
         }
     }

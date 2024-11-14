@@ -2,7 +2,7 @@ use std::num::NonZeroU64;
 use std::path::Path;
 use std::sync::Arc;
 
-use crossbeam_channel::{unbounded, TryRecvError};
+use crossbeam_channel::{unbounded, Receiver, TryRecvError};
 use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -40,7 +40,7 @@ pub struct Painter {
     tile_transform_buffer: (Buffer, u64),
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
+    rx: Receiver<Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
 
     font_system: FontSystem,
