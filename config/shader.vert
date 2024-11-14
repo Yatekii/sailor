@@ -47,9 +47,9 @@ void main() {
     LayerData layer_data = layer_datas[feature_id];
     TileData tile_data = tile_datas[tile_id];
 
-    // Is the line we are currently handling sized in world coordinates or pixels?
-    bool is_world_scale_line = (layer_data.line_width & 0x02) == 1;
     bool is_line = feature_type == 1;
+    // Is the line we are currently handling (if it is a line) sized in world coordinates or pixels?
+    bool is_world_scale_line = (layer_data.line_width & 0x02) == 1;
 
     float line_width = layer_data.line_width >> 2;
 

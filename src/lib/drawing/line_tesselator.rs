@@ -14,7 +14,7 @@ pub fn get_side(a: &Point2, b: &Point2, c: &Point2) -> i32 {
     ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)).signum() as i32
 }
 
-pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder) {
+pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
     // Helper matrixes to be reused.
     let rot_90: Rotation2 = Rotation2::from_scaled_axis(Vector1::new(PI / 2.0));
     let rot_45: Rotation2 = Rotation2::from_scaled_axis(Vector1::new(PI / 4.0));
@@ -53,8 +53,8 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder) {
     let mut last_line = second - first;
     let normal = (rot_90 * rot_45 * last_line).normalize();
 
-    let mut last_vertex_left = builder.add_vertex(first, normal).unwrap();
-    let mut last_vertex_right = builder.add_vertex(first, rot_90 * normal).unwrap();
+    let mut last_vertex_left = builder.add_vertex(first, normal * extent);
+    let mut last_vertex_right = builder.add_vertex(first, rot_90 * normal * extent);
     let mut last_normal = normal;
 
     for i in 0..points.len() - 2 {
@@ -89,8 +89,8 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder) {
             }
         };
 
-        let vertex_left = builder.add_vertex(vl.0, vl.1).unwrap();
-        let vertex_right = builder.add_vertex(vr.0, vr.1).unwrap();
+        let vertex_left = builder.add_vertex(vl.0, vl.1 * extent);
+        let vertex_right = builder.add_vertex(vr.0, vr.1 * extent);
 
         <dyn FillGeometryBuilder>::add_triangle(
             builder,
@@ -124,8 +124,8 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder) {
     let line = last - second_last;
     let normal = (rot_45 * line).normalize();
 
-    let vertex_left = builder.add_vertex(last, normal).unwrap();
-    let vertex_right = builder.add_vertex(last, mrot_90 * normal).unwrap();
+    let vertex_left = builder.add_vertex(last, normal * extent);
+    let vertex_right = builder.add_vertex(last, mrot_90 * normal * extent);
 
     <dyn FillGeometryBuilder>::add_triangle(
         builder,
@@ -134,5 +134,6 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder) {
         vertex_left,
     );
     <dyn FillGeometryBuilder>::add_triangle(builder, last_vertex_right, vertex_right, vertex_left);
+
     builder.end_geometry();
 }

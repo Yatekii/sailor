@@ -148,15 +148,16 @@ pub fn paths_to_drawable(
         }
 
         if geometry_type == GeomType::LINESTRING {
-            let offset = builder.buffers.vertices.len();
             builder.set_current_vertex_type(VertexType::Line);
             builder.set_current_extent(extent);
-            tesselate_line2(path, builder);
-            set_normals(&mut builder.buffers.vertices[offset..], path, extent);
+            tesselate_line2(path, builder, extent);
         }
     }
 }
 
+// TODO: Very buggy!
+// Creates normals that are NaN because the vector normalization is called on a vector that has length 0.
+// Why is the vector (0, 0)? Point subtraction yields it, so maybe wrong 2 points?
 fn set_normals(vertices: &mut [Vertex], path: &Path, extent: f32) {
     let points = path.points();
     let len = points.len();
@@ -172,6 +173,8 @@ fn set_normals(vertices: &mut [Vertex], path: &Path, extent: f32) {
 
     let first_vector = points[1] - points[0];
     let mut previous_normal = Vector::new(first_vector.y, -first_vector.x).normalize();
+
+    // println!("len: {len}");
 
     let normal = calculate_normals(
         &points[len - 1],
@@ -209,9 +212,16 @@ fn set_normal(vertices: &mut [Vertex], position: &Point, normal: Vector) {
         .iter_mut()
         .find(|v| v.position[0] == position.x as i16 && v.position[1] == position.y as i16);
     if let Some(vertex) = vertex {
+        // println!("{}", normal.length());
+        let len = normal.length();
+        if len < 4000.0 {
+            // println!("Sml: {:?} - {}", normal, len);
+        } else if len.is_nan() {
+            // panic!("NaN: {:?}", normal);
+        }
         vertex.normal = [normal.x as i16, normal.y as i16];
     } else {
-        println!("not found");
+        println!("vertex {}/{} was not found", position.x, position.y);
     }
 }
 
@@ -227,11 +237,22 @@ fn calculate_normals(
 
     let normal1 = (v1.normalize() + v2.normalize()).normalize();
 
+    // println!(
+    //     "norm hehe: {:?} {:?} {:?}",
+    //     v1,
+    //     v1.normalize(),
+    //     v2.normalize()
+    // );
+
     let normal = if normal1.dot(*previous_normal) < 0.0 {
         -normal1
     } else {
         normal1
     } * extent;
+
+    if normal.length().is_nan() {
+        // panic!();
+    }
 
     if normal.x as i16 == 3125
         && normal.y as i16 == -2647

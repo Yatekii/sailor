@@ -48,20 +48,16 @@ impl<'l> MeshBuilder<'l> {
         self.vertex_constructor.vertex_type = vertex_type;
     }
 
-    pub fn add_vertex(
-        &mut self,
-        vertex: Point2,
-        normal: Vector2,
-    ) -> Result<VertexId, GeometryBuilderError> {
+    pub fn add_vertex(&mut self, vertex: Point2, normal: Vector2) -> VertexId {
         self.buffers.vertices.push(
             self.vertex_constructor
                 .new_osm_vertex(vertex.convert(), normal.convert()),
         );
         let len = self.buffers.vertices.len();
-        if len > u32::MAX as usize {
-            return Err(GeometryBuilderError::TooManyVertices);
-        }
-        Ok(VertexId((len - 1) as u32 - self.vertex_offset))
+        // len is always at least 1 after we push an element.
+        // Subtracting vertex_offset could cause an underflow if we remove elements from the buffer,
+        // so don't do that ;)
+        VertexId((len - 1) as u32 - self.vertex_offset)
     }
 }
 
