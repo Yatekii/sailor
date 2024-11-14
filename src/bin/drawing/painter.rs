@@ -241,12 +241,6 @@ impl Painter {
         let text_renderer =
             TextRenderer::new(&mut atlas, &device, MultisampleState::default(), None);
 
-        // let font =
-        //     FontArc::try_from_slice(include_bytes!("../../../config/Ruda-Bold.ttf")).unwrap();
-
-        // let glyph_brush =
-        //     GlyphBrushBuilder::using_font(font).build(&device, TextureFormat::Bgra8Unorm);
-
         // let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
         let init_command_buf = init_encoder.finish();

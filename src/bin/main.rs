@@ -16,20 +16,29 @@ use winit::{
 };
 
 fn main() {
-    log::set_max_level(CONFIG.general.log_level.to_level_filter());
+    log::set_max_level(CONFIG.general.log.level.to_level_filter());
     pretty_env_logger::init();
 
-    let z = 8.0;
-    let tile_coordinate = deg2num(47.3769, 8.5417, z as u32);
-    let zurich = tile_to_world_space(&tile_coordinate);
+    let tile_coordinate = deg2num(
+        CONFIG.map.initial.center.latitude,
+        CONFIG.map.initial.center.longitude,
+        CONFIG.map.initial.zoom as u32,
+    );
+    let initial_center = tile_to_world_space(&tile_coordinate);
 
     let width = 1200;
     let height = 800;
 
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
 
-    let app_state =
-        app_state::AppState::new(CONFIG.renderer.css.clone(), zurich, width, height, z, 2.0);
+    let app_state = app_state::AppState::new(
+        CONFIG.renderer.css.clone(),
+        initial_center,
+        width,
+        height,
+        CONFIG.map.initial.zoom,
+        2.0,
+    );
 
     let mut painter = drawing::Painter::init(&event_loop, width, height, &app_state);
     let hud = drawing::ui::Hud::new(

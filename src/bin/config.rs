@@ -4,6 +4,15 @@ use serde::Deserialize;
 pub static CONFIG: Lazy<Config> = Lazy::new(|| Config::new().expect("Config could not be loaded."));
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Config {
+    pub general: General,
+    pub map: MapState,
+    pub renderer: Renderer,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Renderer {
     pub vertex_shader: String,
     pub fragment_shader: String,
@@ -17,22 +26,44 @@ pub struct Renderer {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Temperature {
     pub vertex_shader: String,
     pub fragment_shader: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct General {
-    pub log_level: log::Level,
+    pub log: Log,
     pub display_framerate: bool,
     pub data_root: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Config {
-    pub general: General,
-    pub renderer: Renderer,
+#[serde(rename_all = "kebab-case")]
+pub struct Log {
+    pub level: log::Level,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct MapState {
+    pub initial: InitialMapState,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct InitialMapState {
+    pub zoom: f32,
+    pub center: InitialCenterPoint,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct InitialCenterPoint {
+    pub latitude: f32,
+    pub longitude: f32,
 }
 
 impl Config {
