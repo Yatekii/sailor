@@ -17,9 +17,7 @@ pub fn get_side(a: &Point2, b: &Point2, c: &Point2) -> i32 {
 pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
     // Helper matrixes to be reused.
     let rot_90: Rotation2 = Rotation2::from_scaled_axis(Vector1::new(PI / 2.0));
-    let rot_45: Rotation2 = Rotation2::from_scaled_axis(Vector1::new(PI / 4.0));
-    let mrot_90: Rotation2 = Rotation2::from_scaled_axis(Vector1::new(-PI / 2.0));
-    let factor = (1.0 / (PI / 4.0).sin()).abs();
+    let factor = (1.0 / (PI / 2.0).sin()).abs();
 
     // Start a new tesselation geometry.
     builder.begin_geometry();
@@ -35,27 +33,27 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
 
     // We look at the first two points to calculate the first special normal which is necessary to
     // have a nice and flat line cap.
-    // The normal at the linecap is 45 degrees.
+    // The normal at the linecap is 90 degrees.
 
-    //      \
-    //       \   Normal 1
-    //  first \_______ second
+    //        |
+    //        | Normal 1
+    //  first |_______ second
     //        |
     //        |   Line (two triangles)
     //        |_______
-    //        /
-    //       /   Normal 2
-    //      /
+    //        |
+    //        |  Normal 2
+    //        |
 
     // A line always has at least 2 points. If not, we have a bug.
     // TODO: Harden this against potential faulty tiles.
     let first = points[0].convert();
     let second = points[1].convert();
     let mut last_line = second - first;
-    let normal = (rot_90 * rot_45 * last_line).normalize();
+    let normal = (rot_90 * last_line).normalize();
 
     let mut last_vertex_left = builder.add_vertex(first, normal * extent * factor);
-    let mut last_vertex_right = builder.add_vertex(first, rot_90 * normal * extent * factor);
+    let mut last_vertex_right = builder.add_vertex(first, -normal * extent * factor);
 
     for i in 0..points.len() - 2 {
         let previous = points[i].convert();
@@ -96,20 +94,20 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
     }
 
     // We take the last two points that also need a special normal calculation.
-    // We do the same as for the first two points of the line string but only rotate 45 degrees.
+    // We do the same as for the first two points of the line string but only rotate 90 degrees.
     // Which makes a 90 degree angle between this normal and the first one, which makes sense if you think
     // about it for a second :)
 
-    // And the second normal is again 90 degrees further, but this trime clockwise.
+    // And the second normal is again 90 degrees further, but this time clockwise.
 
     // The line string has at least two points (same assumption as before).
     let last = points[points.len() - 1].convert();
     let second_last = points[points.len() - 2].convert();
     let line = last - second_last;
-    let normal = (rot_45 * line).normalize();
+    let normal = (rot_90 * line).normalize();
 
     let vertex_left = builder.add_vertex(last, normal * extent * factor);
-    let vertex_right = builder.add_vertex(last, mrot_90 * normal * extent * factor);
+    let vertex_right = builder.add_vertex(last, -normal * extent * factor);
 
     <dyn FillGeometryBuilder>::add_triangle(
         builder,
