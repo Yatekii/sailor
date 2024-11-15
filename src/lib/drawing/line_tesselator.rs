@@ -19,6 +19,7 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
     let rot_90: Rotation2 = Rotation2::from_scaled_axis(Vector1::new(PI / 2.0));
     let rot_45: Rotation2 = Rotation2::from_scaled_axis(Vector1::new(PI / 4.0));
     let mrot_90: Rotation2 = Rotation2::from_scaled_axis(Vector1::new(-PI / 2.0));
+    let factor = (1.0 / (PI / 4.0).sin()).abs();
 
     // Start a new tesselation geometry.
     builder.begin_geometry();
@@ -53,44 +54,28 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
     let mut last_line = second - first;
     let normal = (rot_90 * rot_45 * last_line).normalize();
 
-    let mut last_vertex_left = builder.add_vertex(first, normal * extent);
-    let mut last_vertex_right = builder.add_vertex(first, rot_90 * normal * extent);
-    let mut last_normal = normal;
+    let mut last_vertex_left = builder.add_vertex(first, normal * extent * factor);
+    let mut last_vertex_right = builder.add_vertex(first, rot_90 * normal * extent * factor);
 
     for i in 0..points.len() - 2 {
         let previous = points[i].convert();
         let current = points[i + 1].convert();
         let next = points[i + 2].convert();
-        let current_line = current - previous;
-        let next_line = current - next;
+        let current_line = previous - current;
+        let next_line = next - current;
 
-        let normal = current_line.normalize() + next_line.normalize();
-        let local_normal = Vector2::new(last_line.y, -last_line.x);
-        let dot = local_normal.dot(&last_normal);
-        let local_normal = if (0.0..=1.0).contains(&dot) {
-            local_normal
-        } else {
-            -local_normal
+        let mut normal = (current_line.normalize() + next_line.normalize()).normalize();
+        if is_ccw_angle(current_line, normal) {
+            normal = -normal;
         }
-        .normalize();
 
-        let dot = local_normal.dot(&normal);
-        let normal = if dot == 0.0 { local_normal } else { normal }.normalize();
+        let local_normal = (rot_90 * last_line).normalize();
 
-        let factor = (1.0 / normal.dot(&local_normal).abs()).min(3.0);
+        let factor =
+            1.0 / (normal.dot(&local_normal) / (normal.norm() * local_normal.norm())).abs();
 
-        let (vl, vr) = {
-            let v1 = (current, normal * factor);
-            let v2 = (current, -normal * factor);
-            if get_side(&current, &previous, &(current + normal)) == 1 {
-                (v1, v2)
-            } else {
-                (v2, v1)
-            }
-        };
-
-        let vertex_left = builder.add_vertex(vl.0, vl.1 * extent);
-        let vertex_right = builder.add_vertex(vr.0, vr.1 * extent);
+        let vertex_left = builder.add_vertex(current, normal * extent * factor);
+        let vertex_right = builder.add_vertex(current, -normal * extent * factor);
 
         <dyn FillGeometryBuilder>::add_triangle(
             builder,
@@ -107,7 +92,6 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
 
         last_vertex_left = vertex_left;
         last_vertex_right = vertex_right;
-        last_normal = normal;
         last_line = next_line;
     }
 
@@ -124,8 +108,8 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
     let line = last - second_last;
     let normal = (rot_45 * line).normalize();
 
-    let vertex_left = builder.add_vertex(last, normal * extent);
-    let vertex_right = builder.add_vertex(last, mrot_90 * normal * extent);
+    let vertex_left = builder.add_vertex(last, normal * extent * factor);
+    let vertex_right = builder.add_vertex(last, mrot_90 * normal * extent * factor);
 
     <dyn FillGeometryBuilder>::add_triangle(
         builder,
@@ -136,4 +120,138 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
     <dyn FillGeometryBuilder>::add_triangle(builder, last_vertex_right, vertex_right, vertex_left);
 
     builder.end_geometry();
+}
+
+/// Positive angle means CCW, negative means CW.
+fn ccw_angle(a: Vector2, b: Vector2) -> f32 {
+    let dot = a.x * b.x + a.y * b.y;
+    let det = a.x * b.y - a.y * b.x;
+    det.atan2(dot)
+}
+
+fn is_ccw_angle(a: Vector2, b: Vector2) -> bool {
+    ccw_angle(a, b) >= 0.0
+}
+
+#[cfg(test)]
+mod tests {
+    use std::f32::consts::PI;
+
+    use lyon::{math::Point, path::Path, tessellation::VertexBuffers};
+
+    use crate::{
+        drawing::{
+            line_tesselator::{ccw_angle, is_ccw_angle},
+            mesh::MeshBuilder,
+            vertex::{LayerVertexCtor, VertexType},
+        },
+        math::{TileId, Vector2},
+    };
+
+    use super::tesselate_line2;
+
+    #[test]
+    fn tesselate_straight_line() {
+        let extent = 4096.0;
+
+        let mut builder = Path::builder();
+        builder.begin(Point::new(0.0, 0.0));
+        builder.line_to(Point::new(1.0, 0.0));
+        builder.end(false);
+        let path = builder.build();
+
+        let mut buffers = VertexBuffers::new();
+        let mut builder = MeshBuilder::new(
+            &mut buffers,
+            LayerVertexCtor {
+                tile_id: TileId::new(0, 0, 0),
+                feature_id: 0,
+                extent,
+                vertex_type: VertexType::Line,
+            },
+        );
+
+        tesselate_line2(&path, &mut builder, extent);
+
+        insta::assert_debug_snapshot!(builder.buffers);
+    }
+
+    #[test]
+    fn tesselate_90deg_angle_line() {
+        let extent = 4096.0;
+
+        let mut builder = Path::builder();
+        builder.begin(Point::new(0.0, 0.0));
+        builder.line_to(Point::new(1.0, 0.0));
+        builder.line_to(Point::new(1.0, 1.0));
+        builder.end(false);
+        let path = builder.build();
+
+        let mut buffers = VertexBuffers::new();
+        let mut builder = MeshBuilder::new(
+            &mut buffers,
+            LayerVertexCtor {
+                tile_id: TileId::new(0, 0, 0),
+                feature_id: 0,
+                extent,
+                vertex_type: VertexType::Line,
+            },
+        );
+
+        tesselate_line2(&path, &mut builder, extent);
+
+        insta::assert_debug_snapshot!(builder.buffers);
+    }
+
+    #[test]
+    fn tesselate_zigzag_line() {
+        let extent = 4096.0;
+
+        let mut builder = Path::builder();
+        builder.begin(Point::new(0.0, 0.0));
+        builder.line_to(Point::new(1.0, 0.0));
+        builder.line_to(Point::new(1.0, 1.0));
+        builder.line_to(Point::new(2.0, 1.0));
+        builder.end(false);
+        let path = builder.build();
+
+        let mut buffers = VertexBuffers::new();
+        let mut builder = MeshBuilder::new(
+            &mut buffers,
+            LayerVertexCtor {
+                tile_id: TileId::new(0, 0, 0),
+                feature_id: 0,
+                extent,
+                vertex_type: VertexType::Line,
+            },
+        );
+
+        tesselate_line2(&path, &mut builder, extent);
+
+        insta::assert_debug_snapshot!(builder.buffers);
+    }
+
+    #[test]
+    fn test_ccw_angle() {
+        let a = Vector2::new(0.0, -1.0);
+        let b = Vector2::new(1.0, 0.0);
+
+        let angle = ccw_angle(a, b);
+        let is_ccw = is_ccw_angle(a, b);
+
+        assert_eq!(angle, PI / 2.0);
+        assert!(is_ccw);
+    }
+
+    #[test]
+    fn test_cw_angle() {
+        let b = Vector2::new(0.0, -1.0);
+        let a = Vector2::new(1.0, 0.0);
+
+        let angle = ccw_angle(a, b);
+        let is_ccw = is_ccw_angle(a, b);
+
+        assert_eq!(angle, -PI / 2.0);
+        assert!(!is_ccw);
+    }
 }

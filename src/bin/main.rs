@@ -169,12 +169,12 @@ impl ApplicationHandler for Application {
                     / size
                     / 2f32.powf(self.app_state.zoom)
                     / size
-                    / 1.5;
+                    / 1.13;
                 let zoom_y = (self.app_state.screen.height as f32)
                     / size
                     / 2f32.powf(self.app_state.zoom)
                     / size
-                    / 1.5;
+                    / 1.13;
                 delta.x *= zoom_x;
                 delta.y *= zoom_y;
 

@@ -51,5 +51,8 @@ egui_wgpu_backend = "0.31"
 egui_winit_platform = "0.24"
 egui_demo_lib = "0.29"
 
+[dev-dependencies]
+insta = "1"
+
 [profile.release]
 debug = true

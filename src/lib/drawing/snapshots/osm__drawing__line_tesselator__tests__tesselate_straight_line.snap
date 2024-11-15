@@ -1,0 +1,60 @@
+---
+source: src/lib/drawing/line_tesselator.rs
+expression: builder.buffers
+---
+VertexBuffers {
+    vertices: [
+        Vertex {
+            position: [
+                0,
+                0,
+            ],
+            normal: [
+                -4096,
+                4095,
+            ],
+            feature_id: 65536,
+        },
+        Vertex {
+            position: [
+                0,
+                0,
+            ],
+            normal: [
+                -4095,
+                -4096,
+            ],
+            feature_id: 65536,
+        },
+        Vertex {
+            position: [
+                1,
+                0,
+            ],
+            normal: [
+                4096,
+                4096,
+            ],
+            feature_id: 65536,
+        },
+        Vertex {
+            position: [
+                1,
+                0,
+            ],
+            normal: [
+                4095,
+                -4096,
+            ],
+            feature_id: 65536,
+        },
+    ],
+    indices: [
+        0,
+        1,
+        2,
+        1,
+        3,
+        2,
+    ],
+}
