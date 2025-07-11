@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::config::CONFIG;
 use lyon::math::vector;
-use osm::math::{deg2num, tile_to_world_space};
+use osm::math::{deg2num, tile_to_world_space, TileId};
 use winit::{
     application::ApplicationHandler,
     dpi::{LogicalPosition, LogicalSize, PhysicalPosition},
@@ -194,7 +194,7 @@ impl ApplicationHandler for Application {
             WindowEvent::RedrawRequested => {
                 if !event_loop.exiting() {
                     self.painter.update_shader();
-                    self.app_state.load_tiles();
+                    self.app_state.load_tile(TileId::new(13, 4290, 2868));
                     self.painter.paint(&mut self.hud, &mut self.app_state);
 
                     self.app_state.stats.capture_frame();

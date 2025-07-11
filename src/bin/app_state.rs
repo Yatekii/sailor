@@ -65,6 +65,30 @@ impl AppState {
         self.feature_collection.clone()
     }
 
+    pub fn load_tile(&mut self, tile_id: TileId) {
+        self.tile_cache.finalize_loaded_tiles();
+        if !self.visible_tiles.contains(&tile_id) {
+            println!("Loading: {}", tile_id);
+            self.tile_cache.load_tile(
+                &tile_id,
+                self.feature_collection.clone(),
+                &CONFIG.renderer.selection_tags.clone(),
+            );
+
+            let tile_cache = &mut self.tile_cache;
+            if let Some(tile) = tile_cache.try_get_tile_mut(&tile_id) {
+                println!("Loading collider: {}", tile_id);
+                tile.load_collider();
+
+                self.visible_tiles.push(tile_id);
+            }
+        }
+
+        if let Ok(mut feature_collection) = self.feature_collection.try_write() {
+            feature_collection.load_styles(self.zoom, &mut self.css_cache);
+        }
+    }
+
     pub fn load_tiles(&mut self) {
         let tile_field = self.screen.get_tile_boundaries_for_zoom_level(self.zoom, 1);
 
