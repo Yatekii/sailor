@@ -199,7 +199,7 @@ impl std::fmt::Display for Selector {
             selector += v;
             selector += "]";
         }
-        write!(f, "({})", selector)
+        write!(f, "({selector})")
     }
 }
 

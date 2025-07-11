@@ -3,7 +3,7 @@ use std::{fs::File, io::Read, path::Path};
 use crate::math::TileId;
 
 pub fn fetch_tile_data(cache_location: &Path, tile_id: &TileId) -> Option<Vec<u8>> {
-    let pbf = format!("cache/{}.pbf", tile_id);
+    let pbf = format!("cache/{tile_id}.pbf");
     if !is_in_cache(pbf.clone()) {
         let data = fetch_tile_from_server(tile_id)?;
         ensure_cache_structure(cache_location, tile_id);
@@ -86,7 +86,7 @@ fn is_in_cache(path: impl Into<String>) -> bool {
 
 /// Creates all necessary directories on disk to store the PBF file of the given `tile_id`.
 fn ensure_cache_structure(root: &Path, tile_id: &TileId) {
-    let dir_path = root.join(&format!("cache/{:0>3}/{:0>3}/", tile_id.z, tile_id.x));
+    let dir_path = root.join(format!("cache/{:0>3}/{:0>3}/", tile_id.z, tile_id.x));
     std::fs::create_dir_all(dir_path).expect("Could not create cache directories.");
 }
 

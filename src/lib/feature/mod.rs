@@ -61,7 +61,7 @@ impl Feature {
         let background_color = rules
             .iter()
             .filter_map(|r| r.kvs.get("background-color"))
-            .last();
+            .next_back();
 
         if let Some(color) = background_color {
             match color {
@@ -91,7 +91,7 @@ impl Feature {
         let border_color = rules
             .iter()
             .filter_map(|r| r.kvs.get("border-color"))
-            .last();
+            .next_back();
 
         if let Some(color) = border_color {
             match color {
@@ -121,7 +121,7 @@ impl Feature {
         let border_width = rules
             .iter()
             .filter_map(|r| r.kvs.get("border-width"))
-            .last();
+            .next_back();
 
         if let Some(border_width) = border_width {
             match border_width {
@@ -139,7 +139,7 @@ impl Feature {
             }
         }
 
-        let display = rules.iter().filter_map(|r| r.kvs.get("display")).last();
+        let display = rules.iter().filter_map(|r| r.kvs.get("display")).next_back();
 
         if let Some(display) = display {
             match display {
@@ -156,7 +156,7 @@ impl Feature {
             self.style.display = true;
         }
 
-        let line_width = rules.iter().filter_map(|r| r.kvs.get("line-width")).last();
+        let line_width = rules.iter().filter_map(|r| r.kvs.get("line-width")).next_back();
 
         if let Some(line_width) = line_width {
             match line_width {
@@ -177,7 +177,7 @@ impl Feature {
             self.style.line_width = 0;
         }
 
-        let z_index = rules.iter().filter_map(|r| r.kvs.get("z-index")).last();
+        let z_index = rules.iter().filter_map(|r| r.kvs.get("z-index")).next_back();
 
         if let Some(z_index) = z_index {
             match z_index {
