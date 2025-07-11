@@ -194,7 +194,10 @@ impl ApplicationHandler for Application {
             WindowEvent::RedrawRequested => {
                 if !event_loop.exiting() {
                     self.painter.update_shader();
-                    self.app_state.load_tile(TileId::new(13, 4290, 2868));
+                    // self.app_state.load_tile(TileId::new(13, 4290, 2868));
+                    self.app_state.load_tile(TileId::new(14, 8580, 5737));
+                    // self.app_state.load_tile(TileId::new(17, 137290, 91796));
+                    // self.app_state.load_tiles();
                     self.painter.paint(&mut self.hud, &mut self.app_state);
 
                     self.app_state.stats.capture_frame();
