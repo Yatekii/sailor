@@ -1,12 +1,14 @@
 pub mod fps;
 pub mod state;
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use egui::color_picker::Alpha;
 use egui::Color32;
 use egui::FontDefinitions;
 use egui::Rgba;
+use egui::ScrollArea;
 use egui::Style;
 use egui::Ui;
 use egui::Visuals;
@@ -14,6 +16,7 @@ use egui::WidgetText;
 use egui_wgpu_backend::RenderPass;
 use egui_wgpu_backend::ScreenDescriptor;
 use egui_winit_platform::PlatformDescriptor;
+use glyphon::cosmic_text::ttf_parser::feat;
 use osm::css::CSSValue;
 use osm::css::Color;
 use osm::css::Number;
@@ -64,6 +67,7 @@ impl Hud {
             stats_window: StatsWindow { open: true },
             location_finder_window: LocationFinderWindow { open: true },
             fps_graph: FpsGraph { open: true },
+            side_panel: SidePanel { open: true },
         };
 
         Self {
@@ -200,6 +204,7 @@ struct HudUi {
     stats_window: StatsWindow,
     location_finder_window: LocationFinderWindow,
     fps_graph: FpsGraph,
+    side_panel: SidePanel,
 }
 
 impl HudUi {
@@ -236,6 +241,8 @@ impl HudUi {
             self.location_finder_window.ui(ctx, app_state);
 
             self.fps_graph.ui(ctx, app_state);
+
+            self.side_panel.ui(ctx, app_state);
         }
     }
 }
@@ -248,6 +255,7 @@ impl MainWindow {
     pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
         // Draw main window.
         egui::Window::new("Main")
+            .default_pos([320.0, 40.0])
             .default_width(400.0)
             .default_height(600.0)
             .open(&mut self.open)
@@ -338,7 +346,7 @@ struct StatsWindow {
 impl StatsWindow {
     pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
         egui::Window::new("Stats")
-            .default_pos([60.0, 330.0])
+            .default_pos([320.0, 330.0])
             .default_width(400.0)
             .default_height(230.0)
             .open(&mut self.open)
@@ -360,7 +368,7 @@ struct LocationFinderWindow {
 impl LocationFinderWindow {
     pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
         egui::Window::new("Location Finder")
-            .default_pos([520.0, 60.0])
+            .default_pos([520.0, 40.0])
             .default_width(400.0)
             .default_height(100.0)
             .open(&mut self.open)
@@ -382,6 +390,67 @@ impl LocationFinderWindow {
                         }
                     }
                 }
+            });
+    }
+}
+
+struct SidePanel {
+    open: bool,
+}
+
+impl SidePanel {
+    pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
+        egui::SidePanel::left("sidepanel")
+            .default_width(300.0)
+            .min_width(300.0)
+            .show_separator_line(false)
+            .exact_width(300.0)
+            .max_width(300.0)
+            .show(ctx, |ui| {
+                ScrollArea::vertical().max_height(800.0).show(ui, |ui| {
+                    let feature_collection = app_state.feature_collection();
+                    let css_cache = app_state.css_cache_mut();
+                    let mut features = feature_collection.write().unwrap();
+                    let features = features.features_mut();
+                    for feature in features {
+                        let mut rules = css_cache.get_matching_rules_mut(&feature.selector);
+
+                        println!("{}", feature.selector);
+                        // assert!(rules.len() <= 1);
+                        let rule = rules.first_mut();
+                        if rule.is_none() {
+                            css_cache.add_rule(Rule {
+                                selector: feature.selector.clone(),
+                                kvs: BTreeMap::new(),
+                            });
+                        }
+                        let mut rules = css_cache.get_matching_rules_mut(&feature.selector);
+                        // TODO: Ugly!
+                        let rule = rules.first_mut().unwrap();
+                        let value = rule
+                            .kvs
+                            .entry("display".to_string())
+                            .or_insert(CSSValue::String("block".to_string()));
+                        let mut display_mut = false;
+                        match &value {
+                            CSSValue::String(value) => match &value[..] {
+                                "none" => display_mut = false,
+                                _ => display_mut = true,
+                            },
+                            value => log::info!(
+                                "The value '{:?}' is currently not supported for 'display'.",
+                                value
+                            ),
+                        }
+
+                        ui.checkbox(&mut display_mut, feature.selector.to_string());
+                        if display_mut {
+                            *value = CSSValue::String("block".to_string());
+                        } else {
+                            *value = CSSValue::String("none".to_string());
+                        }
+                    }
+                })
             });
     }
 }

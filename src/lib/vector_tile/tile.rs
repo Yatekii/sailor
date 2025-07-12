@@ -1,4 +1,5 @@
 use crate::*;
+use egui::TextBuffer;
 use glyphon::{
     Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, TextArea, TextBounds, Weight,
 };
@@ -131,6 +132,7 @@ impl Tile {
         let extent = tile.layers[0].extent as u16;
         let mut features = vec![];
         let mut text = vec![];
+        let mut layers = vec![];
 
         // Add a background feature to the tile data.
         let (mut current_feature_id, object, range) =
@@ -142,6 +144,11 @@ impl Tile {
         for layer in tile.layers {
             let mut map: std::collections::HashMap<Selector, Vec<(GeomType, Vec<Path>)>> =
                 HashMap::new();
+            let layer_name = layer.name.to_string();
+            if !layers.contains(&(0, layer_name.clone())) {
+                println!("{}", layer.name);
+                layers.push((0, layer_name));
+            }
 
             // Preevaluate the selectors and group features by the selector they belong to.
             for feature in &layer.features {
@@ -212,6 +219,10 @@ impl Tile {
 
             features.extend(inner_features);
         }
+
+        let mut feature_collection = feature_collection.write().unwrap();
+        feature_collection.set_layers(layers);
+        drop(feature_collection);
 
         let collider = Arc::new(RwLock::new(TileCollider::new()));
         let _collider_keep = collider.clone();

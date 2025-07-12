@@ -6,6 +6,7 @@ use super::{Feature, FeatureStyle};
 pub struct FeatureCollection {
     features: Vec<Feature>,
     n_features_max: u32,
+    layers: Vec<(usize, String)>,
 }
 
 impl FeatureCollection {
@@ -13,11 +14,24 @@ impl FeatureCollection {
         Self {
             features: vec![],
             n_features_max,
+            layers: vec![],
         }
     }
 
-    pub fn get_features(&self) -> &Vec<Feature> {
+    pub fn features(&self) -> &Vec<Feature> {
         &self.features
+    }
+
+    pub fn features_mut(&mut self) -> &mut Vec<Feature> {
+        &mut self.features
+    }
+
+    pub fn layers(&self) -> &Vec<(usize, String)> {
+        &self.layers
+    }
+
+    pub fn set_layers(&mut self, layers: Vec<(usize, String)>) {
+        self.layers = layers
     }
 
     fn get_feature_id(&mut self, selector: &crate::css::Selector) -> Option<u32> {

@@ -18,6 +18,7 @@ impl FpsGraph {
     pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
         egui::Window::new("FPS")
             .open(&mut self.open)
+            .default_pos([1390.0, 40.0])
             .default_size(vec2(500.0, 20.0))
             .vscroll(false)
             .show(ctx, |ui| {

@@ -682,7 +682,7 @@ impl Painter {
             tile.load_to_gpu(&self.device);
         }
 
-        let features = feature_collection.get_features();
+        let features = feature_collection.features();
         if !features.is_empty() {
             if let Ok(frame) = self.surface.get_current_texture() {
                 let mut encoder = self

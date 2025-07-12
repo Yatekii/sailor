@@ -139,7 +139,10 @@ impl Feature {
             }
         }
 
-        let display = rules.iter().filter_map(|r| r.kvs.get("display")).next_back();
+        let display = rules
+            .iter()
+            .filter_map(|r| r.kvs.get("display"))
+            .next_back();
 
         if let Some(display) = display {
             match display {
@@ -156,7 +159,10 @@ impl Feature {
             self.style.display = true;
         }
 
-        let line_width = rules.iter().filter_map(|r| r.kvs.get("line-width")).next_back();
+        let line_width = rules
+            .iter()
+            .filter_map(|r| r.kvs.get("line-width"))
+            .next_back();
 
         if let Some(line_width) = line_width {
             match line_width {
@@ -177,7 +183,10 @@ impl Feature {
             self.style.line_width = 0;
         }
 
-        let z_index = rules.iter().filter_map(|r| r.kvs.get("z-index")).next_back();
+        let z_index = rules
+            .iter()
+            .filter_map(|r| r.kvs.get("z-index"))
+            .next_back();
 
         if let Some(z_index) = z_index {
             match z_index {
