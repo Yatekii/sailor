@@ -22,9 +22,9 @@ use osm::css::CSSValue;
 use osm::css::Color;
 use osm::css::Number;
 use osm::css::Rule;
-use views::fps::FpsGraph;
+use views::fps::view_fps;
 use views::location_finder::LocationFinderWindow;
-use views::stats::StatsWindow;
+use views::panel_right::panel_right;
 use wgpu::SurfaceConfiguration;
 use widgets::tabs::Pane;
 use widgets::tabs::TabsBehavior;
@@ -33,7 +33,7 @@ use crate::app_state::AppState;
 use crate::app_state::EditableObject;
 
 pub struct Hud {
-    pub platform: egui_winit_platform::Platform,
+    pub(crate) platform: egui_winit_platform::Platform,
     rpass: RenderPass,
     ui: HudUi,
 }
@@ -67,9 +67,7 @@ impl Hud {
         let rpass = RenderPass::new(device, surface_config.format, 1);
 
         let ui = HudUi {
-            stats_window: StatsWindow::new(true),
-            location_finder_window: LocationFinderWindow::new(true),
-            fps_graph: FpsGraph { open: true },
+            location_finder_window: LocationFinderWindow::new(false),
             side_panel: SidePanel::new(),
         };
 
@@ -206,9 +204,7 @@ fn add_display_none(ui: &mut Ui, rule: &mut Rule, label: &str) {
 }
 
 struct HudUi {
-    stats_window: StatsWindow,
     location_finder_window: LocationFinderWindow,
-    fps_graph: FpsGraph,
     side_panel: SidePanel,
 }
 
@@ -216,6 +212,9 @@ impl HudUi {
     pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
         {
             let pointer_position = ctx.input(|i| i.pointer.hover_pos()).unwrap_or_default();
+
+            // This should have precedence for grabbing keystrokes when it's open.
+            self.location_finder_window.ui(ctx, app_state);
 
             // Draw menubar.
             egui::TopBottomPanel::top("Main Menu Bar").show(ctx, |ui| {
@@ -240,8 +239,6 @@ impl HudUi {
                         |ui| {},
                     );
                     ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
-                        self.location_finder_window.ui(ui, app_state);
-
                         ui.label(format!(
                             "Frametime {:.2?} at zoom {:.2}",
                             app_state.stats.get_average(),
@@ -252,13 +249,13 @@ impl HudUi {
                             "Mouse Position: ({:.1},{:.1})",
                             pointer_position[0], pointer_position[1]
                         ));
+
+                        view_fps(ui, app_state);
                     })
                 })
             });
 
-            self.stats_window.ui(ctx, app_state);
-
-            self.fps_graph.ui(ctx, app_state);
+            panel_right(ctx, app_state);
 
             self.side_panel.ui(ctx, app_state);
         }

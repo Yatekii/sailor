@@ -1232,6 +1232,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
+name = "human_bytes"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91f255a4535024abf7640cb288260811fc14794f62b063652ed349f9a6c2348e"
+
+[[package]]
 name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2942,10 +2948,12 @@ dependencies = [
  "crossbeam-channel",
  "egui",
  "egui_demo_lib",
+ "egui_extras",
  "egui_tiles",
  "egui_wgpu_backend",
  "egui_winit_platform",
  "glyphon",
+ "human_bytes",
  "insta",
  "log",
  "lyon",

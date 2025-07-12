@@ -12,12 +12,12 @@ use crate::vector_tile::tile::{Tile, TileStats};
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct CacheStats {
-    cached_tiles: usize,
-    loading_tiles: usize,
-    cached_objects: usize,
-    cached_features: usize,
-    cached_vertices: usize,
-    total_stats: TileStats,
+    pub cached_tiles: usize,
+    pub loading_tiles: usize,
+    pub cached_objects: usize,
+    pub cached_features: usize,
+    pub cached_vertices: usize,
+    pub total_stats: TileStats,
 }
 
 /// A cache structure to hold all loaded `Tile`s.
