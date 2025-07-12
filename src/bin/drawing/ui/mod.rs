@@ -1,12 +1,14 @@
-pub mod fps;
 pub mod state;
+pub mod views;
+pub mod widgets;
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use egui::color_picker::Alpha;
+use egui::vec2;
 use egui::Color32;
 use egui::FontDefinitions;
+use egui::Layout;
 use egui::Rgba;
 use egui::ScrollArea;
 use egui::Style;
@@ -16,18 +18,19 @@ use egui::WidgetText;
 use egui_wgpu_backend::RenderPass;
 use egui_wgpu_backend::ScreenDescriptor;
 use egui_winit_platform::PlatformDescriptor;
-use glyphon::cosmic_text::ttf_parser::feat;
 use osm::css::CSSValue;
 use osm::css::Color;
 use osm::css::Number;
 use osm::css::Rule;
-use osm::css::Selector;
+use views::fps::FpsGraph;
+use views::location_finder::LocationFinderWindow;
+use views::stats::StatsWindow;
 use wgpu::SurfaceConfiguration;
+use widgets::tabs::Pane;
+use widgets::tabs::TabsBehavior;
 
 use crate::app_state::AppState;
 use crate::app_state::EditableObject;
-
-use self::fps::FpsGraph;
 
 pub struct Hud {
     platform: egui_winit_platform::Platform,
@@ -64,11 +67,10 @@ impl Hud {
         let rpass = RenderPass::new(device, surface_config.format, 1);
 
         let ui = HudUi {
-            main_window: MainWindow { open: true },
-            stats_window: StatsWindow { open: true },
-            location_finder_window: LocationFinderWindow { open: true },
+            stats_window: StatsWindow::new(true),
+            location_finder_window: LocationFinderWindow::new(true),
             fps_graph: FpsGraph { open: true },
-            side_panel: SidePanel { open: true },
+            side_panel: SidePanel::new(),
         };
 
         Self {
@@ -93,14 +95,17 @@ impl Hud {
 
         self.platform.context().set_pixels_per_point(4.0);
         // Begin to draw the UI frame.
-        self.platform.begin_frame();
+        self.platform.begin_pass();
 
         // Draw the demo application.
         self.ui.ui(&self.platform.context(), app_state);
 
         // End the UI frame. We could now handle the output and draw the UI with the backend.
-        let full_output = self.platform.end_frame(Some(window));
-        let paint_jobs = self.platform.context().tessellate(full_output.shapes, 4.0);
+        let full_output = self.platform.end_pass(Some(window));
+        let paint_jobs = self.platform.context().tessellate(
+            full_output.shapes,
+            self.platform.context().pixels_per_point(),
+        );
 
         // Upload all resources for the GPU.
         let size = window.inner_size();
@@ -201,7 +206,6 @@ fn add_display_none(ui: &mut Ui, rule: &mut Rule, label: &str) {
 }
 
 struct HudUi {
-    main_window: MainWindow,
     stats_window: StatsWindow,
     location_finder_window: LocationFinderWindow,
     fps_graph: FpsGraph,
@@ -215,31 +219,44 @@ impl HudUi {
 
             // Draw menubar.
             egui::TopBottomPanel::top("Main Menu Bar").show(ctx, |ui| {
-                egui::menu::bar(ui, |ui| {
+                ui.horizontal_centered(|ui| {
+                    // Take full width and fixed height:
+                    let height = ui.spacing().interact_size.y;
+                    ui.style_mut().spacing.button_padding = vec2(2.0, 0.0);
+                    ui.set_min_size(vec2(ui.available_width(), height));
                     ui.menu_button("File", |ui| {
                         if ui.button("Quit").clicked() {
                             ui.close_menu();
                         }
                     });
+                    ui.with_layout(
+                        Layout::from_main_dir_and_cross_align(
+                            egui::Direction::LeftToRight,
+                            egui::Align::Center,
+                        )
+                        .with_cross_justify(false)
+                        .with_main_justify(false)
+                        .with_main_align(egui::Align::Center),
+                        |ui| {},
+                    );
+                    ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+                        self.location_finder_window.ui(ui, app_state);
 
-                    ui.label(format!(
-                        "Frametime {:.2?} at zoom {:.2}",
-                        app_state.stats.get_average(),
-                        app_state.zoom
-                    ));
+                        ui.label(format!(
+                            "Frametime {:.2?} at zoom {:.2}",
+                            app_state.stats.get_average(),
+                            app_state.zoom
+                        ));
 
-                    ui.label(format!(
-                        "Mouse Position: ({:.1},{:.1})",
-                        pointer_position[0], pointer_position[1]
-                    ));
-                });
+                        ui.label(format!(
+                            "Mouse Position: ({:.1},{:.1})",
+                            pointer_position[0], pointer_position[1]
+                        ));
+                    })
+                })
             });
 
-            self.main_window.ui(ctx, app_state);
-
             self.stats_window.ui(ctx, app_state);
-
-            self.location_finder_window.ui(ctx, app_state);
 
             self.fps_graph.ui(ctx, app_state);
 
@@ -248,158 +265,37 @@ impl HudUi {
     }
 }
 
-struct MainWindow {
-    open: bool,
-}
-
-impl MainWindow {
-    pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
-        // Draw main window.
-        egui::Window::new("Main")
-            .default_pos([320.0, 40.0])
-            .default_width(400.0)
-            .default_height(600.0)
-            .open(&mut self.open)
-            .show(ctx, |ui| {
-                let mut size = ui.min_size();
-                size[1] = 100.0;
-                ui.heading("Hovered Objects");
-                ui.vertical(|ui| {
-                    let hovered_objects = app_state.hovered_objects.lock().unwrap();
-                    let objects = hovered_objects
-                        .iter()
-                        .map(|o| o.selector().to_string())
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    ui.label(objects);
-                });
-
-                let mut item: i32 = 0;
-                for i in 0..app_state.selected_objects.len() {
-                    if app_state.selected_objects[i].selected {
-                        app_state.selected_objects[i].selected = false;
-                        item = i as i32;
-                    }
-                }
-                let items = Arc::new(
-                    app_state
-                        .selected_objects
-                        .iter()
-                        .map(|o| format!("{}", o.object.selector()))
-                        .collect::<Vec<_>>(),
-                );
-                let items_clone = items.clone();
-
-                ui.collapsing("Selected objects", |ui| {
-                    ui.vertical(|ui| {
-                        for item in &*items_clone {
-                            ui.label(item);
-                        }
-                    })
-                });
-
-                ui.collapsing("Selected object", |ui| {
-                    if item >= 0 && !items.is_empty() {
-                        app_state.selected_objects[item as usize].selected = true;
-                    }
-
-                    let objects = &mut app_state.selected_objects;
-
-                    if let Some(EditableObject { object, .. }) =
-                        objects.iter_mut().find(|object| object.selected)
-                    {
-                        ui.separator();
-                        ui.label("Tags");
-                        ui.separator();
-
-                        ui.label(format!("{:#?}", object.tags()));
-
-                        ui.separator();
-                        ui.label("Applying rules");
-                        ui.separator();
-
-                        let mut rules = app_state
-                            .css_cache
-                            .get_matching_rules_mut(object.selector());
-                        for rule in rules.iter_mut() {
-                            ui.collapsing(format!("{}", rule.selector), |ui| {
-                                add_color_picker(ui, rule, "background-color");
-                                add_color_picker(ui, rule, "border-color");
-                                add_slider_float(ui, rule, "border-width");
-                                add_slider_float(ui, rule, "line-width");
-                                add_display_none(ui, rule, "display");
-                            });
-                        }
-                    } else {
-                        ui.separator();
-                        ui.label("No Object selected");
-                        ui.separator();
-                    }
-                });
-            });
-    }
-}
-
-struct StatsWindow {
-    open: bool,
-}
-
-impl StatsWindow {
-    pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
-        egui::Window::new("Stats")
-            .default_pos([320.0, 330.0])
-            .default_width(400.0)
-            .default_height(230.0)
-            .open(&mut self.open)
-            .show(ctx, |ui| {
-                // Show cache stats
-                egui::CollapsingHeader::new("Cache Stats")
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        ui.label(format!("{:#?}", app_state.tile_cache.get_stats()));
-                    });
-            });
-    }
-}
-
-struct LocationFinderWindow {
-    open: bool,
-}
-
-impl LocationFinderWindow {
-    pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
-        egui::Window::new("Location Finder")
-            .default_pos([520.0, 40.0])
-            .default_width(400.0)
-            .default_height(100.0)
-            .open(&mut self.open)
-            .show(ctx, |ui| {
-                ui.label("Center Coordinates");
-                ui.text_edit_singleline(&mut app_state.ui.loaction_finder.input);
-
-                if ui.button("Find").clicked() {
-                    let split: Result<Vec<f32>, _> = app_state
-                        .ui
-                        .loaction_finder
-                        .input
-                        .split(' ')
-                        .map(|s| s.parse::<f32>())
-                        .collect();
-                    if let Ok(split) = split {
-                        if split.len() == 2 {
-                            app_state.set_center((split[0], split[1]));
-                        }
-                    }
-                }
-            });
-    }
-}
-
 struct SidePanel {
     open: bool,
+    tree: egui_tiles::Tree<Pane>,
 }
 
 impl SidePanel {
+    pub fn new() -> Self {
+        let mut tiles = egui_tiles::Tiles::default();
+
+        let tabs = vec![
+            tiles.insert_pane(Pane {
+                name: "Inspector",
+                show: Box::new(|ui, app_state| {
+                    view_inspector(ui, app_state);
+                }),
+            }),
+            tiles.insert_pane(Pane {
+                name: "Layers",
+                show: Box::new(|ui, app_state| {
+                    view_layer_toggle(ui, app_state);
+                }),
+            }),
+        ];
+
+        let root = tiles.insert_tab_tile(tabs);
+
+        let tree = egui_tiles::Tree::new("my_tree", root, tiles);
+
+        Self { open: true, tree }
+    }
+
     pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
         egui::SidePanel::left("sidepanel")
             .default_width(300.0)
@@ -408,14 +304,108 @@ impl SidePanel {
             .exact_width(300.0)
             .max_width(300.0)
             .show(ctx, |ui| {
-                ScrollArea::vertical().max_height(800.0).show(ui, |ui| {
-                    let feature_collection = app_state.feature_collection();
-                    let mut features = feature_collection.write().unwrap();
-                    let layers = features.layers_mut();
-                    for layer in layers {
-                        ui.checkbox(&mut layer.display, &layer.name);
-                    }
-                })
+                let mut behavior = TabsBehavior { app_state };
+                self.tree.ui(&mut behavior, ui);
+                view_layer_toggle(ui, app_state);
             });
     }
+}
+
+impl Default for SidePanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn view_layer_toggle(ui: &mut Ui, app_state: &mut AppState) {
+    ui.heading("Layers");
+    ScrollArea::vertical().max_height(800.0).show(ui, |ui| {
+        let feature_collection = app_state.feature_collection();
+        let mut features = feature_collection.write().unwrap();
+        let layers = features.layers_mut();
+        for layer in layers {
+            ui.checkbox(&mut layer.display, &layer.name);
+        }
+    });
+}
+
+fn view_inspector(ui: &mut Ui, app_state: &mut AppState) {
+    ui.heading("Inspector");
+    ScrollArea::vertical().max_height(800.0).show(ui, |ui| {
+        let mut size = ui.min_size();
+        size[1] = 100.0;
+        ui.heading("Hovered Objects");
+        ui.vertical(|ui| {
+            let hovered_objects = app_state.hovered_objects.lock().unwrap();
+            let objects = hovered_objects
+                .iter()
+                .map(|o| o.selector().to_string())
+                .collect::<Vec<_>>()
+                .join("\n");
+            ui.label(objects);
+        });
+
+        let mut item: i32 = 0;
+        for i in 0..app_state.selected_objects.len() {
+            if app_state.selected_objects[i].selected {
+                app_state.selected_objects[i].selected = false;
+                item = i as i32;
+            }
+        }
+        let items = Arc::new(
+            app_state
+                .selected_objects
+                .iter()
+                .map(|o| format!("{}", o.object.selector()))
+                .collect::<Vec<_>>(),
+        );
+        let items_clone = items.clone();
+
+        ui.collapsing("Selected objects", |ui| {
+            ui.vertical(|ui| {
+                for item in &*items_clone {
+                    ui.label(item);
+                }
+            })
+        });
+
+        ui.collapsing("Selected object", |ui| {
+            if item >= 0 && !items.is_empty() {
+                app_state.selected_objects[item as usize].selected = true;
+            }
+
+            let objects = &mut app_state.selected_objects;
+
+            if let Some(EditableObject { object, .. }) =
+                objects.iter_mut().find(|object| object.selected)
+            {
+                ui.separator();
+                ui.label("Tags");
+                ui.separator();
+
+                ui.label(format!("{:#?}", object.tags()));
+
+                ui.separator();
+                ui.label("Applying rules");
+                ui.separator();
+
+                let mut rules = app_state
+                    .css_cache
+                    .get_matching_rules_mut(object.selector());
+                for rule in rules.iter_mut() {
+                    ui.collapsing(format!("{}", rule.selector), |ui| {
+                        add_color_picker(ui, rule, "background-color");
+                        add_color_picker(ui, rule, "border-color");
+                        add_slider_float(ui, rule, "border-width");
+                        add_slider_float(ui, rule, "line-width");
+                        add_display_none(ui, rule, "display");
+                    });
+                }
+            } else {
+                ui.separator();
+                ui.label("No Object selected");
+                ui.separator();
+            }
+        });
+    });
 }

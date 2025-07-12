@@ -56,7 +56,7 @@ impl Painter {
     pub fn init(window: Arc<Window>, size: PhysicalSize<u32>, app_state: &AppState) -> Self {
         let factor = window.scale_factor();
 
-        let instance = wgpu::Instance::new(InstanceDescriptor::default());
+        let instance = wgpu::Instance::new(&InstanceDescriptor::default());
         let surface = instance.create_surface(window.clone()).unwrap();
 
         let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -288,7 +288,7 @@ impl Painter {
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: vs_module,
-                entry_point: "main",
+                entry_point: Some("main"),
                 buffers: &[VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: VertexStepMode::Vertex,
@@ -314,7 +314,7 @@ impl Painter {
             },
             fragment: Some(FragmentState {
                 module: fs_module,
-                entry_point: "main",
+                entry_point: Some("main"),
                 targets: &[Some(ColorTargetState {
                     format: TextureFormat::Bgra8Unorm,
                     blend: Some(BlendState {

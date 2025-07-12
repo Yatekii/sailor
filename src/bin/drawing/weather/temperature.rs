@@ -177,13 +177,13 @@ impl Temperature {
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: vs_module,
-                entry_point: "main",
+                entry_point: Some("main"),
                 buffers: &[],
                 compilation_options: PipelineCompilationOptions::default(),
             },
             fragment: Some(FragmentState {
                 module: fs_module,
-                entry_point: "main",
+                entry_point: Some("main"),
                 targets: &[Some(ColorTargetState {
                     format: TextureFormat::Bgra8Unorm,
                     blend: Some(BlendState {
@@ -273,15 +273,15 @@ impl Temperature {
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         encoder.copy_buffer_to_texture(
-            wgpu::ImageCopyBuffer {
-                layout: wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferInfo {
+                layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(width * 4),
                     rows_per_image: Some(height),
                 },
                 buffer,
             },
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &self.texture,
                 mip_level: 0,
                 aspect: wgpu::TextureAspect::All,
