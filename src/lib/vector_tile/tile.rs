@@ -1,5 +1,6 @@
 use crate::*;
 use egui::TextBuffer;
+use feature::collection::LayerInfo;
 use glyphon::{
     Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, TextArea, TextBounds, Weight,
 };
@@ -132,7 +133,6 @@ impl Tile {
         let extent = tile.layers[0].extent as u16;
         let mut features = vec![];
         let mut text = vec![];
-        let mut layers = vec![];
 
         // Add a background feature to the tile data.
         let (mut current_feature_id, object, range) =
@@ -142,13 +142,25 @@ impl Tile {
 
         // Transform all features of the tile.
         for layer in tile.layers {
+            let mut fc = feature_collection.write().unwrap();
+            let layers = fc.layers_mut();
             let mut map: std::collections::HashMap<Selector, Vec<(GeomType, Vec<Path>)>> =
                 HashMap::new();
             let layer_name = layer.name.to_string();
-            if !layers.contains(&(0, layer_name.clone())) {
+            let layer_id = if let Some(layer) = layers.iter().find(|l| l.name == layer_name) {
+                layer.id
+            } else {
                 println!("{}", layer.name);
-                layers.push((0, layer_name));
-            }
+                let id = layers.len();
+                let value = LayerInfo {
+                    id,
+                    name: layer_name,
+                    display: true,
+                };
+                layers.push(value);
+                id
+            };
+            drop(fc);
 
             // Preevaluate the selectors and group features by the selector they belong to.
             for feature in &layer.features {
@@ -198,7 +210,7 @@ impl Tile {
                     current_feature_id = {
                         // Scope the lock guard real tight to ensure it's released quickly.
                         let mut feature_collection = feature_collection.write().unwrap();
-                        feature_collection.ensure_feature(&selector)
+                        feature_collection.ensure_feature(&selector, layer_id)
                     };
                     builder.set_current_feature_id(current_feature_id);
 
@@ -219,10 +231,6 @@ impl Tile {
 
             features.extend(inner_features);
         }
-
-        let mut feature_collection = feature_collection.write().unwrap();
-        feature_collection.set_layers(layers);
-        drop(feature_collection);
 
         let collider = Arc::new(RwLock::new(TileCollider::new()));
         let _collider_keep = collider.clone();
@@ -340,7 +348,7 @@ impl Tile {
         let current_feature_id = {
             // Scope the lock guard real tight to ensure it's released quickly.
             let mut feature_collection = feature_collection.write().unwrap();
-            feature_collection.ensure_feature(&selector)
+            feature_collection.ensure_feature(&selector, 0)
         };
         builder.set_current_feature_id(current_feature_id);
 

@@ -21,6 +21,7 @@ use osm::css::CSSValue;
 use osm::css::Color;
 use osm::css::Number;
 use osm::css::Rule;
+use osm::css::Selector;
 use wgpu::SurfaceConfiguration;
 
 use crate::app_state::AppState;
@@ -181,7 +182,7 @@ fn add_slider_float(ui: &mut Ui, rule: &mut Rule, attribute: &str) {
         .insert(attribute.to_string(), CSSValue::Number(Number::Px(value)));
 }
 
-fn add_display_none(ui: &mut Ui, rule: &mut Rule) {
+fn add_display_none(ui: &mut Ui, rule: &mut Rule, label: &str) {
     let attribute = "display";
     let mut value = if let Some(CSSValue::String(value)) = rule.kvs.get(attribute) {
         !matches!(&value[..], "none")
@@ -189,7 +190,7 @@ fn add_display_none(ui: &mut Ui, rule: &mut Rule) {
         true
     };
 
-    ui.checkbox(&mut value, WidgetText::from(attribute));
+    ui.checkbox(&mut value, WidgetText::from(label));
 
     if !value {
         rule.kvs
@@ -326,7 +327,7 @@ impl MainWindow {
                                 add_color_picker(ui, rule, "border-color");
                                 add_slider_float(ui, rule, "border-width");
                                 add_slider_float(ui, rule, "line-width");
-                                add_display_none(ui, rule);
+                                add_display_none(ui, rule, "display");
                             });
                         }
                     } else {
@@ -409,46 +410,10 @@ impl SidePanel {
             .show(ctx, |ui| {
                 ScrollArea::vertical().max_height(800.0).show(ui, |ui| {
                     let feature_collection = app_state.feature_collection();
-                    let css_cache = app_state.css_cache_mut();
                     let mut features = feature_collection.write().unwrap();
-                    let features = features.features_mut();
-                    for feature in features {
-                        let mut rules = css_cache.get_matching_rules_mut(&feature.selector);
-
-                        println!("{}", feature.selector);
-                        // assert!(rules.len() <= 1);
-                        let rule = rules.first_mut();
-                        if rule.is_none() {
-                            css_cache.add_rule(Rule {
-                                selector: feature.selector.clone(),
-                                kvs: BTreeMap::new(),
-                            });
-                        }
-                        let mut rules = css_cache.get_matching_rules_mut(&feature.selector);
-                        // TODO: Ugly!
-                        let rule = rules.first_mut().unwrap();
-                        let value = rule
-                            .kvs
-                            .entry("display".to_string())
-                            .or_insert(CSSValue::String("block".to_string()));
-                        let mut display_mut = false;
-                        match &value {
-                            CSSValue::String(value) => match &value[..] {
-                                "none" => display_mut = false,
-                                _ => display_mut = true,
-                            },
-                            value => log::info!(
-                                "The value '{:?}' is currently not supported for 'display'.",
-                                value
-                            ),
-                        }
-
-                        ui.checkbox(&mut display_mut, feature.selector.to_string());
-                        if display_mut {
-                            *value = CSSValue::String("block".to_string());
-                        } else {
-                            *value = CSSValue::String("none".to_string());
-                        }
+                    let layers = features.layers_mut();
+                    for layer in layers {
+                        ui.checkbox(&mut layer.display, &layer.name);
                     }
                 })
             });

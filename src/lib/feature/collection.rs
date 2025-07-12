@@ -6,7 +6,14 @@ use super::{Feature, FeatureStyle};
 pub struct FeatureCollection {
     features: Vec<Feature>,
     n_features_max: u32,
-    layers: Vec<(usize, String)>,
+    layers: Vec<LayerInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LayerInfo {
+    pub id: usize,
+    pub name: String,
+    pub display: bool,
 }
 
 impl FeatureCollection {
@@ -14,7 +21,11 @@ impl FeatureCollection {
         Self {
             features: vec![],
             n_features_max,
-            layers: vec![],
+            layers: vec![LayerInfo {
+                id: 0,
+                name: "background".to_string(),
+                display: true,
+            }],
         }
     }
 
@@ -26,12 +37,12 @@ impl FeatureCollection {
         &mut self.features
     }
 
-    pub fn layers(&self) -> &Vec<(usize, String)> {
+    pub fn layers(&self) -> &Vec<LayerInfo> {
         &self.layers
     }
 
-    pub fn set_layers(&mut self, layers: Vec<(usize, String)>) {
-        self.layers = layers
+    pub fn layers_mut(&mut self) -> &mut Vec<LayerInfo> {
+        &mut self.layers
     }
 
     fn get_feature_id(&mut self, selector: &crate::css::Selector) -> Option<u32> {
@@ -49,11 +60,11 @@ impl FeatureCollection {
         self.features.len() as u32 - 1
     }
 
-    pub fn ensure_feature(&mut self, selector: &Selector) -> u32 {
+    pub fn ensure_feature(&mut self, selector: &Selector, layer_id: usize) -> u32 {
         if let Some(feature_id) = self.get_feature_id(selector) {
             feature_id
         } else {
-            self.add_feature(Feature::new(selector.clone(), 0))
+            self.add_feature(Feature::new(selector.clone(), layer_id))
         }
     }
 
@@ -84,7 +95,15 @@ impl FeatureCollection {
 
     pub fn load_styles(&mut self, zoom: f32, css_cache: &mut RulesCache) {
         for feature in &mut self.features {
-            feature.load_style(zoom, css_cache)
+            feature.load_style(
+                zoom,
+                css_cache,
+                self.layers
+                    .iter()
+                    .find(|l| l.id == feature.layer_id)
+                    .map(|l| l.display)
+                    .unwrap_or_default(),
+            )
         }
     }
 

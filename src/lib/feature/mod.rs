@@ -34,13 +34,13 @@ pub struct FeatureStyle {
 #[derive(Debug, Clone, Default)]
 pub struct Feature {
     pub selector: Selector,
-    pub layer_id: u32,
+    pub layer_id: usize,
     pub id: u32,
     pub style: FeatureStyle,
 }
 
 impl Feature {
-    pub fn new(selector: Selector, layer_id: u32) -> Self {
+    pub fn new(selector: Selector, layer_id: usize) -> Self {
         Self {
             selector,
             layer_id,
@@ -50,7 +50,7 @@ impl Feature {
         }
     }
 
-    pub fn load_style(&mut self, zoom: f32, css_cache: &mut RulesCache) {
+    pub fn load_style(&mut self, zoom: f32, css_cache: &mut RulesCache, display_override: bool) {
         let rules = css_cache.get_matching_rules(
             &self
                 .selector
@@ -158,6 +158,8 @@ impl Feature {
         } else {
             self.style.display = true;
         }
+
+        self.style.display = self.style.display && display_override;
 
         let line_width = rules
             .iter()
