@@ -14,10 +14,7 @@ use crate::vector_tile::tile::{Tile, TileStats};
 pub struct CacheStats {
     pub cached_tiles: usize,
     pub loading_tiles: usize,
-    pub cached_objects: usize,
-    pub cached_features: usize,
-    pub cached_vertices: usize,
-    pub total_stats: TileStats,
+    pub tile_stats: TileStats,
 }
 
 /// A cache structure to hold all loaded `Tile`s.
@@ -160,10 +157,7 @@ impl TileCache {
         CacheStats {
             cached_tiles: self.cache.len(),
             loading_tiles: self.loaders.len(),
-            cached_objects: 0,
-            cached_features: 0,
-            cached_vertices: 0,
-            total_stats,
+            tile_stats: total_stats,
         }
     }
 }

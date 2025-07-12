@@ -21,16 +21,13 @@ pub fn view_stats(ui: &mut Ui, app_state: &mut AppState) {
                 let data = [
                     ("cached tiles", format!("{}", tile_stats.cached_tiles)),
                     ("loading tiles", format!("{}", tile_stats.loading_tiles)),
-                    ("cached objects", format!("{}", tile_stats.cached_objects)),
-                    ("cached features", format!("{}", tile_stats.cached_features)),
-                    ("cached vertices", format!("{}", tile_stats.cached_vertices)),
-                    ("objects", format!("{}", tile_stats.total_stats.objects)),
-                    ("features", format!("{}", tile_stats.total_stats.features)),
-                    ("vertices", format!("{}", tile_stats.total_stats.vertices)),
-                    ("indices", format!("{}", tile_stats.total_stats.indices)),
+                    ("objects", format!("{}", tile_stats.tile_stats.objects)),
+                    ("features", format!("{}", tile_stats.tile_stats.features)),
+                    ("vertices", format!("{}", tile_stats.tile_stats.vertices)),
+                    ("indices", format!("{}", tile_stats.tile_stats.indices)),
                     (
                         "size",
-                        human_bytes::human_bytes(tile_stats.total_stats.size as f64),
+                        human_bytes::human_bytes(tile_stats.tile_stats.size as f64),
                     ),
                 ];
                 body.rows(20.0, data.len(), |mut row| {
