@@ -10,7 +10,7 @@ use lyon::math::vector;
 use osm::math::{deg2num, tile_to_world_space, TileId};
 use winit::{
     application::ApplicationHandler,
-    dpi::{LogicalPosition, LogicalSize, PhysicalPosition},
+    dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize},
     event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{Key, ModifiersState, NamedKey},
@@ -64,6 +64,7 @@ fn main() {
 
     let modifiers_state = ModifiersState::default();
 
+    let screen = app_state.screen.clone();
     let mut application = Application {
         hud,
         painter,
@@ -72,6 +73,14 @@ fn main() {
         mouse_down,
         last_pos,
     };
+
+    application
+        .hud
+        .platform
+        .handle_event(&winit::event::WindowEvent::Resized(PhysicalSize::new(
+            screen.width,
+            screen.height,
+        )));
 
     event_loop.run_app(&mut application).unwrap();
 }
@@ -192,6 +201,12 @@ impl ApplicationHandler for Application {
                 }
             }
             WindowEvent::RedrawRequested => {
+                self.hud
+                    .platform
+                    .handle_event(&winit::event::WindowEvent::Resized(PhysicalSize::new(
+                        self.app_state.screen.width,
+                        self.app_state.screen.height,
+                    )));
                 if !event_loop.exiting() {
                     self.painter.update_shader();
                     // self.app_state.load_tile(TileId::new(13, 4290, 2868));

@@ -33,7 +33,7 @@ use crate::app_state::AppState;
 use crate::app_state::EditableObject;
 
 pub struct Hud {
-    platform: egui_winit_platform::Platform,
+    pub platform: egui_winit_platform::Platform,
     rpass: RenderPass,
     ui: HudUi,
 }
