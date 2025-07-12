@@ -6,6 +6,7 @@ mod stats;
 use std::sync::Arc;
 
 use crate::config::CONFIG;
+use clap::Parser;
 use lyon::math::vector;
 use osm::math::{deg2num, tile_to_world_space, TileId};
 use winit::{
@@ -20,6 +21,8 @@ use winit::{
 fn main() {
     log::set_max_level(CONFIG.general.log.level.to_level_filter());
     pretty_env_logger::init();
+
+    let args = Args::parse();
 
     let tile_coordinate = deg2num(
         CONFIG.map.initial.center.latitude,
@@ -72,6 +75,7 @@ fn main() {
         modifiers_state,
         mouse_down,
         last_pos,
+        args,
     };
 
     // Hack to make the UI scale correctly.
@@ -93,6 +97,7 @@ pub struct Application {
     modifiers_state: ModifiersState,
     mouse_down: bool,
     last_pos: LogicalPosition<f64>,
+    args: Args,
 }
 
 impl ApplicationHandler for Application {
@@ -211,9 +216,22 @@ impl ApplicationHandler for Application {
                 if !event_loop.exiting() {
                     self.painter.update_shader();
                     // self.app_state.load_tile(TileId::new(13, 4290, 2868));
-                    self.app_state.load_tile(TileId::new(14, 8580, 5737));
-                    // self.app_state.load_tile(TileId::new(17, 137290, 91796));
-                    // self.app_state.load_tiles();
+
+                    if self.args.tile.is_empty() {
+                        self.app_state.load_tiles();
+                    } else {
+                        for tile in &self.args.tile {
+                            let coords: Vec<u32> =
+                                tile.split("/").filter_map(|v| v.parse().ok()).collect();
+                            if coords.len() != 3 {
+                                continue;
+                            }
+
+                            self.app_state
+                                .load_tile(TileId::new(coords[0], coords[1], coords[2]));
+                        }
+                    }
+
                     self.painter.paint(&mut self.hud, &mut self.app_state);
 
                     self.app_state.stats.capture_frame();
@@ -230,4 +248,15 @@ impl ApplicationHandler for Application {
         }
         self.painter.window.request_redraw();
     }
+}
+
+/// Render a map beautifully and ultra fast with CSS styling
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Tile to load (this argument can be given multiple times to load multiple tiles)
+    ///
+    /// If no tiles were given the full map is loaded.
+    #[arg(short, long)]
+    tile: Vec<String>,
 }

@@ -25,6 +25,7 @@ name = "sailor"
 path = "src/bin/main.rs"
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
 config = "0.14"
 crossbeam-channel = "0.5"
 log = { version = "0.4", features = ["serde"] }

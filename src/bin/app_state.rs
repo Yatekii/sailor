@@ -65,10 +65,6 @@ impl AppState {
         self.feature_collection.clone()
     }
 
-    pub fn css_cache_mut(&mut self) -> &mut RulesCache {
-        &mut self.css_cache
-    }
-
     pub fn load_tile(&mut self, tile_id: TileId) {
         self.tile_cache.finalize_loaded_tiles();
         if !self.visible_tiles.contains(&tile_id) {
