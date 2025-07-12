@@ -2,6 +2,7 @@ pub mod state;
 pub mod views;
 pub mod widgets;
 
+use std::fmt::format;
 use std::sync::Arc;
 
 use egui::color_picker::Alpha;
@@ -336,7 +337,10 @@ fn view_inspector(ui: &mut Ui, app_state: &mut AppState) {
             let hovered_objects = app_state.hovered_objects.lock().unwrap();
             let objects = hovered_objects
                 .iter()
-                .map(|o| o.selector().to_string())
+                .map(|o| {
+                    let pts = o.points().iter().fold(0.0, |a, b| a + b.x + b.y);
+                    format!("{pts}: {}", o.selector())
+                })
                 .collect::<Vec<_>>()
                 .join("\n");
             ui.label(objects);
