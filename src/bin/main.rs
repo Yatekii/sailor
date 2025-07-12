@@ -74,6 +74,7 @@ fn main() {
         last_pos,
     };
 
+    // Hack to make the UI scale correctly.
     application
         .hud
         .platform
