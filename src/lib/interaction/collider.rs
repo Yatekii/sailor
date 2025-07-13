@@ -52,10 +52,12 @@ impl Collider {
                     if let Ok(objects) = objects.try_read() {
                         let object_ids = collider.get_hovered_objects(&tile_point);
                         for object_id in object_ids {
-                            return_objects.push((objects.deref())[object_id].clone())
+                            let object = (objects.deref())[object_id].clone();
+                            return_objects.push(object)
                         }
                     }
                 }
+
                 return return_objects;
             }
         }
@@ -69,4 +71,15 @@ pub struct VisibleTile {
     pub extent: f32,
     pub collider: Arc<RwLock<TileCollider>>,
     pub objects: Arc<RwLock<Vec<Object>>>,
+}
+
+impl std::fmt::Debug for VisibleTile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VisibleTile")
+            .field("tile_id", &self.tile_id)
+            .field("extent", &self.extent)
+            .field("collider", &self.collider.read().unwrap().len())
+            .field("objects", &self.objects.read().unwrap().len())
+            .finish()
+    }
 }
