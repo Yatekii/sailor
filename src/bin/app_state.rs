@@ -1,4 +1,5 @@
 use lyon::math::Point;
+use nalgebra_glm::{vec2, Vec2};
 use osm::cache::TileCache;
 use osm::css::RulesCache;
 use osm::feature::collection::FeatureCollection;
@@ -19,11 +20,14 @@ pub struct AppState {
     pub screen: Screen,
     pub zoom: f32,
     pub hovered_objects: Arc<Mutex<Vec<Object>>>,
-    pub selected_objects: Vec<EditableObject>,
+    selected_objects: Vec<EditableObject>,
+    selected_object: usize,
+    selected_object_labels: Vec<String>,
     pub stats: Stats,
     pub ui: UIState,
     pub visible_tiles: Vec<TileId>,
     feature_collection: Arc<RwLock<FeatureCollection>>,
+    cursor: Vec2,
 }
 
 impl AppState {
@@ -48,12 +52,15 @@ impl AppState {
             zoom,
             hovered_objects: Arc::new(Mutex::new(Vec::new())),
             selected_objects: vec![],
+            selected_object: 0,
+            selected_object_labels: vec![],
             stats: Stats::new(),
             ui: UIState::new(),
             visible_tiles: Vec::new(),
             feature_collection: Arc::new(RwLock::new(FeatureCollection::new(
                 CONFIG.renderer.max_features as u32,
             ))),
+            cursor: vec2(0.0, 0.0),
         }
     }
 
@@ -193,22 +200,35 @@ impl AppState {
         });
     }
 
-    pub fn update_selected_hover_objects(&mut self) {
+    pub fn update_selected_from_hover_objects(&mut self) {
         let hovered_objects = self.hovered_objects.lock().unwrap();
-        self.selected_objects = hovered_objects
+        (self.selected_objects, self.selected_object_labels) = hovered_objects
             .iter()
-            .map(|o| EditableObject::new(o.clone()))
+            .map(|o| (EditableObject::new(o.clone()), format!("{}", o.selector())))
             .collect();
+
+        self.selected_object = 0;
     }
 
     pub fn advance_selected_object(&mut self) {
         let len = self.selected_objects.len();
-        for i in 0..len {
-            if self.selected_objects[i].selected {
-                self.selected_objects[(i + 1) % len].selected = true;
-                self.selected_objects[i].selected = true;
-            }
-        }
+        self.selected_object = (self.selected_object + 1) % len;
+    }
+
+    pub fn select_object(&mut self, index: usize) {
+        self.selected_object = index;
+    }
+
+    pub(crate) fn selected_object(&self) -> Option<&EditableObject> {
+        self.selected_objects.get(self.selected_object)
+    }
+
+    pub fn selected_objects(&mut self) -> &[EditableObject] {
+        &self.selected_objects
+    }
+
+    pub fn selected_object_labels(&mut self) -> &[String] {
+        &self.selected_object_labels
     }
 
     pub fn set_center(&mut self, center: (f32, f32)) {
@@ -225,18 +245,22 @@ impl AppState {
             scale_factor,
         )
     }
+
+    pub fn set_cursor(&mut self, cursor: Vec2) {
+        self.cursor = cursor;
+    }
+
+    pub fn cursor(&self) -> Vec2 {
+        self.cursor
+    }
 }
 
 pub struct EditableObject {
     pub object: Object,
-    pub selected: bool,
 }
 
 impl EditableObject {
     pub fn new(object: Object) -> Self {
-        Self {
-            object,
-            selected: false,
-        }
+        Self { object }
     }
 }

@@ -8,11 +8,11 @@ use std::sync::Arc;
 use crate::config::CONFIG;
 use clap::Parser;
 use lyon::geom::euclid::{self};
-use nalgebra_glm::vec4;
+use nalgebra_glm::{vec2, vec4};
 use osm::math::{deg2num, tile_to_world_space, TileId};
 use winit::{
     application::ApplicationHandler,
-    dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize},
+    dpi::{LogicalSize, PhysicalPosition, PhysicalSize},
     event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{Key, ModifiersState, NamedKey},
@@ -64,7 +64,7 @@ fn main() {
     );
 
     let mouse_down = false;
-    let last_pos = winit::dpi::LogicalPosition::new(0.0, 0.0);
+    let last_pos = winit::dpi::PhysicalPosition::new(0.0, 0.0);
 
     let modifiers_state = ModifiersState::default();
 
@@ -97,7 +97,7 @@ pub struct Application {
     app_state: app_state::AppState,
     modifiers_state: ModifiersState,
     mouse_down: bool,
-    last_pos: LogicalPosition<f64>,
+    last_pos: PhysicalPosition<f64>,
     args: Args,
 }
 
@@ -133,20 +133,20 @@ impl ApplicationHandler for Application {
                         ..
                     },
                 ..
-            } => {
-                if !ui_event {
-                    match keycode {
-                        Key::Character(character) => {
-                            if character == "Q" && self.modifiers_state.super_key() {
-                                event_loop.exit()
-                            }
-                        }
-                        Key::Named(NamedKey::Escape) => event_loop.exit(),
-                        Key::Named(NamedKey::Tab) => self.app_state.advance_selected_object(),
-                        _ => {}
+            } => match keycode {
+                Key::Character(character) => {
+                    if character == "Q" && self.modifiers_state.super_key() {
+                        event_loop.exit()
                     }
                 }
-            }
+                Key::Named(NamedKey::Escape) => {
+                    if !ui_event {
+                        event_loop.exit()
+                    }
+                }
+                Key::Named(NamedKey::Tab) => self.app_state.advance_selected_object(),
+                _ => {}
+            },
             WindowEvent::ModifiersChanged(state) => {
                 self.modifiers_state = state.state();
             }
@@ -160,7 +160,7 @@ impl ApplicationHandler for Application {
                             }
                             ElementState::Released => {
                                 self.mouse_down = false;
-                                self.app_state.update_selected_hover_objects();
+                                self.app_state.update_selected_from_hover_objects();
                             }
                         }
                     }
@@ -177,31 +177,27 @@ impl ApplicationHandler for Application {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                let logical_position = position.to_logical(self.painter.get_hidpi_factor() / 2.0);
+                let logical_position = position.to_logical(self.painter.get_hidpi_factor());
 
                 let screen_to_global = self.app_state.screen.pixel_to_world(self.app_state.zoom);
-                let new_pos = screen_to_global
-                    * vec4(
-                        logical_position.x as f32,
-                        logical_position.y as f32,
-                        0.0,
-                        0.0,
-                    );
+                let new_pos =
+                    screen_to_global * vec4(position.x as f32, position.y as f32, 0.0, 0.0);
                 let old_pos = screen_to_global
                     * vec4(self.last_pos.x as f32, self.last_pos.y as f32, 0.0, 0.0);
                 let delta_new = new_pos - old_pos;
 
-                self.last_pos = logical_position;
+                self.last_pos = position;
+
+                self.app_state
+                    .set_cursor(vec2(logical_position.x, logical_position.y));
 
                 if !ui_event {
                     if self.mouse_down {
                         self.app_state.screen.center -= euclid::vec2(delta_new.x, delta_new.y);
                     }
 
-                    self.app_state.update_hovered_objects((
-                        logical_position.x as f32,
-                        logical_position.y as f32,
-                    ))
+                    self.app_state
+                        .update_hovered_objects((position.x as f32, position.y as f32))
                 }
             }
             WindowEvent::RedrawRequested => {
