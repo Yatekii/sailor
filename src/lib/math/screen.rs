@@ -61,23 +61,24 @@ impl Screen {
         glm::scaling(&scale)
     }
 
-    pub fn screen_to_world(&self, z: f32) -> glm::TMat4<f32> {
-        // TODO: make logical width instead of phyiscal.
-        glm::translation2d(&glm::vec2(dbg!(self.center.x), self.center.y))
-            * glm::scaling2d(&glm::vec2(
-                1.0 / 2.0 * f32::powf(2.0, -z) / self.tile_size(),
-                1.0 / 2.0 * f32::powf(2.0, -z) / self.tile_size(),
-            ));
-
+    /// Transforms coordinates from screen space to world space.
+    ///
+    /// This means the ranges get transformed as follows:
+    /// - [0, width] => [0, 1]
+    /// - [0, height] => [0, 1]
+    ///
+    /// First we scale to the world space and then we also translate according to where the screen rect is currently.
+    pub fn pixel_to_world(&self, z: f32) -> glm::TMat4<f32> {
         let matrix = self.global_to_screen(z);
         let screen_to_global = nalgebra_glm::inverse(&matrix);
 
-        let pixel_to_screen = glm::translation(&glm::vec3(-1.0, -1.0, 0.0))
-            * glm::scaling(&glm::vec3(
-                1.0 / (self.width / 2.0),
-                1.0 / (self.height / 2.0),
-                1.0,
-            ));
+        let translate_screen = glm::translation(&glm::vec3(-1.0, -1.0, 0.0));
+        let scale_to_screen = glm::scaling(&glm::vec3(
+            1.0 / (self.width / 2.0),
+            1.0 / (self.height / 2.0),
+            1.0,
+        ));
+        let pixel_to_screen = translate_screen * scale_to_screen;
 
         screen_to_global * pixel_to_screen
     }

@@ -182,7 +182,7 @@ impl ApplicationHandler for Application {
             WindowEvent::CursorMoved { position, .. } => {
                 let logical_position = position.to_logical(self.painter.get_hidpi_factor() / 2.0);
 
-                let screen_to_global = self.app_state.screen.screen_to_world(self.app_state.zoom);
+                let screen_to_global = self.app_state.screen.pixel_to_world(self.app_state.zoom);
                 let new_pos = screen_to_global
                     * vec4(
                         logical_position.x as f32,
