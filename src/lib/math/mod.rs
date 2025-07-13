@@ -56,7 +56,7 @@ pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileCoordinate {
 }
 
 pub fn tile_to_world_space(coordinate: &TileCoordinate) -> Point {
-    point(0.0, 0.0) + vector(coordinate.x, coordinate.y) * 1.0 / 2f32.powi(coordinate.z as i32)
+    point(0.0, 0.0) + vector(coordinate.x, coordinate.y) * f32::powi(2.0, -(coordinate.z as i32))
 }
 
 pub fn world_to_tile_space(point: &Point, z: u32) -> TileCoordinate {
