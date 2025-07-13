@@ -458,8 +458,8 @@ impl Tile {
             .map(move |(((x, y), _), buffer)| {
                 let position = matrix * glm::vec4(*x, *y, 0.0, 1.0);
 
-                let left = (position.x + 1.0) * screen.width as f32 / 2.0;
-                let top = (position.y + 1.0) * screen.height as f32 / 2.0;
+                let left = (position.x + 1.0) * screen.width / 2.0;
+                let top = (position.y + 1.0) * screen.height / 2.0;
 
                 TextArea {
                     buffer,
