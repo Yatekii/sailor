@@ -1,5 +1,4 @@
 use crate::*;
-use egui::TextBuffer;
 use feature::collection::LayerInfo;
 use glyphon::{
     Attrs, Buffer, Color, Family, FontSystem, Metrics, Shaping, TextArea, TextBounds, Weight,
@@ -9,8 +8,8 @@ use lyon::{
     tessellation::{geometry_builder::VertexBuffers, FillOptions, FillTessellator},
 };
 use quick_protobuf::{BytesReader, MessageRead};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::{collections::HashMap, thread::spawn};
 use std::{fmt::Display, ops::Range};
 use vector_tile::vector_tile::mod_Tile::{Feature, GeomType, Layer, Value};
 
@@ -168,12 +167,14 @@ impl Tile {
 
                 let paths = geometry_commands_to_paths(feature.type_pb, &feature.geometry);
 
+                let mut title = None;
                 if let Some(tag) = tags.get("name:en") {
                     let point = paths[0][ControlPointId(0)];
                     text.push((
                         (point.x / extent as f32, point.y / extent as f32),
                         tag.clone(),
                     ));
+                    title = Some(tag.clone());
                 }
 
                 // If we have a valid object at hand, insert it into the object list
@@ -191,6 +192,8 @@ impl Tile {
                         paths[0].points().to_vec(),
                         tags,
                         ot,
+                        *tile_id,
+                        title,
                     ));
                 }
 
@@ -341,7 +344,13 @@ impl Tile {
             .tessellate_path(&path, &FillOptions::tolerance(0.0001), builder)
             .expect("This is a bug. Please report it.");
 
-        let object = Object::new(selector, path.points().to_vec(), ObjectType::Polygon);
+        let object = Object::new(
+            selector,
+            path.points().to_vec(),
+            ObjectType::Polygon,
+            TileId::new(0, 0, 0),
+            Some("background".to_string()),
+        );
 
         (
             current_feature_id,

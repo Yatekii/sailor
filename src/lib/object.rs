@@ -1,3 +1,5 @@
+use crate::math::TileId;
+
 use super::css::Selector;
 
 use lyon::math::Point;
@@ -25,16 +27,26 @@ pub struct Object {
     tags: HashMap<String, String>,
     /// The object type.
     _object_type: ObjectType,
+    pub title: Option<String>,
+    pub tile_id: TileId,
 }
 
 impl Object {
     /// Creates a new object with no tags.
-    pub fn new(selector: Selector, points: Vec<Point>, object_type: ObjectType) -> Self {
+    pub fn new(
+        selector: Selector,
+        points: Vec<Point>,
+        object_type: ObjectType,
+        tile_id: TileId,
+        title: Option<String>,
+    ) -> Self {
         Self {
             selector,
             points,
             tags: HashMap::new(),
             _object_type: object_type,
+            title,
+            tile_id,
         }
     }
 
@@ -44,12 +56,16 @@ impl Object {
         points: Vec<Point>,
         tags: HashMap<String, String>,
         object_type: ObjectType,
+        tile_id: TileId,
+        title: Option<String>,
     ) -> Self {
         Self {
             selector,
             points,
             tags,
             _object_type: object_type,
+            title,
+            tile_id,
         }
     }
 
