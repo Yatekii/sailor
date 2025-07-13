@@ -17,7 +17,6 @@ fn main() {
     }
 
     loop {
-        // dbg!(tile.stats().size);
         std::thread::sleep(Duration::from_secs(1));
     }
 }
