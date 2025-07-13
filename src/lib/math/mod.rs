@@ -42,10 +42,16 @@ impl EuclidVsNalgebra for Vector2 {
     }
 }
 
+/// Converts degrees to radians.
 const fn deg2rad(deg: f32) -> f32 {
     2.0 * PI * deg / 360.0
 }
 
+/// Converts latitude and longitude into euclidian x and y coordinates.
+///
+/// Factors in the current tile zoom level and returns a tile coordinate within a grid of 2^zoom tiles in width.
+///
+/// This reresents the inverse Mercator projection.
 pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileCoordinate {
     let lat_rad = deg2rad(lat_deg);
     let n = f32::powi(2.0, zoom as i32);
