@@ -1,11 +1,15 @@
 use ncollide2d::{
     math::{Isometry, Point, Vector},
-    pipeline::object::{CollisionGroups, GeometricQueryType},
+    pipeline::{
+        object::{CollisionGroups, GeometricQueryType},
+        CollisionObjectSlabHandle,
+    },
     query::Ray,
     shape::{Polyline, Segment, ShapeHandle},
     world::CollisionWorld,
 };
 use std::{
+    collections::HashMap,
     sync::{Arc, RwLock},
     thread::spawn,
 };
@@ -14,12 +18,14 @@ use crate::object::Object;
 
 pub struct TileCollider {
     world: CollisionWorld<f32, usize>,
+    objects: HashMap<usize, CollisionObjectSlabHandle>,
 }
 
 impl TileCollider {
     pub fn new() -> Self {
         Self {
             world: CollisionWorld::new(0.02),
+            objects: HashMap::new(),
         }
     }
 
@@ -33,17 +39,34 @@ impl TileCollider {
             None,
         );
 
-        self.world.add(
-            Isometry::identity(),
-            ShapeHandle::new(polygon),
-            CollisionGroups::new(),
-            GeometricQueryType::Contacts(0.02, 0.02),
-            id,
-        );
+        if !self.objects.contains_key(&id) {
+            self.objects.insert(
+                id,
+                self.world
+                    .add(
+                        Isometry::identity(),
+                        ShapeHandle::new(polygon),
+                        CollisionGroups::new(),
+                        GeometricQueryType::Contacts(0.02, 0.02),
+                        id,
+                    )
+                    .0,
+            );
+        }
     }
 
     pub fn update(&mut self) {
         self.world.update()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.objects.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn get_hovered_objects(&self, point: &Point<f32>) -> Vec<usize> {
