@@ -470,7 +470,7 @@ impl Tile {
         screen: &'a Screen,
         z: f32,
     ) -> impl Iterator<Item = TextArea<'a>> {
-        let matrix = screen.tile_to_global_space(z, &self.tile_id());
+        let matrix = screen.tile_to_screen(z, &self.tile_id());
         self.text
             .iter()
             .zip(self.text_buffers.iter())

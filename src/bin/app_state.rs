@@ -40,10 +40,10 @@ impl AppState {
                 .expect("Unable to load the style file. Please consult the log."),
             screen: Screen::new(
                 center,
-                size.width,
-                size.height,
-                CONFIG.renderer.tile_size,
-                hidpi_factor,
+                size.width as f32,
+                size.height as f32,
+                CONFIG.renderer.tile_size as f32,
+                hidpi_factor as f32,
             ),
             zoom,
             hovered_objects: Arc::new(Mutex::new(Vec::new())),
@@ -216,7 +216,7 @@ impl AppState {
         self.screen.center = tile_to_world_space(&tile_coordinate);
     }
 
-    pub(crate) fn scale_factor_updated(&mut self, scale_factor: f64) {
+    pub(crate) fn scale_factor_updated(&mut self, scale_factor: f32) {
         self.screen = Screen::new(
             self.screen.center,
             self.screen.width,

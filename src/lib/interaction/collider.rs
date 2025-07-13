@@ -15,6 +15,9 @@ use super::tile_collider::TileCollider;
 pub struct Collider {}
 
 impl Collider {
+    /// Get the hovered objects
+    ///
+    /// * point: The pointer in logical coordinates (divided by DPI ratio)
     pub fn get_hovered_objects(
         visible_tiles: &[VisibleTile],
         screen: &Screen,
@@ -30,11 +33,12 @@ impl Collider {
             objects,
         } in visible_tiles
         {
-            let matrix = screen.tile_to_global_space(zoom, tile_id);
+            let matrix = screen.tile_to_screen(zoom, tile_id);
             let matrix = nalgebra_glm::inverse(&matrix);
+            // The point in GPU coordinates.
             let screen_point = Point::new(
-                point.0 / (screen.width / 2) as f32 - 1.0,
-                point.1 / (screen.height / 2) as f32 - 1.0,
+                point.0 / (screen.width / 2f32) - 1.0,
+                point.1 / (screen.height / 2f32) - 1.0,
             );
             let global_point = matrix * Vector4::new(screen_point.x, screen_point.y, 0.0, 1.0);
             let tile_point = Point::new(global_point.x, global_point.y) * *extent;

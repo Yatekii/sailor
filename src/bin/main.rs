@@ -7,7 +7,11 @@ use std::sync::Arc;
 
 use crate::config::CONFIG;
 use clap::Parser;
-use lyon::math::vector;
+use lyon::{
+    geom::euclid::{self, point2},
+    math::vector,
+};
+use nalgebra_glm::{vec2, vec3, vec4, Mat4};
 use osm::math::{deg2num, tile_to_world_space, TileId};
 use winit::{
     application::ApplicationHandler,
@@ -83,8 +87,8 @@ fn main() {
         .hud
         .platform
         .handle_event(&winit::event::WindowEvent::Resized(PhysicalSize::new(
-            screen.width,
-            screen.height,
+            screen.width as u32,
+            screen.height as u32,
         )));
 
     event_loop.run_app(&mut application).unwrap();
@@ -115,13 +119,15 @@ impl ApplicationHandler for Application {
         match event {
             WindowEvent::Destroyed => event_loop.exit(),
             WindowEvent::Resized(physical_size) => {
-                self.app_state.screen.width = physical_size.width.min(8192);
-                self.app_state.screen.height = physical_size.height.min(8192);
-                self.painter
-                    .resize(self.app_state.screen.width, self.app_state.screen.height);
+                self.app_state.screen.width = physical_size.width.min(8192) as f32;
+                self.app_state.screen.height = physical_size.height.min(8192) as f32;
+                self.painter.resize(
+                    self.app_state.screen.width as u32,
+                    self.app_state.screen.height as u32,
+                );
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                self.app_state.scale_factor_updated(scale_factor)
+                self.app_state.scale_factor_updated(scale_factor as f32)
             }
             WindowEvent::KeyboardInput {
                 event:
@@ -174,30 +180,25 @@ impl ApplicationHandler for Application {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
-                let logical_position = position.to_logical(self.painter.get_hidpi_factor());
-                let size = self.app_state.screen.tile_size() as f32;
-                let mut delta = vector(
-                    (logical_position.x - self.last_pos.x) as f32,
-                    (logical_position.y - self.last_pos.y) as f32,
-                );
-                let zoom_x = (self.app_state.screen.width as f32)
-                    / size
-                    / 2f32.powf(self.app_state.zoom)
-                    / size
-                    / 1.13;
-                let zoom_y = (self.app_state.screen.height as f32)
-                    / size
-                    / 2f32.powf(self.app_state.zoom)
-                    / size
-                    / 1.13;
-                delta.x *= zoom_x;
-                delta.y *= zoom_y;
+                let logical_position = position.to_logical(self.painter.get_hidpi_factor() / 2.0);
+
+                let screen_to_global = self.app_state.screen.screen_to_world(self.app_state.zoom);
+                let new_pos = screen_to_global
+                    * vec4(
+                        logical_position.x as f32,
+                        logical_position.y as f32,
+                        0.0,
+                        0.0,
+                    );
+                let old_pos = screen_to_global
+                    * vec4(self.last_pos.x as f32, self.last_pos.y as f32, 0.0, 0.0);
+                let delta_new = new_pos - old_pos;
 
                 self.last_pos = logical_position;
 
                 if !ui_event {
                     if self.mouse_down {
-                        self.app_state.screen.center -= delta;
+                        self.app_state.screen.center -= euclid::vec2(delta_new.x, delta_new.y);
                     }
 
                     self.app_state.update_hovered_objects((
@@ -210,8 +211,8 @@ impl ApplicationHandler for Application {
                 self.hud
                     .platform
                     .handle_event(&winit::event::WindowEvent::Resized(PhysicalSize::new(
-                        self.app_state.screen.width,
-                        self.app_state.screen.height,
+                        self.app_state.screen.width as u32,
+                        self.app_state.screen.height as u32,
                     )));
                 if !event_loop.exiting() {
                     self.painter.update_shader();

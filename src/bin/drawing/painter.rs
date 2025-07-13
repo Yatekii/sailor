@@ -428,7 +428,7 @@ impl Painter {
         let mut i = 0;
         for vt in visible_tiles {
             let extent = vt.extent() as f32;
-            let matrix = screen.tile_to_global_space(z, &vt.tile_id());
+            let matrix = screen.tile_to_screen(z, &vt.tile_id());
             for float in matrix.as_slice() {
                 data[i] = *float;
                 i += 1;
@@ -741,9 +741,7 @@ impl Painter {
                     ) / 2.0;
 
                     for (i, tile_id) in app_state.visible_tiles().iter().enumerate() {
-                        let matrix = app_state
-                            .screen
-                            .tile_to_global_space(app_state.zoom, tile_id);
+                        let matrix = app_state.screen.tile_to_screen(app_state.zoom, tile_id);
                         let start = (matrix * vec).xy() + vec2(1.0, 1.0);
                         let s = vec2(
                             (start.x * screen_dimensions.x)
@@ -755,7 +753,7 @@ impl Painter {
                                 .max(0.0)
                                 .min(screen_dimensions.y * 2.0),
                         );
-                        let matrix = app_state.screen.tile_to_global_space(
+                        let matrix = app_state.screen.tile_to_screen(
                             app_state.zoom,
                             &(*tile_id + TileId::new(tile_id.z, 1, 1)),
                         );

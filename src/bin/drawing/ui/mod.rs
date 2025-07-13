@@ -2,7 +2,6 @@ pub mod state;
 pub mod views;
 pub mod widgets;
 
-use std::fmt::format;
 use std::sync::Arc;
 
 use egui::color_picker::Alpha;
