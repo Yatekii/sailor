@@ -84,16 +84,4 @@ impl Screen {
     pub fn global_to_tile_space(&self, z: f32, coordinate: &TileId) -> glm::TMat4<f32> {
         self.tile_to_screen(z, coordinate).try_inverse().unwrap()
     }
-
-    // pub fn screen_to_global(&self, z: f32) -> glm::TMat4<f32> {
-    //     // self.global_to_screen(z).try_inverse().unwrap()
-    //     let zoom_x = 2.0f32.powf(z) / (self.width / 2.0) * self.tile_size() * 2.0;
-    //     let zoom_y = 2.0f32.powf(z) / (self.height / 2.0) * self.tile_size() * 2.0;
-    //     let zoom = glm::scaling(&glm::vec3(zoom_x, zoom_y, 1.0));
-    //     (zoom).try_inverse().unwrap()
-
-    //     glm::
-    // }
-
-    // screen (px distorted) -> screen (square normalized coordinates) -> world (square coordinates) -> mercator lat lon
 }
