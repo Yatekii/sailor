@@ -379,7 +379,7 @@ impl Painter {
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("map canvas size data"),
-            contents: as_byte_slice(&[screen.width as f32, screen.height as f32, 0.0, 0.0]),
+            contents: as_byte_slice(&[screen.width, screen.height, 0.0, 0.0]),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_SRC,
         });
 
@@ -735,10 +735,8 @@ impl Painter {
                     });
                     render_pass.set_bind_group(0, &self.bind_group, &[]);
                     let vec = vec4(0.0, 0.0, 0.0, 1.0);
-                    let screen_dimensions = vec2(
-                        app_state.screen.width as f32,
-                        app_state.screen.height as f32,
-                    ) / 2.0;
+                    let screen_dimensions =
+                        vec2(app_state.screen.width, app_state.screen.height) / 2.0;
 
                     for (i, tile_id) in app_state.visible_tiles().iter().enumerate() {
                         let matrix = app_state.screen.tile_to_screen(app_state.zoom, tile_id);

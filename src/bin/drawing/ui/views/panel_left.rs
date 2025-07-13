@@ -6,7 +6,7 @@ use crate::{
 use super::{inspector::view_inspector, layer_toggle::view_layer_toggle};
 
 pub struct PanelLeft {
-    open: bool,
+    _open: bool,
     tree: egui_tiles::Tree<Pane>,
 }
 
@@ -33,7 +33,7 @@ impl PanelLeft {
 
         let tree = egui_tiles::Tree::new("my_tree", root, tiles);
 
-        Self { open: true, tree }
+        Self { _open: true, tree }
     }
 
     pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {

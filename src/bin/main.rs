@@ -7,11 +7,8 @@ use std::sync::Arc;
 
 use crate::config::CONFIG;
 use clap::Parser;
-use lyon::{
-    geom::euclid::{self, point2},
-    math::vector,
-};
-use nalgebra_glm::{vec2, vec3, vec4, Mat4};
+use lyon::geom::euclid::{self};
+use nalgebra_glm::vec4;
 use osm::math::{deg2num, tile_to_world_space, TileId};
 use winit::{
     application::ApplicationHandler,
