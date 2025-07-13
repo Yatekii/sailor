@@ -42,15 +42,15 @@ impl EuclidVsNalgebra for Vector2 {
     }
 }
 
-fn deg2rad(deg: f32) -> f32 {
+const fn deg2rad(deg: f32) -> f32 {
     2.0 * PI * deg / 360.0
 }
 
 pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileCoordinate {
     let lat_rad = deg2rad(lat_deg);
-    let n = 2f32.powi(zoom as i32);
+    let n = f32::powi(2.0, zoom as i32);
     let xtile = (lon_deg + 180.0) / 360.0 * n;
-    let ytile = (1.0 - (lat_rad.tan() + 1.0 / lat_rad.cos()).ln() / PI) / 2.0 * n;
+    let ytile = (1.0 - (f32::tan(lat_rad) + 1.0 / f32::ln(f32::cos(lat_rad))) / PI) / 2.0 * n;
 
     TileCoordinate::new(zoom, xtile, ytile)
 }
