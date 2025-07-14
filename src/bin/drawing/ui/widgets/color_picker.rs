@@ -21,7 +21,7 @@ pub fn add_color_picker(ui: &mut Ui, rule: &mut Rule, attribute: &str) {
         _ => Color::TRANSPARENT, // This should never happen, but transparent should be a decent fallback
     };
     let mut color = Rgba::from_rgba_premultiplied(color.r, color.g, color.b, color.a);
-    egui::widgets::color_picker::color_edit_button_rgba(ui, &mut color, Alpha::Opaque);
+    egui::widgets::color_picker::color_edit_button_rgba(ui, &mut color, Alpha::OnlyBlend);
 
     rule.kvs.insert(
         attribute.to_string(),
