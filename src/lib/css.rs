@@ -406,7 +406,9 @@ fn any<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorP
     let (remaining, _) = char('[')(input)?;
     let (remaining, name) = take_while(|c| is_alphanumeric(c as u8))(remaining)?;
     let (remaining, _) = char('=')(remaining)?;
+    let (remaining, _) = char('"')(remaining)?;
     let (remaining, value) = take_while(|c| is_alphanumeric(c as u8))(remaining)?;
+    let (remaining, _) = char('"')(remaining)?;
     let (remaining, _) = char(']')(remaining)?;
     Ok((remaining, SelectorPart::Any(name.into(), value.into())))
 }
