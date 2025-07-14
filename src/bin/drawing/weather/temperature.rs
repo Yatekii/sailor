@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use std::path::Path;
+use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
-use crossbeam_channel::{unbounded, TryRecvError};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use osm::drawing::as_byte_slice;
 use wgpu::naga::ShaderStage;
@@ -24,7 +24,7 @@ pub struct Temperature {
     pipeline: RenderPipeline,
     bind_group_layout: BindGroupLayout,
     _bind_group: BindGroup,
-    rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
+    rx: Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
     texture: Texture,
 }
@@ -35,7 +35,7 @@ impl Temperature {
             label: Some("temperature overlay encoder"),
         });
 
-        let (tx, rx) = unbounded();
+        let (tx, rx) = channel();
 
         let mut watcher: RecommendedWatcher =
             match notify::recommended_watcher(move |res| tx.send(res).unwrap()) {

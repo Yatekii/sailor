@@ -1,8 +1,8 @@
 use std::num::NonZeroU64;
 use std::path::Path;
+use std::sync::mpsc::{channel, Receiver, TryRecvError};
 use std::sync::Arc;
 
-use crossbeam_channel::{unbounded, Receiver, TryRecvError};
 use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -85,7 +85,7 @@ impl Painter {
             label: Some("initial command encoder (loading font atlas, etc)"),
         });
 
-        let (tx, rx) = unbounded();
+        let (tx, rx) = channel();
 
         let mut watcher: RecommendedWatcher =
             match notify::recommended_watcher(move |res| tx.send(res).unwrap()) {

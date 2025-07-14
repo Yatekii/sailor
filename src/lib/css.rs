@@ -1,4 +1,3 @@
-use crossbeam_channel::{unbounded, TryRecvError};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
@@ -13,7 +12,12 @@ use nom::{
     AsChar, Err, IResult, InputTakeAtPosition,
 };
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::{collections::BTreeMap, num::ParseIntError, path::Path};
+use std::{
+    collections::BTreeMap,
+    num::ParseIntError,
+    path::Path,
+    sync::mpsc::{channel, Receiver, TryRecvError},
+};
 
 /// Tries to parse an entire stylesheet.
 pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
@@ -35,7 +39,7 @@ pub struct RulesCache {
     buffer: String,
     file_path: String,
     pub rules: Vec<Rule>,
-    rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
+    rx: Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
 }
 
@@ -47,7 +51,7 @@ impl RulesCache {
         let buffer: String = std::fs::read_to_string(std::path::Path::new(&file_path))
             .expect("Something went wrong reading the file");
 
-        let (tx, rx) = unbounded();
+        let (tx, rx) = channel();
         let mut _watcher: RecommendedWatcher =
             match notify::recommended_watcher(move |res| tx.send(res).unwrap()) {
                 Ok(watcher) => watcher,
