@@ -32,6 +32,8 @@ pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
 }
 
 pub struct RulesCache {
+    buffer: String,
+    file_path: String,
     pub rules: Vec<Rule>,
     rx: crossbeam_channel::Receiver<std::result::Result<notify::event::Event, notify::Error>>,
     _watcher: RecommendedWatcher,
@@ -39,14 +41,14 @@ pub struct RulesCache {
 
 impl RulesCache {
     /// Tries to create a new CSS rule cache from a given CSS file path.
-    pub fn try_load_from_file(filename: impl Into<String>) -> Option<Self> {
-        let filename = filename.into();
+    pub fn try_load_from_file(file_path: impl Into<String>) -> Option<Self> {
+        let file_path = file_path.into();
 
-        let contents = std::fs::read_to_string(std::path::Path::new(&filename))
+        let buffer: String = std::fs::read_to_string(std::path::Path::new(&file_path))
             .expect("Something went wrong reading the file");
 
         let (tx, rx) = unbounded();
-        let mut watcher: RecommendedWatcher =
+        let mut _watcher: RecommendedWatcher =
             match notify::recommended_watcher(move |res| tx.send(res).unwrap()) {
                 Ok(watcher) => watcher,
                 Err(err) => {
@@ -56,21 +58,23 @@ impl RulesCache {
                 }
             };
 
-        match watcher.watch(Path::new(&filename), RecursiveMode::Recursive) {
+        match _watcher.watch(Path::new(&file_path), RecursiveMode::Recursive) {
             Ok(_) => {}
             Err(err) => {
-                log::info!("Failed to start watching {}:", filename);
+                log::info!("Failed to start watching {}:", file_path);
                 log::info!("{}", err);
                 return None;
             }
         };
 
-        let rules = try_parse_styles(&contents)?;
+        let rules = try_parse_styles(&buffer)?;
 
         Some(Self {
+            buffer,
+            file_path,
             rules,
             rx,
-            _watcher: watcher,
+            _watcher,
         })
     }
 
@@ -139,10 +143,11 @@ impl RulesCache {
     fn try_reload_from_file(&mut self, filename: &std::path::Path) -> bool {
         match std::fs::read_to_string(filename) {
             Ok(contents) => {
-                self.rules = match try_parse_styles(&contents) {
+                self.buffer = contents;
+                self.rules = match try_parse_styles(&self.buffer) {
                     Some(rules) => rules,
                     None => return false,
-                }
+                };
             }
             Err(err) => {
                 log::info!("Failed to read file at {:?}:", filename);
@@ -151,6 +156,14 @@ impl RulesCache {
             }
         }
         true
+    }
+
+    pub fn try_save_to_file(&mut self) -> std::io::Result<()> {
+        std::fs::write(&self.file_path, &self.buffer)
+    }
+
+    pub fn buffer_mut(&mut self) -> &mut String {
+        &mut self.buffer
     }
 }
 
@@ -286,30 +299,6 @@ impl Selector {
         std::mem::size_of::<Selector>() + self.malloc_size_of()
     }
 }
-
-// impl wr_malloc_size_of::MallocSizeOf for Selector {
-//     /// Returns the memory size of the selector.
-//     fn size_of(&self, ops: &mut wr_malloc_size_of::MallocSizeOfOps) -> usize {
-//         let size_any =
-//             self.any.len() * (
-//               std::mem::size_of::<String>()
-//             + std::mem::size_of::<String>()
-//             + std::mem::size_of::<usize>()
-//             )
-//           + self.any.iter().map(|(k, v)| k.len() + v.len()).sum();
-
-//         let size_classes =
-//             self.classes.len() * std::mem::size_of::<String>()
-//           + self.classes.iter().map(|v| v.len()).sum();
-
-//         let base_len =
-//             2 * std::mem::size_of::<Option<String>>()
-//           + self.typ.map_or(0, |v| v.len())
-//           + self.id.map_or(0, |v| v.len());
-
-//         size_any + size_classes + base_len
-//     }
-// }
 
 /// A single part of a selector.
 /// Used for parsing only.

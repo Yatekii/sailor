@@ -14,6 +14,7 @@ use egui_wgpu_backend::ScreenDescriptor;
 use egui_winit_platform::PlatformDescriptor;
 use views::fps::view_fps;
 use views::location_finder::LocationFinderWindow;
+use views::panel_bottom::panel_bottom;
 use views::panel_left::PanelLeft;
 use views::panel_right::panel_right;
 use wgpu::SurfaceConfiguration;
@@ -161,6 +162,8 @@ impl HudUi {
                     })
                 })
             });
+
+            panel_bottom(ctx, app_state);
 
             panel_right(ctx, app_state);
 
