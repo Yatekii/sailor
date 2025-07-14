@@ -3,7 +3,7 @@ mod tile_field;
 mod tile_id;
 
 use lyon::math::{point, vector, Point};
-use std::f32::consts::PI;
+use std::f32::consts::{E, PI};
 
 pub use screen::*;
 pub use tile_field::*;
@@ -42,6 +42,11 @@ impl EuclidVsNalgebra for Vector2 {
     }
 }
 
+/// Converts radians to degrees.
+const fn rad2deg(rad: f32) -> f32 {
+    rad * 360.0 / (2.0 * PI)
+}
+
 /// Converts degrees to radians.
 const fn deg2rad(deg: f32) -> f32 {
     2.0 * PI * deg / 360.0
@@ -56,9 +61,22 @@ pub fn deg2num(lat_deg: f32, lon_deg: f32, zoom: u32) -> TileCoordinate {
     let lat_rad = deg2rad(lat_deg);
     let n = f32::powi(2.0, zoom as i32);
     let xtile = (lon_deg + 180.0) / 360.0 * n;
-    let ytile = (1.0 - (f32::tan(lat_rad) + 1.0 / f32::ln(f32::cos(lat_rad))) / PI) / 2.0 * n;
+    let ytile = (1.0 - (PI / 4.0 + lat_rad / 2.0).tan().ln() / PI) / 2.0 * n;
 
     TileCoordinate::new(zoom, xtile, ytile)
+}
+
+/// Converts euclidian x and y coordinates into latitude and longitude.
+///
+/// This is the Mercator projection and the inverse of [`deg2num`].
+pub fn num2deg(tile: TileCoordinate) -> Point {
+    let n = f32::powi(2.0, tile.z as i32);
+
+    let lon_deg = tile.x * 360.0 / n - 180.0;
+    let lat_rad = 2.0 * (E.powf(1.0 - tile.y * 2.0 / n).atan() * PI - PI / 4.0);
+    let lat_deg = rad2deg(lat_rad);
+
+    point(lon_deg, lat_deg)
 }
 
 pub fn tile_to_world_space(coordinate: &TileCoordinate) -> Point {

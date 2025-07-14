@@ -29,30 +29,24 @@ fn selected_object(ui: &mut Ui, app_state: &mut AppState) {
         let selector = object.selector().clone();
         let tags = object.tags();
 
-        ui.separator();
         ui.label(RichText::from("Tags").strong());
         ui.separator();
 
-        ui.label(format!("{tags:#?}"));
         let data = tags
             .iter()
             .map(|(k, v)| (k.as_str(), v.clone()))
             .collect::<Vec<_>>();
         widget_key_value_table(ui, &data);
-
-        ui.separator();
-        ui.label("Applying rules");
         ui.separator();
 
         let mut rules = app_state.css_cache.get_matching_rules_mut(&selector);
         for rule in rules.iter_mut() {
-            ui.collapsing(format!("{}", rule.selector), |ui| {
-                add_color_picker(ui, rule, "background-color");
-                add_color_picker(ui, rule, "border-color");
-                add_slider_float(ui, rule, "border-width");
-                add_slider_float(ui, rule, "line-width");
-                add_display_none(ui, rule, "display");
-            });
+            ui.label(format!("{}", rule.selector));
+            add_color_picker(ui, rule, "background-color");
+            add_color_picker(ui, rule, "border-color");
+            add_slider_float(ui, rule, "border-width");
+            add_slider_float(ui, rule, "line-width");
+            add_display_none(ui, rule, "display");
         }
     } else {
         ui.label("No Object selected");
