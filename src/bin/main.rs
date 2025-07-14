@@ -112,6 +112,7 @@ impl ApplicationHandler for Application {
         _window_id: WindowId,
         event: WindowEvent,
     ) {
+        self.app_state.css_cache.update();
         let ui_event = self.hud.interact(&event);
         match event {
             WindowEvent::Destroyed => event_loop.exit(),
