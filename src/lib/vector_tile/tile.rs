@@ -144,8 +144,8 @@ impl Tile {
         for layer in tile.layers {
             let mut fc = feature_collection.write().unwrap();
             let layers = fc.layers_mut();
-            let mut map: std::collections::HashMap<Selector, Vec<(GeomType, Vec<Path>)>> =
-                HashMap::new();
+            let mut map: HashMap<Selector, Vec<(GeomType, Vec<Path>)>> =
+                HashMap::with_capacity(200);
             let layer_name = layer.name.to_string();
             let layer_id = if let Some(layer) = layers.iter().find(|l| l.name == layer_name) {
                 layer.id
