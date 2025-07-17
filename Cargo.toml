@@ -28,8 +28,10 @@ path = "src/bin/main.rs"
 clap = { version = "4", features = ["derive"] }
 config = "0.14"
 log = { version = "0.4", features = ["serde"] }
-lyon = { version = "1", path = "../lyon/crates/lyon" }
+# lyon = { version = "1", path = "../lyon/crates/lyon" }
+lyon = { version = "1", git = "https://github.com/Yatekii/lyon.git" }
 lru = "0.16"
+lazy_static = "1"
 malloc_size_of_derive = "0.1"
 nalgebra = "0.33"
 nalgebra-glm = "0.19"

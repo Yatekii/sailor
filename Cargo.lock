@@ -1822,6 +1822,7 @@ dependencies = [
 [[package]]
 name = "lyon"
 version = "1.0.0"
+source = "git+https://github.com/Yatekii/lyon.git#bc874aa55071e2599831a3ed0b849ca4c4aaae21"
 dependencies = [
  "lyon_algorithms",
  "lyon_tessellation",
@@ -1830,6 +1831,7 @@ dependencies = [
 [[package]]
 name = "lyon_algorithms"
 version = "1.0.1"
+source = "git+https://github.com/Yatekii/lyon.git#bc874aa55071e2599831a3ed0b849ca4c4aaae21"
 dependencies = [
  "lyon_path",
 ]
@@ -1837,6 +1839,7 @@ dependencies = [
 [[package]]
 name = "lyon_geom"
 version = "1.0.1"
+source = "git+https://github.com/Yatekii/lyon.git#bc874aa55071e2599831a3ed0b849ca4c4aaae21"
 dependencies = [
  "arrayvec",
  "euclid",
@@ -1846,6 +1849,7 @@ dependencies = [
 [[package]]
 name = "lyon_path"
 version = "1.0.1"
+source = "git+https://github.com/Yatekii/lyon.git#bc874aa55071e2599831a3ed0b849ca4c4aaae21"
 dependencies = [
  "lyon_geom",
 ]
@@ -1853,6 +1857,7 @@ dependencies = [
 [[package]]
 name = "lyon_tessellation"
 version = "1.0.4"
+source = "git+https://github.com/Yatekii/lyon.git#bc874aa55071e2599831a3ed0b849ca4c4aaae21"
 dependencies = [
  "float_next_after",
  "lyon_path",
@@ -3124,6 +3129,7 @@ dependencies = [
  "glyphon",
  "human_bytes",
  "insta",
+ "lazy_static",
  "log",
  "lru 0.16.0",
  "lyon",
