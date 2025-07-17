@@ -19,8 +19,6 @@ pub fn view_fps(ui: &mut Ui, app_state: &mut AppState) {
         let to_screen =
             emath::RectTransform::from_to(Rect::from_x_y_ranges(0.0..=1.0, -1.0..=1.0), rect);
 
-        let mut shapes = vec![];
-
         let points: Vec<Pos2> = app_state
             .stats
             .get_times()
@@ -38,11 +36,9 @@ pub fn view_fps(ui: &mut Ui, app_state: &mut AppState) {
             })
             .collect();
 
-        shapes.push(epaint::Shape::line(
+        ui.painter().add(epaint::Shape::line(
             points,
             PathStroke::new(WIDTH, Color32::WHITE),
         ));
-
-        ui.painter().extend(shapes);
     });
 }

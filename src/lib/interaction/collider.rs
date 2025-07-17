@@ -24,7 +24,8 @@ impl Collider {
         zoom: f32,
         point: (f32, f32),
     ) -> Vec<Object> {
-        let mut return_objects = vec![];
+        let mut object_ids = Vec::with_capacity(200);
+        let mut return_objects = Vec::with_capacity(200);
 
         for VisibleTile {
             tile_id,
@@ -50,18 +51,22 @@ impl Collider {
             {
                 if let Ok(collider) = collider.try_read() {
                     if let Ok(objects) = objects.try_read() {
-                        let object_ids = collider.get_hovered_objects(&tile_point);
-                        for object_id in object_ids {
-                            let object = (objects.deref())[object_id].clone();
+                        collider.get_hovered_objects(&tile_point, &mut object_ids);
+
+                        for object_id in &object_ids {
+                            let object = (objects.deref())[*object_id].clone();
                             return_objects.push(object)
                         }
+
+                        object_ids.clear();
                     }
                 }
 
-                return return_objects;
+                break;
             }
         }
 
+        // We return an empty vector.
         return_objects
     }
 }

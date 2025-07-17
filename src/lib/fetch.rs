@@ -54,7 +54,8 @@ fn fetch_tile_from_server(tile_id: &TileId) -> Option<Vec<u8>> {
     if let Ok(response) = response {
         if response.status() == 200 {
             let mut reader = response.into_reader();
-            let mut data = vec![];
+            // Reserve 4MB upfront which should cover all requests
+            let mut data = Vec::with_capacity(4_194_304);
             match reader.read_to_end(&mut data) {
                 Ok(_) => Some(data),
                 Err(e) => {

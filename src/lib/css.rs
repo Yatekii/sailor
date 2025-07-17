@@ -226,7 +226,8 @@ impl Selector {
         Self {
             typ: None,
             id: None,
-            classes: vec![],
+            // Usually we don't have many classes so don't allocate much.
+            classes: Vec::with_capacity(4),
             any: BTreeMap::new(),
         }
     }
@@ -238,13 +239,13 @@ impl Selector {
     }
 
     /// Makes the selector require the id `id`.
-    pub fn _with_id(mut self, id: impl Into<String>) -> Self {
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
         self
     }
 
     /// Makes the selector require the class `class`.
-    pub fn _with_class(mut self, class: impl Into<String>) -> Self {
+    pub fn with_class(mut self, class: impl Into<String>) -> Self {
         self.classes.push(class.into());
         self
     }

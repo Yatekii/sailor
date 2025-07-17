@@ -55,6 +55,8 @@ egui_winit_platform = "0.26"
 egui_tiles = "0.12.0"
 egui_extras = { version = "0.31.0", features = ["syntect"] }
 human_bytes = "0.4"
+heapless = "*"
+parking_lot = "*"
 
 [dev-dependencies]
 insta = "1"

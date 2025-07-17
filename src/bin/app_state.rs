@@ -1,6 +1,7 @@
 use lyon::math::Point;
 use nalgebra_glm::{vec2, Vec2};
 use osm::cache::TileCache;
+use osm::config::MAX_TILES;
 use osm::css::RulesCache;
 use osm::feature::collection::FeatureCollection;
 use osm::interaction::collider::{Collider, VisibleTile};
@@ -10,7 +11,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use winit::dpi::PhysicalSize;
 
-use crate::config::{CONFIG, MAX_FEATURES, MAX_TILES};
+use crate::config::CONFIG;
 use crate::drawing::ui::state::UIState;
 use crate::stats::Stats;
 
@@ -51,13 +52,13 @@ impl AppState {
             ),
             zoom,
             hovered_objects: Arc::new(Mutex::new(Vec::new())),
-            selected_objects: vec![],
+            selected_objects: Vec::with_capacity(64),
             selected_object: 0,
-            selected_object_labels: vec![],
+            selected_object_labels: Vec::with_capacity(64),
             stats: Stats::new(),
             ui: UIState::new(),
             visible_tiles: Vec::new(),
-            feature_collection: Arc::new(RwLock::new(FeatureCollection::new(MAX_FEATURES))),
+            feature_collection: Arc::new(RwLock::new(FeatureCollection::new())),
             cursor: vec2(0.0, 0.0),
         }
     }

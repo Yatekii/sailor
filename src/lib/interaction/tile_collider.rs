@@ -69,9 +69,8 @@ impl TileCollider {
         self.len() == 0
     }
 
-    pub fn get_hovered_objects(&self, point: &Point<f32>) -> Vec<usize> {
-        let mut object_ids = vec![];
-        let mut interferences = vec![];
+    pub fn get_hovered_objects(&self, point: &Point<f32>, hovered_objects: &mut Vec<usize>) {
+        let mut interferences = Vec::with_capacity(100);
         self.world
             .broad_phase
             .interferences_with_point(point, &mut interferences);
@@ -93,13 +92,11 @@ impl TileCollider {
 
                     if winding_number % 2 == 1 {
                         // We found a general polygon that contains our mouse pointer.
-                        object_ids.push(*co.data());
+                        hovered_objects.push(*co.data());
                     }
                 }
             }
         }
-
-        object_ids
     }
 }
 

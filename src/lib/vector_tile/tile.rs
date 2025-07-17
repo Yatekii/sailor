@@ -1,3 +1,4 @@
+use crate::config::MAX_FEATURES;
 use crate::*;
 use feature::collection::LayerInfo;
 use glyphon::{
@@ -130,8 +131,8 @@ impl Tile {
         let mut mesh: VertexBuffers<Vertex, u32> = VertexBuffers::with_capacity(10_000, 10_000);
         let mut builder = MeshBuilder::new(&mut mesh, LayerVertexCtor::new(tile_id, 1.0));
         let extent = tile.layers[0].extent as u16;
-        let mut features = vec![];
-        let mut text = vec![];
+        let mut features = Vec::with_capacity(MAX_FEATURES);
+        let mut text = Vec::with_capacity(MAX_FEATURES);
 
         // Add a background feature to the tile data.
         let (mut current_feature_id, object, range) =
@@ -200,15 +201,18 @@ impl Tile {
                 if let Some(value) = map.get_mut(&selector) {
                     value.push((feature.type_pb, paths));
                 } else {
-                    map.insert(selector.clone(), vec![(feature.type_pb, paths)]);
+                    map.insert(selector.clone(), {
+                        let mut selectors = Vec::with_capacity(1024);
+                        selectors.push((feature.type_pb, paths));
+                        selectors
+                    });
                 }
             }
 
             // Transform all the features on a per selector basis.
-            let mut inner_features = vec![];
-            for (selector, features) in map {
+            for (selector, feats) in map {
                 let index_start_before = builder.get_current_index();
-                for feature in features {
+                for feature in feats {
                     // Set the current feature id.
                     current_feature_id = {
                         // Scope the lock guard real tight to ensure it's released quickly.
@@ -226,13 +230,11 @@ impl Tile {
                     );
                 }
 
-                inner_features.push((
+                features.push((
                     current_feature_id,
                     index_start_before..builder.get_current_index(),
                 ));
             }
-
-            features.extend(inner_features);
         }
 
         let collider = Arc::new(RwLock::new(TileCollider::new()));
@@ -261,6 +263,7 @@ impl Tile {
             }
         };
 
+        let num_labels = text.len();
         Self {
             tile_id: *tile_id,
             mesh,
@@ -271,7 +274,7 @@ impl Tile {
             gpu_tile: None,
             text,
             stats,
-            text_buffers: vec![],
+            text_buffers: Vec::with_capacity(num_labels),
         }
     }
 

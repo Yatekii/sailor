@@ -1,11 +1,13 @@
-use crate::css::{RulesCache, Selector};
+use crate::{
+    config::MAX_FEATURES,
+    css::{RulesCache, Selector},
+};
 
 use super::{Feature, FeatureStyle};
 
 #[derive(Debug, Clone)]
 pub struct FeatureCollection {
     features: Vec<Feature>,
-    n_features_max: u32,
     layers: Vec<LayerInfo>,
 }
 
@@ -17,15 +19,18 @@ pub struct LayerInfo {
 }
 
 impl FeatureCollection {
-    pub fn new(n_features_max: u32) -> Self {
+    pub fn new() -> Self {
         Self {
-            features: vec![],
-            n_features_max,
-            layers: vec![LayerInfo {
-                id: 0,
-                name: "background".to_string(),
-                display: true,
-            }],
+            features: Vec::with_capacity(MAX_FEATURES),
+            layers: {
+                let mut layers = Vec::with_capacity(30);
+                layers.push(LayerInfo {
+                    id: 0,
+                    name: "background".to_string(),
+                    display: true,
+                });
+                layers
+            },
         }
     }
 
@@ -54,7 +59,7 @@ impl FeatureCollection {
     }
 
     fn add_feature(&mut self, mut feature: Feature) -> u32 {
-        assert!(self.features.len() < self.n_features_max as usize);
+        assert!(self.features.len() < MAX_FEATURES);
         feature.id = self.features.len() as u32;
         self.features.push(feature);
         self.features.len() as u32 - 1
@@ -109,5 +114,11 @@ impl FeatureCollection {
 
     pub fn assemble_style_buffer(&self) -> Vec<FeatureStyle> {
         self.features.iter().map(|f| f.style).collect()
+    }
+}
+
+impl Default for FeatureCollection {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -39,7 +39,9 @@ impl TileCache {
     pub fn new(cache_location: String) -> Self {
         Self {
             cache: LruCache::new(MAX_CACHE_ENTRIES),
-            loaders: vec![],
+            // We should rarely ever load many tiles at once.
+            // In any regular case (slow zooming & paning) we should have low numbers and in extreme cases it's okay to have some reallocations.
+            loaders: Vec::with_capacity(32),
             channel: channel(),
             cache_location,
         }

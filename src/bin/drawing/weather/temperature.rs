@@ -148,7 +148,7 @@ impl Temperature {
         let bind_group = Self::create_bind_group(device, &bind_group_layout, &texture, &sampler);
 
         let init_command_buf = init_encoder.finish();
-        queue.submit(vec![init_command_buf]);
+        queue.submit([init_command_buf]);
 
         Self {
             bind_group_layout,
@@ -294,7 +294,7 @@ impl Temperature {
             },
         );
 
-        queue.submit(vec![encoder.finish()]);
+        queue.submit([encoder.finish()]);
     }
 
     /// Loads a shader module from a GLSL vertex and fragment shader each.

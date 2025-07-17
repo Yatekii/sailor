@@ -6,6 +6,7 @@ use std::sync::Arc;
 use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
 use nalgebra_glm::{vec2, vec4};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use osm::config::{MAX_FEATURES, MAX_TILES};
 use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
@@ -19,9 +20,8 @@ use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 use crate::app_state::AppState;
+use crate::config::CONFIG;
 use crate::drawing::helpers::load_glsl;
-
-use crate::config::{CONFIG, MAX_FEATURES, MAX_TILES};
 
 pub struct Painter {
     pub window: Arc<Window>,
@@ -233,7 +233,7 @@ impl Painter {
         // let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
         let init_command_buf = init_encoder.finish();
-        queue.submit(vec![init_command_buf]); // TODO this fix is bad
+        queue.submit([init_command_buf]); // TODO this fix is bad
 
         // let width = 64 * 8;
         // let height = 64 * 8;
@@ -374,7 +374,7 @@ impl Painter {
         device: &Device,
         screen: &Screen,
         feature_collection: &FeatureCollection,
-    ) -> Vec<(Buffer, usize)> {
+    ) -> [(Buffer, usize); 2] {
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("map canvas size data"),
@@ -395,14 +395,14 @@ impl Painter {
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_SRC,
         });
 
-        vec![
+        [
             (canvas_size_buffer, canvas_size_len),
             (layer_data_buffer, layer_data_len),
         ]
     }
 
     fn create_uniform_buffer(device: &Device) -> Buffer {
-        let data = vec![0; Self::uniform_buffer_size() as usize];
+        let data = [0; Self::uniform_buffer_size() as usize];
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("tile data"),
             contents: as_byte_slice(&data),
@@ -421,8 +421,8 @@ impl Painter {
         visible_tiles: impl Iterator<Item = (TileId, f32)>,
     ) -> (Buffer, u64) {
         const TILE_DATA_SIZE: usize = 20;
-        let tile_data_buffer_byte_size = TILE_DATA_SIZE * 4 * MAX_TILES;
-        let mut data = vec![0f32; tile_data_buffer_byte_size];
+        const TILE_DATA_BUFFER_BYTE_SIZE: usize = TILE_DATA_SIZE * 4 * MAX_TILES;
+        let mut data = [0f32; TILE_DATA_BUFFER_BYTE_SIZE];
 
         let mut i = 0;
         for (tile_id, extent) in visible_tiles {
@@ -445,7 +445,7 @@ impl Painter {
                 });
                 buffer
             },
-            tile_data_buffer_byte_size as u64,
+            TILE_DATA_BUFFER_BYTE_SIZE as u64,
         )
     }
 
@@ -461,8 +461,9 @@ impl Painter {
         }
     }
 
-    fn uniform_buffer_size() -> u64 {
-        4 * 4 + 12 * 4 * (u64::from(MAX_FEATURES))
+    const fn uniform_buffer_size() -> u64 {
+        // TODO: Should be u64::from once stabilized for const.
+        4 * 4 + 12 * 4 * (MAX_FEATURES as u64)
     }
 
     pub fn create_blend_bind_group(
@@ -855,7 +856,7 @@ impl Painter {
                 );
                 self.staging_belt.finish();
 
-                self.queue.submit(vec![encoder.finish()]);
+                self.queue.submit([encoder.finish()]);
                 frame.present();
             }
         }
