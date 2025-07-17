@@ -1,13 +1,17 @@
-use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
 use std::thread::{spawn, JoinHandle};
 
+use lru::LruCache;
+
 use crate::feature::collection::FeatureCollection;
 use crate::fetch::fetch_tile_data;
 use crate::math::TileId;
 use crate::vector_tile::tile::{Tile, TileStats};
+
+const MAX_CACHE_ENTRIES: NonZeroUsize = NonZeroUsize::new(20).unwrap();
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -21,7 +25,7 @@ pub struct CacheStats {
 /// A cache structure to hold all loaded `Tile`s.
 pub struct TileCache {
     /// The cache that holds all the tiles that were loaded to memory.
-    cache: HashMap<TileId, Tile>,
+    cache: LruCache<TileId, Tile>,
     /// The loader thread handles of all active loaders.
     loaders: Vec<(TileId, JoinHandle<Option<Tile>>)>,
     /// The back-channel to signalize the loader when a loader thread finished.
@@ -34,7 +38,7 @@ impl TileCache {
     /// Create a new `TileCache`.
     pub fn new(cache_location: String) -> Self {
         Self {
-            cache: HashMap::new(),
+            cache: LruCache::new(MAX_CACHE_ENTRIES),
             loaders: vec![],
             channel: channel(),
             cache_location,
@@ -54,7 +58,7 @@ impl TileCache {
                     match loader.1.join() {
                         Ok(tile) => {
                             if let Some(tile) = tile {
-                                self.cache.insert(loader.0, tile);
+                                self.cache.put(loader.0, tile);
                             }
                         }
                         Err(e) => {
@@ -85,7 +89,7 @@ impl TileCache {
         let loader = self.loaders.iter().find(|l| l.0 == *tile_id);
 
         // Check if tile is not in the cache yet and is not currently being loaded.
-        if !self.cache.contains_key(tile_id) && loader.is_none() {
+        if !self.cache.contains(tile_id) && loader.is_none() {
             // Make sure we load all tags we want to include.
             let selection_tags = selection_tags.to_vec();
             let cache_location = self.cache_location.clone();
@@ -121,7 +125,7 @@ impl TileCache {
     /// The user has to request the loading of the `Tile` on their own.
     #[track_caller]
     pub fn get_tile(&self, tile_id: &TileId) -> &Tile {
-        self.cache.get(tile_id).unwrap()
+        self.cache.peek(tile_id).unwrap()
     }
 
     /// Get a `Tile` from the `TileCache`.
@@ -129,7 +133,12 @@ impl TileCache {
     /// Returns `None` if the tile is not in the cache.
     /// The user has to request the loading of the `Tile` on their own.
     pub fn try_get_tile(&self, tile_id: &TileId) -> Option<&Tile> {
-        self.cache.get(tile_id)
+        self.cache.peek(tile_id)
+    }
+
+    /// Marks an item as least recently used.
+    pub fn promote(&mut self, tile_id: &TileId) {
+        self.cache.promote(tile_id);
     }
 
     /// Get a `Tile` from the `TileCache`.
@@ -138,7 +147,7 @@ impl TileCache {
     /// The user has to request the loading of the `Tile` on their own.
     #[track_caller]
     pub fn get_tile_mut<'a>(&'a mut self, tile_id: &TileId) -> &'a mut Tile {
-        self.cache.get_mut(tile_id).unwrap()
+        self.cache.peek_mut(tile_id).unwrap()
     }
 
     /// Get a `Tile` from the `TileCache`.
@@ -146,13 +155,13 @@ impl TileCache {
     /// Returns `None` if the tile is not in the cache.
     /// The user has to request the loading of the `Tile` on their own.
     pub fn try_get_tile_mut(&mut self, tile_id: &TileId) -> Option<&mut Tile> {
-        self.cache.get_mut(tile_id)
+        self.cache.peek_mut(tile_id)
     }
 
     /// Gets the latest stats from the cache.
     pub fn get_stats(&self, visible_tiles: &[TileId]) -> CacheStats {
         let mut total_stats = TileStats::new();
-        for tile in self.cache.values() {
+        for (_, tile) in self.cache.iter() {
             total_stats += *tile.stats();
         }
         CacheStats {

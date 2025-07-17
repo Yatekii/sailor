@@ -10,7 +10,6 @@ use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
 use osm::math::{Screen, TileId};
-use osm::vector_tile::tile::Tile;
 use pollster::block_on;
 use util::StagingBelt;
 use wgpu::naga::ShaderStage;
@@ -22,7 +21,7 @@ use winit::window::Window;
 use crate::app_state::AppState;
 use crate::drawing::helpers::load_glsl;
 
-use crate::config::CONFIG;
+use crate::config::{CONFIG, MAX_FEATURES, MAX_TILES};
 
 pub struct Painter {
     pub window: Arc<Window>,
@@ -183,7 +182,7 @@ impl Painter {
             &device,
             &app_state.screen,
             app_state.zoom,
-            std::iter::empty::<&Tile>(),
+            std::iter::empty(),
         );
 
         let blend_pipeline = Self::create_layer_render_pipeline(
@@ -415,20 +414,19 @@ impl Painter {
     /// Creates a new transform buffer from the tile transforms.
     ///
     /// Ensures that the buffer has the size configured in the config, to match the size configured in the shader.
-    fn create_tile_transform_buffer<'a>(
+    fn create_tile_transform_buffer(
         device: &Device,
         screen: &Screen,
         z: f32,
-        visible_tiles: impl Iterator<Item = &'a Tile>,
+        visible_tiles: impl Iterator<Item = (TileId, f32)>,
     ) -> (Buffer, u64) {
         const TILE_DATA_SIZE: usize = 20;
-        let tile_data_buffer_byte_size = TILE_DATA_SIZE * 4 * CONFIG.renderer.max_tiles;
+        let tile_data_buffer_byte_size = TILE_DATA_SIZE * 4 * MAX_TILES;
         let mut data = vec![0f32; tile_data_buffer_byte_size];
 
         let mut i = 0;
-        for vt in visible_tiles {
-            let extent = vt.extent() as f32;
-            let matrix = screen.tile_to_screen(z, &vt.tile_id());
+        for (tile_id, extent) in visible_tiles {
+            let matrix = screen.tile_to_screen(z, &tile_id);
             for float in matrix.as_slice() {
                 data[i] = *float;
                 i += 1;
@@ -464,7 +462,7 @@ impl Painter {
     }
 
     fn uniform_buffer_size() -> u64 {
-        4 * 4 + 12 * 4 * CONFIG.renderer.max_features
+        4 * 4 + 12 * 4 * (u64::from(MAX_FEATURES))
     }
 
     pub fn create_blend_bind_group(
@@ -605,7 +603,7 @@ impl Painter {
     fn update_uniforms(
         &mut self,
         encoder: &mut CommandEncoder,
-        app_state: &AppState,
+        app_state: &mut AppState,
         feature_collection: &FeatureCollection,
     ) {
         Self::copy_uniform_buffers(
@@ -614,14 +612,16 @@ impl Painter {
             &self.uniform_buffer,
         );
 
+        let mut visible_tile_info = Vec::with_capacity(MAX_TILES);
+        for tile_id in app_state.visible_tiles().to_vec() {
+            let tile = app_state.tile_cache.get_tile(&tile_id);
+            visible_tile_info.push((tile_id, tile.extent() as f32));
+        }
         self.tile_transform_buffer = Self::create_tile_transform_buffer(
             &self.device,
             &app_state.screen,
             app_state.zoom,
-            app_state
-                .visible_tiles()
-                .iter()
-                .map(|tile_id| app_state.tile_cache.get_tile(tile_id)),
+            visible_tile_info.into_iter(),
         );
     }
 
@@ -680,6 +680,7 @@ impl Painter {
         for tile_id in &mut app_state.visible_tiles {
             let tile = app_state.tile_cache.try_get_tile_mut(tile_id).unwrap();
             tile.load_to_gpu(&self.device);
+            app_state.tile_cache.promote(tile_id);
         }
 
         let features = feature_collection.features();

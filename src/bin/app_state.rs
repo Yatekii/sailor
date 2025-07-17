@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use winit::dpi::PhysicalSize;
 
-use crate::config::CONFIG;
+use crate::config::{CONFIG, MAX_FEATURES, MAX_TILES};
 use crate::drawing::ui::state::UIState;
 use crate::stats::Stats;
 
@@ -57,9 +57,7 @@ impl AppState {
             stats: Stats::new(),
             ui: UIState::new(),
             visible_tiles: Vec::new(),
-            feature_collection: Arc::new(RwLock::new(FeatureCollection::new(
-                CONFIG.renderer.max_features as u32,
-            ))),
+            feature_collection: Arc::new(RwLock::new(FeatureCollection::new(MAX_FEATURES))),
             cursor: vec2(0.0, 0.0),
         }
     }
@@ -176,23 +174,20 @@ impl AppState {
         }
     }
 
-    pub fn update_hovered_objects(&self, point: (f32, f32)) {
+    pub fn update_hovered_objects(&mut self, point: (f32, f32)) {
         let hovered_objects = self.hovered_objects.clone();
         let screen = self.screen.clone();
         let zoom = self.zoom;
-        let visible_tiles = self
-            .visible_tiles
-            .iter()
-            .map(|tile_id| {
-                let tile = self.tile_cache.try_get_tile(tile_id).unwrap();
-                VisibleTile {
-                    tile_id: *tile_id,
-                    extent: tile.extent() as f32,
-                    collider: tile.collider(),
-                    objects: tile.objects(),
-                }
-            })
-            .collect::<Vec<_>>();
+        let mut visible_tiles = Vec::with_capacity(MAX_TILES);
+        for tile_id in self.visible_tiles.iter() {
+            let tile = self.tile_cache.try_get_tile(tile_id).unwrap();
+            visible_tiles.push(VisibleTile {
+                tile_id: *tile_id,
+                extent: tile.extent() as f32,
+                collider: tile.collider(),
+                objects: tile.objects(),
+            });
+        }
         thread::spawn(move || {
             let objects = Collider::get_hovered_objects(&visible_tiles, &screen, zoom, point);
             let mut hovered_objects = hovered_objects.lock().unwrap();

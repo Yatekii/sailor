@@ -16,8 +16,6 @@ renderer:
   fragment-shader: "config/shader.frag"
   css: "config/style.css"
   ui-font: "config/Ruda-Bold.ttf"
-  max-tiles: 200
-  max-features: 1000
   tile-size: 384
   msaa-samples: 4
   selection-tags: []

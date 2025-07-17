@@ -1,6 +1,10 @@
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 
+pub const MAX_FEATURES: u32 = 1000;
+/// Sync with vertex shader (shader.vert)
+pub const MAX_TILES: usize = 10;
+
 pub static CONFIG: Lazy<Config> = Lazy::new(|| Config::new().expect("Config could not be loaded."));
 
 #[derive(Debug, Deserialize)]
@@ -31,8 +35,6 @@ pub struct Renderer {
     pub vertex_shader: String,
     pub fragment_shader: String,
     pub css: String,
-    pub max_tiles: usize,
-    pub max_features: u64,
     pub tile_size: u32,
     pub msaa_samples: u32,
     pub selection_tags: Vec<String>,
