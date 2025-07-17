@@ -8,7 +8,7 @@ use crate::{app_state::AppState, drawing::ui::widgets::key_value_table::widget_k
 
 pub fn view_stats(ui: &mut Ui, app_state: &mut AppState) {
     Frame::default().outer_margin(5.0).show(ui, |ui| {
-        let tile_stats = app_state.tile_cache.get_stats();
+        let tile_stats = app_state.tile_cache.get_stats(&app_state.visible_tiles);
         let z = app_state.zoom;
         let screen_to_global = app_state.screen.pixel_to_world(z);
         let p = screen_to_global
@@ -25,6 +25,7 @@ pub fn view_stats(ui: &mut Ui, app_state: &mut AppState) {
             ("mouse lat", latlon.y.to_string()),
             ("mouse lon", latlon.x.to_string()),
             ("cached tiles", tile_stats.cached_tiles.to_string()),
+            ("visible tiles", tile_stats.visible_tiles.to_string()),
             ("loading tiles", tile_stats.loading_tiles.to_string()),
             ("objects", tile_stats.tile_stats.objects.to_string()),
             ("features", tile_stats.tile_stats.features.to_string()),

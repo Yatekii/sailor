@@ -13,6 +13,7 @@ use crate::vector_tile::tile::{Tile, TileStats};
 #[allow(dead_code)]
 pub struct CacheStats {
     pub cached_tiles: usize,
+    pub visible_tiles: usize,
     pub loading_tiles: usize,
     pub tile_stats: TileStats,
 }
@@ -149,13 +150,14 @@ impl TileCache {
     }
 
     /// Gets the latest stats from the cache.
-    pub fn get_stats(&self) -> CacheStats {
+    pub fn get_stats(&self, visible_tiles: &[TileId]) -> CacheStats {
         let mut total_stats = TileStats::new();
         for tile in self.cache.values() {
             total_stats += *tile.stats();
         }
         CacheStats {
             cached_tiles: self.cache.len(),
+            visible_tiles: visible_tiles.len(),
             loading_tiles: self.loaders.len(),
             tile_stats: total_stats,
         }
