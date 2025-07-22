@@ -32,8 +32,9 @@ impl<'l> MeshBuilder<'l> {
         }
     }
 
-    pub fn set_current_feature_id(&mut self, feature_id: u32) {
+    pub fn set_current_feature_and_object_id(&mut self, feature_id: u32, object_id: u32) {
         self.vertex_constructor.feature_id = feature_id;
+        self.vertex_constructor.object_id = object_id;
     }
 
     pub fn set_current_extent(&mut self, extent: f32) {

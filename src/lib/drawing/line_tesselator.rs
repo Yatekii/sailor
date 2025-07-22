@@ -166,6 +166,7 @@ mod tests {
                 feature_id: 0,
                 extent,
                 vertex_type: VertexType::Line,
+                object_id: 0,
             },
         );
 
@@ -193,6 +194,7 @@ mod tests {
                 feature_id: 0,
                 extent,
                 vertex_type: VertexType::Line,
+                object_id: 0,
             },
         );
 
@@ -221,6 +223,7 @@ mod tests {
                 feature_id: 0,
                 extent,
                 vertex_type: VertexType::Line,
+                object_id: 0,
             },
         );
 

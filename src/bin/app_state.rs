@@ -198,21 +198,40 @@ impl AppState {
 
     pub fn update_selected_from_hover_objects(&mut self) {
         let hovered_objects = self.hovered_objects.lock().unwrap();
-        (self.selected_objects, self.selected_object_labels) = hovered_objects
+        self.selected_objects = hovered_objects
             .iter()
-            .map(|o| (EditableObject::new(o.clone()), format!("{}", o.selector())))
+            .map(|o| (EditableObject::new(o.id, o.tile_id, o.clone())))
             .collect();
-
+        drop(hovered_objects);
         self.selected_object = 0;
+        self.refresh_labels();
     }
 
     pub fn advance_selected_object(&mut self) {
         let len = self.selected_objects.len();
         self.selected_object = (self.selected_object + 1) % len;
+        self.refresh_labels();
     }
 
     pub fn select_object(&mut self, index: usize) {
         self.selected_object = index;
+        self.refresh_labels();
+    }
+
+    fn refresh_labels(&mut self) {
+        self.selected_object_labels = self
+            .selected_objects
+            .iter()
+            .enumerate()
+            .map(|(i, o)| {
+                let selector = o.object.selector();
+                if i == self.selected_object {
+                    format!("{selector} •")
+                } else {
+                    format!("{selector}")
+                }
+            })
+            .collect();
     }
 
     pub(crate) fn selected_object(&self) -> Option<&EditableObject> {
@@ -252,11 +271,17 @@ impl AppState {
 }
 
 pub struct EditableObject {
+    pub id: u32,
+    pub tile_id: TileId,
     pub object: Object,
 }
 
 impl EditableObject {
-    pub fn new(object: Object) -> Self {
-        Self { object }
+    pub fn new(id: u32, tile_id: TileId, object: Object) -> Self {
+        Self {
+            id,
+            tile_id,
+            object,
+        }
     }
 }

@@ -1,5 +1,5 @@
 use nalgebra::base::Vector4;
-use ncollide2d::math::Point;
+use rapier2d::math::Point;
 use std::{
     ops::Deref,
     sync::{Arc, RwLock},

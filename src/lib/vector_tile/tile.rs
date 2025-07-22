@@ -144,7 +144,7 @@ impl Tile {
         for layer in tile.layers {
             let mut fc = feature_collection.write().unwrap();
             let layers = fc.layers_mut();
-            let mut map: HashMap<Selector, Vec<(GeomType, Vec<Path>)>> =
+            let mut map: HashMap<Selector, Vec<(GeomType, usize, Vec<Path>)>> =
                 HashMap::with_capacity(200);
             let layer_name = layer.name.to_string();
             let layer_id = if let Some(layer) = layers.iter().find(|l| l.name == layer_name) {
@@ -184,7 +184,7 @@ impl Tile {
                     GeomType::POLYGON => Some(ObjectType::Polygon),
                     GeomType::LINESTRING => Some(ObjectType::Line),
                     GeomType::POINT => Some(ObjectType::Point),
-                    _ => None,
+                    _ => unreachable!(),
                 };
 
                 if let Some(ot) = object_type {
@@ -194,40 +194,32 @@ impl Tile {
                         tags,
                         ot,
                         *tile_id,
+                        objects.len() as u32,
                         title,
                     ));
+                } else {
+                    println!("FUCK")
                 }
 
-                if let Some(value) = map.get_mut(&selector) {
-                    value.push((feature.type_pb, paths));
-                } else {
-                    map.insert(selector.clone(), {
-                        let mut selectors = Vec::with_capacity(1024);
-                        selectors.push((feature.type_pb, paths));
-                        selectors
-                    });
-                }
+                let entry = map
+                    .entry(selector)
+                    .or_insert_with(|| Vec::with_capacity(1024));
+                entry.push((feature.type_pb, objects.len() - 1, paths));
             }
 
             // Transform all the features on a per selector basis.
             for (selector, feats) in map {
                 let index_start_before = builder.get_current_index();
-                for feature in feats {
+                for (kind, object_id, path) in feats {
                     // Set the current feature id.
                     current_feature_id = {
                         // Scope the lock guard real tight to ensure it's released quickly.
                         let mut feature_collection = feature_collection.write().unwrap();
                         feature_collection.ensure_feature(&selector, layer_id)
                     };
-                    builder.set_current_feature_id(current_feature_id);
+                    builder.set_current_feature_and_object_id(current_feature_id, object_id as u32);
 
-                    paths_to_drawable(
-                        &mut builder,
-                        feature.0,
-                        &feature.1,
-                        layer.extent as f32,
-                        tile_id,
-                    );
+                    paths_to_drawable(&mut builder, kind, &path, layer.extent as f32, tile_id);
                 }
 
                 features.push((
@@ -337,7 +329,7 @@ impl Tile {
             let mut feature_collection = feature_collection.write().unwrap();
             feature_collection.ensure_feature(&selector, 0)
         };
-        builder.set_current_feature_id(current_feature_id);
+        builder.set_current_feature_and_object_id(current_feature_id, u32::MAX);
 
         // Remember buffer index before.
         let index_start_before = builder.get_current_index();
@@ -352,6 +344,7 @@ impl Tile {
             path.points().to_vec(),
             ObjectType::Polygon,
             TileId::new(0, 0, 0),
+            u32::MAX,
             Some("background".to_string()),
         );
 

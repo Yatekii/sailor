@@ -18,6 +18,7 @@ pub struct Vertex {
     pub position: [i16; 2],
     pub normal: [i16; 2],
     pub feature_id: u32,
+    pub object_id: u32,
 }
 
 // A very simple vertex constructor that only outputs the vertex position
@@ -26,6 +27,7 @@ pub struct LayerVertexCtor {
     pub feature_id: u32,
     pub extent: f32,
     pub vertex_type: VertexType,
+    pub object_id: u32,
 }
 
 impl LayerVertexCtor {
@@ -35,6 +37,7 @@ impl LayerVertexCtor {
             feature_id: 0,
             extent,
             vertex_type: VertexType::Polygon,
+            object_id: 0,
         }
     }
 
@@ -48,6 +51,7 @@ impl LayerVertexCtor {
             position: [point.x as i16, point.y as i16],
             normal: [normal.x as i16, normal.y as i16],
             feature_id: ((meta as u32) << 16) | self.feature_id,
+            object_id: self.object_id,
         }
     }
 }
@@ -71,6 +75,7 @@ impl FillVertexConstructor<Vertex> for LayerVertexCtor {
             // normal: [normal.x.round() as i16, normal.y.round() as i16],
             normal: [1, 1],
             feature_id: ((meta as u32) << 16) | self.feature_id,
+            object_id: self.object_id,
         }
     }
 }
@@ -89,6 +94,7 @@ impl StrokeVertexConstructor<Vertex> for LayerVertexCtor {
             position: [vertex.position().x as i16, vertex.position().y as i16],
             normal: [normal.x.round() as i16, normal.y.round() as i16],
             feature_id: self.feature_id,
+            object_id: self.object_id,
         }
     }
 }

@@ -23,6 +23,10 @@ use crate::app_state::AppState;
 use crate::config::CONFIG;
 use crate::drawing::helpers::load_glsl;
 
+const TILE_DATA_BUFFER_BYTE_SIZE: u64 = 8;
+// TODO: Should be u64::from once stabilized for const.
+const UNIFORM_BUFFER_SIZE: u64 = 4 * 4 + 12 * 4 * (MAX_FEATURES as u64);
+
 pub struct Painter {
     pub window: Arc<Window>,
     hidpi_factor: f64,
@@ -37,6 +41,7 @@ pub struct Painter {
     stencil: TextureView,
     uniform_buffer: Buffer,
     tile_transform_buffer: (Buffer, u64),
+    tile_selection_buffer: Buffer,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     rx: Receiver<Result<notify::event::Event, notify::Error>>,
@@ -154,6 +159,16 @@ impl Painter {
                     },
                     count: None,
                 },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
@@ -184,6 +199,7 @@ impl Painter {
             app_state.zoom,
             std::iter::empty(),
         );
+        let tile_selection_buffer = Self::create_tile_selection_buffer(&device, 0, 0);
 
         let blend_pipeline = Self::create_layer_render_pipeline(
             &device,
@@ -220,6 +236,7 @@ impl Painter {
             &bind_group_layout,
             &uniform_buffer,
             &tile_transform_buffer,
+            &tile_selection_buffer,
         );
 
         let font_system = FontSystem::new();
@@ -254,6 +271,7 @@ impl Painter {
             uniform_buffer,
             stencil,
             tile_transform_buffer,
+            tile_selection_buffer,
             bind_group_layout,
             bind_group,
             _watcher: watcher,
@@ -306,6 +324,11 @@ impl Painter {
                             format: VertexFormat::Uint32,
                             offset: 8,
                             shader_location: 2,
+                        },
+                        VertexAttribute {
+                            format: VertexFormat::Uint32,
+                            offset: 12,
+                            shader_location: 3,
                         },
                     ],
                 }],
@@ -378,6 +401,7 @@ impl Painter {
         let canvas_size_len = 4 * 4;
         let canvas_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("map canvas size data"),
+            // screen width, screen height, selected tile, selected object
             contents: as_byte_slice(&[screen.width, screen.height, 0.0, 0.0]),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_SRC,
         });
@@ -402,7 +426,7 @@ impl Painter {
     }
 
     fn create_uniform_buffer(device: &Device) -> Buffer {
-        let data = [0; Self::uniform_buffer_size() as usize];
+        let data = [0; UNIFORM_BUFFER_SIZE as usize];
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("tile data"),
             contents: as_byte_slice(&data),
@@ -420,21 +444,24 @@ impl Painter {
         z: f32,
         visible_tiles: impl Iterator<Item = (TileId, f32)>,
     ) -> (Buffer, u64) {
+        #[derive(Copy, Clone, Debug, Default)]
+        #[repr(C)]
+        pub struct TileData {
+            pub transform: [f32; 16],
+            pub extent: f32,
+            _unused: f32,
+            _unused2: f32,
+            _unused3: f32,
+        }
+
         const TILE_DATA_SIZE: usize = 20;
         const TILE_DATA_BUFFER_BYTE_SIZE: usize = TILE_DATA_SIZE * 4 * MAX_TILES;
-        let mut data = [0f32; TILE_DATA_BUFFER_BYTE_SIZE];
+        let mut data = [TileData::default(); MAX_TILES];
 
-        let mut i = 0;
-        for (tile_id, extent) in visible_tiles {
+        for (i, (tile_id, extent)) in visible_tiles.enumerate() {
             let matrix = screen.tile_to_screen(z, &tile_id);
-            for float in matrix.as_slice() {
-                data[i] = *float;
-                i += 1;
-            }
-            for _ in 0..4 {
-                data[i] = extent;
-                i += 1;
-            }
+            data[i].transform.copy_from_slice(matrix.as_slice());
+            data[i].extent = extent;
         }
         (
             {
@@ -449,6 +476,26 @@ impl Painter {
         )
     }
 
+    fn create_tile_selection_buffer(
+        device: &Device,
+        selected_tile_id: u32,
+        selected_object_id: u32,
+    ) -> Buffer {
+        #[derive(Copy, Clone, Debug, Default)]
+        #[repr(C, packed)]
+        pub struct SelectedData {
+            pub selected_tile_id: u32,
+            pub selected_object_id: u32,
+        }
+
+        let buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("tile selection buffer"),
+            contents: as_byte_slice(&[selected_tile_id, selected_object_id]),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+        buffer
+    }
+
     fn copy_uniform_buffers(
         encoder: &mut CommandEncoder,
         source: &[(Buffer, usize)],
@@ -461,16 +508,12 @@ impl Painter {
         }
     }
 
-    const fn uniform_buffer_size() -> u64 {
-        // TODO: Should be u64::from once stabilized for const.
-        4 * 4 + 12 * 4 * (MAX_FEATURES as u64)
-    }
-
     pub fn create_blend_bind_group(
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         uniform_buffer: &Buffer,
         tile_transform_buffer: &(Buffer, u64),
+        tile_selection_buffer: &Buffer,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("bind vertex stage buffers"),
@@ -481,7 +524,7 @@ impl Painter {
                     resource: BindingResource::Buffer(BufferBinding {
                         buffer: uniform_buffer,
                         offset: 0,
-                        size: NonZeroU64::new(Self::uniform_buffer_size()),
+                        size: NonZeroU64::new(UNIFORM_BUFFER_SIZE),
                     }),
                 },
                 wgpu::BindGroupEntry {
@@ -490,6 +533,14 @@ impl Painter {
                         buffer: &tile_transform_buffer.0,
                         offset: 0,
                         size: NonZeroU64::new(tile_transform_buffer.1),
+                    }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: BindingResource::Buffer(BufferBinding {
+                        buffer: tile_selection_buffer,
+                        offset: 0,
+                        size: NonZeroU64::new(TILE_DATA_BUFFER_BYTE_SIZE),
                     }),
                 },
             ],
@@ -618,12 +669,28 @@ impl Painter {
             let tile = app_state.tile_cache.get_tile(&tile_id);
             visible_tile_info.push((tile_id, tile.extent() as f32));
         }
+
+        let (selected_tile_id, selected_object_id) = app_state
+            .selected_object()
+            .and_then(|object| {
+                visible_tile_info
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, (id, _))| {
+                        (id == &object.tile_id).then_some((i as u32, object.id))
+                    })
+            })
+            .unwrap_or((u32::MAX, u32::MAX));
+
         self.tile_transform_buffer = Self::create_tile_transform_buffer(
             &self.device,
             &app_state.screen,
             app_state.zoom,
             visible_tile_info.into_iter(),
         );
+
+        self.tile_selection_buffer =
+            Self::create_tile_selection_buffer(&self.device, selected_tile_id, selected_object_id);
     }
 
     fn create_multisampled_framebuffer(
@@ -698,6 +765,7 @@ impl Painter {
                     &self.bind_group_layout,
                     &self.uniform_buffer,
                     &self.tile_transform_buffer,
+                    &self.tile_selection_buffer,
                 );
                 {
                     let view = frame

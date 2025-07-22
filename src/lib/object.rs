@@ -28,6 +28,7 @@ pub struct Object {
     /// The object type.
     _object_type: ObjectType,
     pub title: Option<String>,
+    pub id: u32,
     pub tile_id: TileId,
 }
 
@@ -38,6 +39,7 @@ impl Object {
         points: Vec<Point>,
         object_type: ObjectType,
         tile_id: TileId,
+        id: u32,
         title: Option<String>,
     ) -> Self {
         Self {
@@ -47,6 +49,7 @@ impl Object {
             _object_type: object_type,
             title,
             tile_id,
+            id,
         }
     }
 
@@ -57,6 +60,7 @@ impl Object {
         tags: HashMap<String, String>,
         object_type: ObjectType,
         tile_id: TileId,
+        id: u32,
         title: Option<String>,
     ) -> Self {
         Self {
@@ -66,6 +70,7 @@ impl Object {
             _object_type: object_type,
             title,
             tile_id,
+            id,
         }
     }
 

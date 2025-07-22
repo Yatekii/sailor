@@ -25,7 +25,7 @@ fn selected_object(ui: &mut Ui, app_state: &mut AppState) {
         ui.label(RichText::from("press <tab> to cycle").small());
     });
 
-    if let Some(EditableObject { object }) = app_state.selected_object() {
+    if let Some(EditableObject { object, .. }) = app_state.selected_object() {
         let selector = object.selector().clone();
         let tags = object.tags();
 

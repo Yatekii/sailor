@@ -4,6 +4,7 @@
 layout(location = 0) in ivec2 position;
 layout(location = 1) in ivec2 normal;
 layout(location = 2) in uint feature;
+layout(location = 3) in uint object_id;
 
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out float d;
@@ -18,7 +19,8 @@ layout(std140) struct LayerData {
 
 layout(std140, set = 0, binding = 0) uniform Locals {
     vec2 canvas_size;
-    vec2 _unused;
+    uint _unused;
+    uint _unused1;
     LayerData layer_datas[1000];
 };
 
@@ -32,6 +34,11 @@ layout(std140) struct TileData {
 
 layout(std140, set = 0, binding = 1) uniform Transform {
     TileData tile_datas[10];
+};
+
+layout(std140, set = 0, binding = 2) uniform Selected {
+    uint selected_tile_id;
+    uint selected_object_id;
 };
 
 void main() {
@@ -90,4 +97,9 @@ void main() {
     gl_Position.y = -gl_Position.y;
 
     gl_Position.z = layer_data.z_index / 1000 + 0.001;
+
+    if(( selected_tile_id == tile_id && selected_object_id == object_id)) {
+        outColor = vec4(1.0, 0.0, 0.0, 0.5);
+    }
+    gl_Position.z = 1;
 }

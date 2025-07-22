@@ -114,7 +114,7 @@ impl ApplicationHandler for Application {
     ) {
         self.app_state.css_cache.update();
         let ui_event = self.hud.interact(&event);
-        match event {
+        match &event {
             WindowEvent::Destroyed => event_loop.exit(),
             WindowEvent::Resized(physical_size) => {
                 self.app_state.screen.width = physical_size.width.min(8192) as f32;
@@ -125,11 +125,12 @@ impl ApplicationHandler for Application {
                 );
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                self.app_state.scale_factor_updated(scale_factor as f32)
+                self.app_state.scale_factor_updated(*scale_factor as f32)
             }
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
+                        state: ElementState::Pressed,
                         logical_key: keycode,
                         ..
                     },
@@ -172,7 +173,7 @@ impl ApplicationHandler for Application {
                     match delta {
                         MouseScrollDelta::LineDelta(_, y) => self.app_state.zoom += 0.1 * y,
                         MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => {
-                            self.app_state.zoom += 0.001 * y as f32
+                            self.app_state.zoom += 0.001 * *y as f32
                         }
                     }
                 }
@@ -187,7 +188,7 @@ impl ApplicationHandler for Application {
                     * vec4(self.last_pos.x as f32, self.last_pos.y as f32, 0.0, 0.0);
                 let delta_new = new_pos - old_pos;
 
-                self.last_pos = position;
+                self.last_pos = *position;
 
                 self.app_state
                     .set_cursor(vec2(logical_position.x, logical_position.y));
