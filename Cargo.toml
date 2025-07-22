@@ -2,7 +2,7 @@
 name = "sailor"
 version = "0.1.0"
 authors = ["Noah Hüsser <yatekii@yatekii.ch>"]
-edition = "2018"
+edition = "2024"
 resolver = "2"
 
 description = "A sailing navigation application."

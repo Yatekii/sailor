@@ -1,11 +1,11 @@
 use std::num::NonZeroU64;
 use std::path::Path;
-use std::sync::mpsc::{channel, Receiver, TryRecvError};
 use std::sync::Arc;
+use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
 use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
 use nalgebra_glm::{vec2, vec4};
-use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
 use osm::config::{MAX_FEATURES, MAX_TILES};
 use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
@@ -427,12 +427,12 @@ impl Painter {
 
     fn create_uniform_buffer(device: &Device) -> Buffer {
         let data = [0; UNIFORM_BUFFER_SIZE as usize];
-        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("tile data"),
             contents: as_byte_slice(&data),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-        });
-        buffer
+        })
     }
 
     /// Creates a new transform buffer from the tile transforms.
@@ -465,12 +465,11 @@ impl Painter {
         }
         (
             {
-                let buffer = device.create_buffer_init(&BufferInitDescriptor {
+                device.create_buffer_init(&BufferInitDescriptor {
                     label: Some("tile transforms buffer"),
                     contents: as_byte_slice(data.as_slice()),
                     usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-                });
-                buffer
+                })
             },
             TILE_DATA_BUFFER_BYTE_SIZE as u64,
         )
@@ -488,12 +487,11 @@ impl Painter {
             pub selected_object_id: u32,
         }
 
-        let buffer = device.create_buffer_init(&BufferInitDescriptor {
+        device.create_buffer_init(&BufferInitDescriptor {
             label: Some("tile selection buffer"),
             contents: as_byte_slice(&[selected_tile_id, selected_object_id]),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-        });
-        buffer
+        })
     }
 
     fn copy_uniform_buffers(
