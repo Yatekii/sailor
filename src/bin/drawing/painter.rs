@@ -96,7 +96,7 @@ impl Painter {
                 Ok(watcher) => watcher,
                 Err(err) => {
                     log::info!("Failed to create a watcher for the vertex shader:");
-                    log::info!("{}", err);
+                    log::info!("{err}");
                     panic!("Unable to load a vertex shader.");
                 }
             };
@@ -111,7 +111,7 @@ impl Painter {
                     "Failed to start watching {}:",
                     &CONFIG.renderer.vertex_shader
                 );
-                log::info!("{}", err);
+                log::info!("{err}");
             }
         };
 
@@ -125,7 +125,7 @@ impl Painter {
                     "Failed to start watching {}:",
                     &CONFIG.renderer.fragment_shader
                 );
-                log::info!("{}", err);
+                log::info!("{err}");
             }
         };
 
@@ -620,17 +620,11 @@ impl Painter {
             // This happens all the time when there is no new message.
             Err(TryRecvError::Empty) => false,
             Ok(Err(err)) => {
-                log::info!(
-                    "Something went wrong with the shader file watcher:\r\n{:?}",
-                    err
-                );
+                log::info!("Something went wrong with the shader file watcher:\r\n{err:?}");
                 false
             }
             Err(err) => {
-                log::info!(
-                    "Something went wrong with the shader file watcher:\r\n{:?}",
-                    err
-                );
+                log::info!("Something went wrong with the shader file watcher:\r\n{err:?}");
                 false
             }
         }

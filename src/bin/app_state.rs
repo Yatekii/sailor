@@ -158,7 +158,7 @@ impl AppState {
                         self.remove_visible_tile(tile_id);
                     }
                 } else {
-                    log::trace!("Could not read tile {} from cache.", tile_id);
+                    log::trace!("Could not read tile {tile_id} from cache.");
                 }
             }
         }

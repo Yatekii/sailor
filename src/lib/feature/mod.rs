@@ -76,13 +76,12 @@ impl Feature {
                         "black" => self.style.background_color = Color::BLACK.into(),
                         "white" => self.style.background_color = Color::WHITE.into(),
                         // Other CSS colors to come later.
-                        color => log::info!("The color '{}' is currently not supported.", color),
+                        color => log::info!("The color '{color}' is currently not supported."),
                     }
                 }
                 value => {
                     log::info!(
-                        "The value '{:?}' is currently not supported for 'background-color'.",
-                        value
+                        "The value '{value:?}' is currently not supported for 'background-color'."
                     );
                 }
             }
@@ -106,13 +105,12 @@ impl Feature {
                         "black" => self.style.background_color = Color::BLACK.into(),
                         "white" => self.style.background_color = Color::WHITE.into(),
                         // Other CSS colors to come later.
-                        color => log::info!("The color '{}' is currently not supported.", color),
+                        color => log::info!("The color '{color}' is currently not supported."),
                     }
                 }
                 value => {
                     log::info!(
-                        "The value '{:?}' is currently not supported for 'border-color'.",
-                        value
+                        "The value '{value:?}' is currently not supported for 'border-color'."
                     );
                 }
             }
@@ -128,13 +126,11 @@ impl Feature {
                 CSSValue::Number(number) => match number {
                     Number::Px(px) => self.style.border_width = *px,
                     value => log::info!(
-                        "The value '{:?}' is currently not supported for 'border-width'.",
-                        value
+                        "The value '{value:?}' is currently not supported for 'border-width'."
                     ),
                 },
                 value => log::info!(
-                    "The value '{:?}' is currently not supported for 'border-width'.",
-                    value
+                    "The value '{value:?}' is currently not supported for 'border-width'."
                 ),
             }
         }
@@ -150,10 +146,9 @@ impl Feature {
                     "none" => self.style.display = false,
                     _ => self.style.display = true,
                 },
-                value => log::info!(
-                    "The value '{:?}' is currently not supported for 'display'.",
-                    value
-                ),
+                value => {
+                    log::info!("The value '{value:?}' is currently not supported for 'display'.")
+                }
             }
         } else {
             self.style.display = true;
@@ -172,14 +167,12 @@ impl Feature {
                     Number::Px(px) => self.style.line_width = (*px as u32) << 1 | 0b01,
                     Number::World(world) => self.style.line_width = (*world as u32) << 1,
                     value => log::info!(
-                        "The value '{:?}' is currently not supported for 'line-width'.",
-                        value
+                        "The value '{value:?}' is currently not supported for 'line-width'."
                     ),
                 },
-                value => log::info!(
-                    "The value '{:?}' is currently not supported for 'line-width'.",
-                    value
-                ),
+                value => {
+                    log::info!("The value '{value:?}' is currently not supported for 'line-width'.")
+                }
             }
         } else {
             self.style.line_width = 0;
@@ -195,14 +188,12 @@ impl Feature {
                 CSSValue::Number(number) => match number {
                     Number::Unitless(unitless) => self.style.z_index = *unitless,
                     value => log::info!(
-                        "The value '{:?}' is currently not supported for 'z-index'.",
-                        value
+                        "The value '{value:?}' is currently not supported for 'z-index'."
                     ),
                 },
-                value => log::info!(
-                    "The value '{:?}' is currently not supported for 'z-index'.",
-                    value
-                ),
+                value => {
+                    log::info!("The value '{value:?}' is currently not supported for 'z-index'.")
+                }
             }
         } else {
             self.style.z_index = self.layer_id as f32;

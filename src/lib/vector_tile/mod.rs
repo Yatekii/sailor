@@ -141,7 +141,7 @@ pub fn paths_to_drawable(
             let _ = tessellator
                 .tessellate_path(path, &FillOptions::tolerance(0.0000001), builder)
                 .map_err(|e| {
-                    log::error!("Broken path on tile {}.", tile_id);
+                    log::error!("Broken path on tile {tile_id}.");
                     log::error!("{e:#?}");
                 });
             set_normals(&mut builder.buffers.vertices[offset..], path, extent);

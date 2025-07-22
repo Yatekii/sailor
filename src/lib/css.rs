@@ -1,16 +1,15 @@
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
-    character::complete::multispace0,
-    character::{complete::char, is_alphanumeric},
+    character::complete::{char, multispace0},
     combinator::map_res,
-    error::FromExternalError,
-    error::{convert_error, ParseError, VerboseError},
+    error::{FromExternalError, ParseError},
     multi::many0,
     number::complete::float,
-    sequence::{delimited, preceded, separated_pair, tuple},
-    AsChar, Err, IResult, InputTakeAtPosition,
+    sequence::{delimited, preceded, separated_pair},
+    AsChar, Err, IResult, Input, Parser,
 };
+use nom_language::error::{convert_error, VerboseError};
 use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     collections::BTreeMap,
@@ -57,7 +56,7 @@ impl RulesCache {
                 Ok(watcher) => watcher,
                 Err(err) => {
                     log::info!("Failed to create a watcher for the stylesheet:");
-                    log::info!("{}", err);
+                    log::info!("{err}");
                     return None;
                 }
             };
@@ -65,8 +64,8 @@ impl RulesCache {
         match _watcher.watch(Path::new(&file_path), RecursiveMode::Recursive) {
             Ok(_) => {}
             Err(err) => {
-                log::info!("Failed to start watching {}:", file_path);
-                log::info!("{}", err);
+                log::info!("Failed to start watching {file_path}:");
+                log::info!("{err}");
                 return None;
             }
         };
@@ -122,19 +121,13 @@ impl RulesCache {
             // Everything is alright but file wasn't actually changed.
             Ok(Ok(_)) => false,
             Ok(Err(err)) => {
-                log::info!(
-                    "Something went wrong with the CSS file watcher:\r\n{:?}",
-                    err
-                );
+                log::info!("Something went wrong with the CSS file watcher:\r\n{err:?}");
                 false
             }
             // This happens all the time when there is no new message.
             Err(TryRecvError::Empty) => false,
             Err(err) => {
-                log::info!(
-                    "Something went wrong with the CSS file watcher:\r\n{:?}",
-                    err
-                );
+                log::info!("Something went wrong with the CSS file watcher:\r\n{err:?}");
                 false
             }
         }
@@ -154,8 +147,8 @@ impl RulesCache {
                 };
             }
             Err(err) => {
-                log::info!("Failed to read file at {:?}:", filename);
-                log::info!("{}", err);
+                log::info!("Failed to read file at {filename:?}:");
+                log::info!("{err}");
                 return false;
             }
         }
@@ -319,15 +312,15 @@ fn rules<'a, E>(input: &'a str) -> IResult<&'a str, Vec<Rule>, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    many0(rule)(input)
+    many0(rule).parse(input)
 }
 
 /// Munch all whitespace before and after `f`.
-fn whitespace<I, O, E, F>(f: F) -> impl FnMut(I) -> IResult<I, O, E>
+fn whitespace<I, O, E, F>(f: F) -> impl Parser<I, Output = O, Error = E>
 where
-    I: Clone + PartialEq + InputTakeAtPosition,
-    <I as InputTakeAtPosition>::Item: AsChar + Clone,
-    F: Fn(I) -> IResult<I, O, E>,
+    I: Clone + PartialEq + Input,
+    <I as Input>::Item: AsChar + Clone,
+    F: FnMut(I) -> IResult<I, O, E>,
     E: ParseError<I>,
 {
     delimited(multispace0, f, multispace0)
@@ -339,12 +332,13 @@ fn rule<'a, E>(input: &'a str) -> IResult<&'a str, Rule, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    let (remaining, (selector, _, kvs, _)) = tuple((
+    let (remaining, (selector, _, kvs, _)) = (
         whitespace(selector),
         whitespace(char('{')),
         body,
         whitespace(char('}')),
-    ))(input)?;
+    )
+        .parse(input)?;
 
     Ok((remaining, Rule { selector, kvs }))
 }
@@ -355,7 +349,7 @@ fn selector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Sele
     let mut selector: Selector = Default::default();
 
     // Try parsing the type (Html tag) of a selector.
-    let (remaining, typ) = take_while(|c| is_alphanumeric(c as u8))(input)?;
+    let (remaining, typ) = take_while(|c| (c as u8).is_alphanum())(input)?;
 
     // The type is optional. So if no type was found, set the type to `None`.
     selector.typ = if !typ.is_empty() {
@@ -365,7 +359,7 @@ fn selector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Sele
     };
 
     // Parse all the remaining selector parts.
-    let (remaining, pairs) = many0(alt((class, id, any)))(remaining)?;
+    let (remaining, pairs) = many0(alt((class, id, any))).parse(remaining)?;
 
     for pair in pairs {
         match pair {
@@ -383,14 +377,16 @@ fn selector<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Sele
 /// Parse a single class name.
 /// E.g. `.class`.
 fn class<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorPart, E> {
-    preceded(char('.'), take_while(|c| is_alphanumeric(c as u8)))(input)
+    preceded(char('.'), take_while(|c| (c as u8).is_alphanum()))
+        .parse(input)
         .map(|(r, v)| (r, SelectorPart::Class(v.into())))
 }
 
 /// Parse a single id name.
 /// E.g. `#id`.
 fn id<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorPart, E> {
-    preceded(char('#'), take_while(|c| is_alphanumeric(c as u8)))(input)
+    preceded(char('#'), take_while(|c| (c as u8).is_alphanum()))
+        .parse(input)
         .map(|(r, v)| (r, SelectorPart::Id(v.into())))
 }
 
@@ -398,10 +394,10 @@ fn id<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorPa
 /// E.g. `[name=water]`
 fn any<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SelectorPart, E> {
     let (remaining, _) = char('[')(input)?;
-    let (remaining, name) = take_while(|c| is_alphanumeric(c as u8))(remaining)?;
+    let (remaining, name) = take_while(|c| (c as u8).is_alphanum())(remaining)?;
     let (remaining, _) = char('=')(remaining)?;
     let (remaining, _) = char('"')(remaining)?;
-    let (remaining, value) = take_while(|c| is_alphanumeric(c as u8))(remaining)?;
+    let (remaining, value) = take_while(|c| (c as u8).is_alphanum())(remaining)?;
     let (remaining, _) = char('"')(remaining)?;
     let (remaining, _) = char(']')(remaining)?;
     Ok((remaining, SelectorPart::Any(name.into(), value.into())))
@@ -414,7 +410,7 @@ where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
     let mut hm = std::collections::BTreeMap::new();
-    many0(kv)(input).map(|v| {
+    many0(kv).parse(input).map(|v| {
         v.1.into_iter().for_each(|v| {
             hm.insert(v.0.into(), v.1);
         });
@@ -429,14 +425,14 @@ where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
     let (remaining, (kv, _)) =
-        tuple((separated_pair(css_name, char(':'), css_value), char(';')))(input)?;
+        (separated_pair(css_name, char(':'), css_value), char(';')).parse(input)?;
     Ok((remaining, kv))
 }
 
 /// Parses a CSS qualified name.
 /// Can contain alphanumeric characters and '-'.
 fn css_name<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
-    whitespace(take_while(|c| is_alphanumeric(c as u8) || c == '-'))(input)
+    whitespace(take_while(|c| (c as u8).is_alphanum() || c == '-')).parse(input)
 }
 
 /// Parses a single CSS qualified value.
@@ -452,7 +448,8 @@ where
         whitespace(world_value),
         whitespace(unitless_value),
         whitespace(string),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -476,21 +473,22 @@ pub enum CSSValue {
 /// Can contain alphanumeric characters, '-' and spaces.
 fn string<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
     let (input, value) = whitespace(take_while(|c| {
-        is_alphanumeric(c as u8) || c == '-' || c == ' '
-    }))(input)?;
+        (c as u8).is_alphanum() || c == '-' || c == ' '
+    }))
+    .parse(input)?;
 
     Ok((input, CSSValue::String(value.into())))
 }
 
 /// Parses a single CSS px value.
 fn px_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
-    let (input, (value, _)) = tuple((float, tag("px")))(input)?;
+    let (input, (value, _)) = (float, tag("px")).parse(input)?;
 
     Ok((input, CSSValue::Number(Number::Px(value))))
 }
 
 fn world_value<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, CSSValue, E> {
-    let (input, (value, _)) = tuple((float, tag("w")))(input)?;
+    let (input, (value, _)) = (float, tag("w")).parse(input)?;
     Ok((input, CSSValue::Number(Number::World(value))))
 }
 
@@ -559,7 +557,7 @@ fn hex_primary<'a, E>(input: &'a str) -> IResult<&'a str, u8, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    map_res(take_while_m_n(2, 2, char::is_hex_digit), from_hex)(input)
+    map_res(take_while_m_n(2, 2, char::is_hex_digit), from_hex).parse(input)
 }
 
 /// Parse a single hex color code including the `#`.
@@ -568,7 +566,7 @@ where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
     let (input, _) = tag("#")(input)?;
-    let (input, (r, g, b)) = tuple((hex_primary, hex_primary, hex_primary))(input)?;
+    let (input, (r, g, b)) = (hex_primary, hex_primary, hex_primary).parse(input)?;
 
     Ok((
         input,
@@ -586,7 +584,7 @@ where
     E: ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
     use std::str::FromStr;
-    map_res(take_while(|c: char| c.is_ascii_digit()), u8::from_str)(input)
+    map_res(take_while(|c: char| c.is_ascii_digit()), u8::from_str).parse(input)
 }
 
 /// Parse a single hex color code including the `#`.
@@ -594,8 +592,8 @@ fn rgba_color<'a, E>(input: &'a str) -> IResult<&'a str, CSSValue, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    let (input, _) = whitespace(tag("rgba("))(input)?;
-    let (input, (r, _, g, _, b, _, a)) = tuple((
+    let (input, _) = whitespace(tag("rgba(")).parse(input)?;
+    let (input, (r, _, g, _, b, _, a)) = (
         u8,
         whitespace(char(',')),
         u8,
@@ -603,7 +601,8 @@ where
         u8,
         whitespace(char(',')),
         float,
-    ))(input)?;
+    )
+        .parse(input)?;
     let (input, _) = tag(")")(input)?;
     Ok((
         input,
@@ -621,9 +620,9 @@ fn rgb_color<'a, E>(input: &'a str) -> IResult<&'a str, CSSValue, E>
 where
     E: ParseError<&'a str> + ParseError<&'a str> + FromExternalError<&'a str, ParseIntError>,
 {
-    let (input, _) = whitespace(tag("rgb("))(input)?;
+    let (input, _) = whitespace(tag("rgb(")).parse(input)?;
     let (input, (r, _, g, _, b)) =
-        tuple((u8, whitespace(char(',')), u8, whitespace(char(',')), u8))(input)?;
+        (u8, whitespace(char(',')), u8, whitespace(char(',')), u8).parse(input)?;
     let (input, _) = tag(")")(input)?;
     Ok((
         input,

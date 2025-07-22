@@ -13,13 +13,13 @@ pub fn fetch_tile_data(cache_location: &Path, tile_id: &TileId) -> Option<Vec<u8
                 match file.write_all(&data[..]) {
                     Ok(_) => Some(data),
                     Err(e) => {
-                        log::error!("Unable to write pbf {}. Reason:\r\n{}", pbf, e);
+                        log::error!("Unable to write pbf {pbf}. Reason:\r\n{e}");
                         None
                     }
                 }
             }
             Err(e) => {
-                log::error!("Could not create pbf {}. Reason:\r\n{}", pbf, e);
+                log::error!("Could not create pbf {pbf}. Reason:\r\n{e}");
                 None
             }
         }
@@ -30,13 +30,13 @@ pub fn fetch_tile_data(cache_location: &Path, tile_id: &TileId) -> Option<Vec<u8
                 match f.read_to_end(&mut buffer) {
                     Ok(_) => Some(buffer),
                     Err(e) => {
-                        log::error!("Unable to read {}. Reason:\r\n{}", pbf, e);
+                        log::error!("Unable to read {pbf}. Reason:\r\n{e}");
                         None
                     }
                 }
             }
             Err(e) => {
-                log::error!("Unable to open {}. Reason:\r\n{}", pbf, e);
+                log::error!("Unable to open {pbf}. Reason:\r\n{e}");
                 None
             }
         }
@@ -53,16 +53,15 @@ fn fetch_tile_from_server(tile_id: &TileId) -> Option<Vec<u8>> {
     let response = ureq::get(&request_url).call();
     if let Ok(response) = response {
         if response.status() == 200 {
-            let mut reader = response.into_reader();
+            let (_, body) = response.into_parts();
+            let mut reader = body.into_reader();
             // Reserve 4MB upfront which should cover all requests
             let mut data = Vec::with_capacity(4_194_304);
             match reader.read_to_end(&mut data) {
                 Ok(_) => Some(data),
                 Err(e) => {
                     log::warn!(
-                        "Could not read http response for {} to buffer. Reason:\r\n{}",
-                        tile_id,
-                        e
+                        "Could not read http response for {tile_id} to buffer. Reason:\r\n{e}"
                     );
                     None
                 }
