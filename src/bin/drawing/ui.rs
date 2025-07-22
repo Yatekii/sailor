@@ -3,12 +3,12 @@ pub mod views;
 pub mod widgets;
 
 use crate::app_state::AppState;
-use egui::vec2;
 use egui::Color32;
 use egui::FontDefinitions;
 use egui::Layout;
 use egui::Style;
 use egui::Visuals;
+use egui::vec2;
 use egui_wgpu_backend::RenderPass;
 use egui_wgpu_backend::ScreenDescriptor;
 use egui_winit_platform::PlatformDescriptor;
@@ -83,6 +83,9 @@ impl Hud {
         self.platform.begin_pass();
 
         // Draw the demo application.
+        self.platform
+            .context()
+            .style_mut(|style| style.visuals.text_cursor.blink = false);
         self.ui.ui(&self.platform.context(), app_state);
 
         // End the UI frame. We could now handle the output and draw the UI with the backend.
