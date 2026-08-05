@@ -84,9 +84,11 @@ impl TileCache {
             // Spawn a loader task that fetches and preprocesses the tile, then
             // hands the result back to be inserted on the next finalize.
             spawn(async move {
-                let tile = fetch_tile_data(Path::new(&cache_location), &tile_id).map(|data| {
-                    Tile::from_mbvt(&tile_id, &data, feature_collection, selection_tags)
-                });
+                let tile = fetch_tile_data(Path::new(&cache_location), &tile_id)
+                    .await
+                    .map(|data| {
+                        Tile::from_mbvt(&tile_id, &data, feature_collection, selection_tags)
+                    });
                 if tx.send((tile_id, tile)).is_err() {
                     log::debug!(
                         "Could not send the tile load message. This most likely happened because the application process was terminated."
