@@ -31,7 +31,6 @@ log = { version = "0.4", features = ["serde"] }
 # lyon = { version = "1", path = "../lyon/crates/lyon" }
 lyon = { version = "1", git = "https://github.com/Yatekii/lyon.git" }
 lru = "0.16"
-lazy_static = "1"
 malloc_size_of_derive = "0.1"
 nalgebra = "0.33"
 nalgebra-glm = "0.19"
@@ -57,7 +56,6 @@ egui_winit_platform = "0.26"
 egui_tiles = "0.12.0"
 egui_extras = { version = "0.31.0", features = ["syntect"] }
 human_bytes = "0.4"
-heapless = "*"
 parking_lot = "0.12"
 
 [dev-dependencies]
