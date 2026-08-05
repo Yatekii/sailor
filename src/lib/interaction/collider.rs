@@ -51,16 +51,17 @@ impl Collider {
                 && tile_point.y <= *extent
             {
                 if let Ok(collider) = collider.try_read()
-                    && let Ok(objects) = objects.try_read() {
-                        collider.get_hovered_objects(&tile_point, &mut object_ids);
+                    && let Ok(objects) = objects.try_read()
+                {
+                    collider.get_hovered_objects(&tile_point, &mut object_ids);
 
-                        for object_id in &object_ids {
-                            let object = (objects.deref())[*object_id].clone();
-                            return_objects.push(object)
-                        }
-
-                        object_ids.clear();
+                    for object_id in &object_ids {
+                        let object = (objects.deref())[*object_id].clone();
+                        return_objects.push(object)
                     }
+
+                    object_ids.clear();
+                }
 
                 break;
             }

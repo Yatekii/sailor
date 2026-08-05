@@ -200,7 +200,7 @@ impl AppState {
         let hovered_objects = self.hovered_objects.lock().unwrap();
         self.selected_objects = hovered_objects
             .iter()
-            .map(|o| EditableObject::new(o.id, o.tile_id, o.clone()) )
+            .map(|o| EditableObject::new(o.id, o.tile_id, o.clone()))
             .collect();
         drop(hovered_objects);
         self.selected_object = 0;

@@ -57,11 +57,7 @@ fn main() {
     );
 
     let painter = drawing::Painter::init(window, size, &app_state);
-    let hud = drawing::ui::Hud::new(
-        &painter.window,
-        &painter.device,
-        &painter.surface_config,
-    );
+    let hud = drawing::ui::Hud::new(&painter.window, &painter.device, &painter.surface_config);
 
     let mouse_down = false;
     let last_pos = winit::dpi::PhysicalPosition::new(0.0, 0.0);
@@ -144,18 +140,17 @@ impl ApplicationHandler for Application {
             }
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::MouseInput { state, button, .. } => {
-                if !ui_event
-                    && let MouseButton::Left = button {
-                        match state {
-                            ElementState::Pressed => {
-                                self.mouse_down = true;
-                            }
-                            ElementState::Released => {
-                                self.mouse_down = false;
-                                self.app_state.update_selected_from_hover_objects();
-                            }
+                if !ui_event && let MouseButton::Left = button {
+                    match state {
+                        ElementState::Pressed => {
+                            self.mouse_down = true;
+                        }
+                        ElementState::Released => {
+                            self.mouse_down = false;
+                            self.app_state.update_selected_from_hover_objects();
                         }
                     }
+                }
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 if !ui_event {
@@ -191,37 +186,36 @@ impl ApplicationHandler for Application {
                         .update_hovered_objects((position.x as f32, position.y as f32))
                 }
             }
-            WindowEvent::RedrawRequested
-                if !event_loop.exiting() => {
-                    self.painter.update_shader();
-                    // self.app_state.load_tile(TileId::new(13, 4290, 2868));
+            WindowEvent::RedrawRequested if !event_loop.exiting() => {
+                self.painter.update_shader();
+                // self.app_state.load_tile(TileId::new(13, 4290, 2868));
 
-                    if self.args.tile.is_empty() {
-                        self.app_state.load_tiles();
-                    } else {
-                        for tile in &self.args.tile {
-                            let coords: Vec<u32> =
-                                tile.split("/").filter_map(|v| v.parse().ok()).collect();
-                            if coords.len() != 3 {
-                                continue;
-                            }
-
-                            self.app_state
-                                .load_tile(TileId::new(coords[0], coords[1], coords[2]));
+                if self.args.tile.is_empty() {
+                    self.app_state.load_tiles();
+                } else {
+                    for tile in &self.args.tile {
+                        let coords: Vec<u32> =
+                            tile.split("/").filter_map(|v| v.parse().ok()).collect();
+                        if coords.len() != 3 {
+                            continue;
                         }
-                    }
 
-                    self.painter.paint(&mut self.hud, &mut self.app_state);
-
-                    self.app_state.stats.capture_frame();
-                    if CONFIG.general.display_framerate {
-                        println!(
-                            "Frametime {:.2?} at zoom {:.2}",
-                            self.app_state.stats.get_average(),
-                            self.app_state.zoom
-                        );
+                        self.app_state
+                            .load_tile(TileId::new(coords[0], coords[1], coords[2]));
                     }
                 }
+
+                self.painter.paint(&mut self.hud, &mut self.app_state);
+
+                self.app_state.stats.capture_frame();
+                if CONFIG.general.display_framerate {
+                    println!(
+                        "Frametime {:.2?} at zoom {:.2}",
+                        self.app_state.stats.get_average(),
+                        self.app_state.zoom
+                    );
+                }
+            }
             _ => (),
         }
         self.painter.window.request_redraw();

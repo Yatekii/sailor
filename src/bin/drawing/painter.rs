@@ -749,183 +749,181 @@ impl Painter {
         if !features.is_empty()
             && let wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) = self.surface.get_current_texture()
-            {
-                let mut encoder = self
-                    .device
-                    .create_command_encoder(&CommandEncoderDescriptor {
-                        label: Some("tile polygon encoder"),
-                    });
-                self.update_uniforms(&mut encoder, app_state, &feature_collection);
-                self.bind_group = Self::create_blend_bind_group(
-                    &self.device,
-                    &self.bind_group_layout,
-                    &self.uniform_buffer,
-                    &self.tile_transform_buffer,
-                    &self.tile_selection_buffer,
-                );
-                {
-                    let view = frame
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default());
-                    let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                        label: Some("tile polygons"),
-                        color_attachments: &[Some(RenderPassColorAttachment {
-                            depth_slice: None,
-                            view: if CONFIG.renderer.msaa_samples > 1 {
-                                &self.multisampled_framebuffer
-                            } else {
-                                &view
-                            },
-                            resolve_target: if CONFIG.renderer.msaa_samples > 1 {
-                                Some(&view)
-                            } else {
-                                None
-                            },
-                            ops: Operations::<wgpu::Color> {
-                                load: LoadOp::Clear(wgpu::Color::TRANSPARENT),
-                                store: StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                            view: &self.stencil,
-                            depth_ops: Some(Operations::<f32> {
-                                load: LoadOp::Clear(0.0),
-                                store: StoreOp::Store,
-                            }),
-                            stencil_ops: Some(Operations::<u32> {
-                                load: LoadOp::Clear(255),
-                                store: StoreOp::Store,
-                            }),
-                        }),
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                        multiview_mask: None,
-                    });
-                    render_pass.set_bind_group(0, &self.bind_group, &[]);
-                    let vec = vec4(0.0, 0.0, 0.0, 1.0);
-                    let screen_dimensions =
-                        vec2(app_state.screen.width, app_state.screen.height) / 2.0;
-
-                    for (i, tile_id) in app_state.visible_tiles().iter().enumerate() {
-                        let matrix = app_state.screen.tile_to_screen(app_state.zoom, tile_id);
-                        let start = (matrix * vec).xy() + vec2(1.0, 1.0);
-                        let s = vec2(
-                            (start.x * screen_dimensions.x)
-                                .round()
-                                .max(0.0)
-                                .min(screen_dimensions.x * 2.0),
-                            (start.y * screen_dimensions.y)
-                                .round()
-                                .max(0.0)
-                                .min(screen_dimensions.y * 2.0),
-                        );
-                        let matrix = app_state.screen.tile_to_screen(
-                            app_state.zoom,
-                            &(*tile_id + TileId::new(tile_id.z, 1, 1)),
-                        );
-                        let end = (matrix * vec).xy() + vec2(1.0, 1.0);
-                        let e = vec2(
-                            (end.x * screen_dimensions.x)
-                                .round()
-                                .max(0.0)
-                                .min(screen_dimensions.x * 2.0),
-                            (end.y * screen_dimensions.y)
-                                .round()
-                                .max(0.0)
-                                .min(screen_dimensions.y * 2.0),
-                        );
-                        let width = (e.x - s.x) as u32;
-                        let height = (e.y - s.y) as u32;
-
-                        if width > 0 && height > 0 {
-                            render_pass.set_scissor_rect(s.x as u32, s.y as u32, width, height);
-                        }
-
-                        let tile = app_state.tile_cache.try_get_tile(tile_id).unwrap();
-                        let gpu_tile = tile.gpu_tile();
-                        tile.paint(
-                            &mut render_pass,
-                            &self.blend_pipeline,
-                            gpu_tile,
-                            &feature_collection,
-                            i as u32,
-                        );
-                    }
-                }
-
-                self.viewport.update(
-                    &self.queue,
-                    Resolution {
-                        width: self.surface_config.width,
-                        height: self.surface_config.height,
-                    },
-                );
-
-                let tile_cache = &mut app_state.tile_cache;
-                let screen = &app_state.screen;
-                let zoom = app_state.zoom;
-                for tile_id in &app_state.visible_tiles {
-                    let tile = tile_cache.get_tile_mut(tile_id);
-                    tile.prepare_text(&mut self.font_system);
-                }
-                let text_areas = app_state.visible_tiles.iter().flat_map(|tile_id| {
-                    let tile = tile_cache.get_tile(tile_id);
-                    tile.queue_text(screen, zoom)
+        {
+            let mut encoder = self
+                .device
+                .create_command_encoder(&CommandEncoderDescriptor {
+                    label: Some("tile polygon encoder"),
                 });
-
-                self.text_renderer
-                    .prepare(
-                        &self.device,
-                        &self.queue,
-                        &mut self.font_system,
-                        &mut self.atlas,
-                        &self.viewport,
-                        text_areas,
-                        &mut self.swash_cache,
-                    )
-                    .unwrap();
-
-                let view = &frame
+            self.update_uniforms(&mut encoder, app_state, &feature_collection);
+            self.bind_group = Self::create_blend_bind_group(
+                &self.device,
+                &self.bind_group_layout,
+                &self.uniform_buffer,
+                &self.tile_transform_buffer,
+                &self.tile_selection_buffer,
+            );
+            {
+                let view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
-
-                let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                    label: Some("tile text pass"),
+                let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                    label: Some("tile polygons"),
                     color_attachments: &[Some(RenderPassColorAttachment {
-                        view,
                         depth_slice: None,
-                        resolve_target: None,
-                        ops: Operations {
-                            load: LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
+                        view: if CONFIG.renderer.msaa_samples > 1 {
+                            &self.multisampled_framebuffer
+                        } else {
+                            &view
+                        },
+                        resolve_target: if CONFIG.renderer.msaa_samples > 1 {
+                            Some(&view)
+                        } else {
+                            None
+                        },
+                        ops: Operations::<wgpu::Color> {
+                            load: LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: StoreOp::Store,
                         },
                     })],
-                    depth_stencil_attachment: None,
+                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                        view: &self.stencil,
+                        depth_ops: Some(Operations::<f32> {
+                            load: LoadOp::Clear(0.0),
+                            store: StoreOp::Store,
+                        }),
+                        stencil_ops: Some(Operations::<u32> {
+                            load: LoadOp::Clear(255),
+                            store: StoreOp::Store,
+                        }),
+                    }),
                     timestamp_writes: None,
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
+                render_pass.set_bind_group(0, &self.bind_group, &[]);
+                let vec = vec4(0.0, 0.0, 0.0, 1.0);
+                let screen_dimensions = vec2(app_state.screen.width, app_state.screen.height) / 2.0;
 
-                self.text_renderer
-                    .render(&self.atlas, &self.viewport, &mut pass)
-                    .unwrap();
+                for (i, tile_id) in app_state.visible_tiles().iter().enumerate() {
+                    let matrix = app_state.screen.tile_to_screen(app_state.zoom, tile_id);
+                    let start = (matrix * vec).xy() + vec2(1.0, 1.0);
+                    let s = vec2(
+                        (start.x * screen_dimensions.x)
+                            .round()
+                            .max(0.0)
+                            .min(screen_dimensions.x * 2.0),
+                        (start.y * screen_dimensions.y)
+                            .round()
+                            .max(0.0)
+                            .min(screen_dimensions.y * 2.0),
+                    );
+                    let matrix = app_state
+                        .screen
+                        .tile_to_screen(app_state.zoom, &(*tile_id + TileId::new(tile_id.z, 1, 1)));
+                    let end = (matrix * vec).xy() + vec2(1.0, 1.0);
+                    let e = vec2(
+                        (end.x * screen_dimensions.x)
+                            .round()
+                            .max(0.0)
+                            .min(screen_dimensions.x * 2.0),
+                        (end.y * screen_dimensions.y)
+                            .round()
+                            .max(0.0)
+                            .min(screen_dimensions.y * 2.0),
+                    );
+                    let width = (e.x - s.x) as u32;
+                    let height = (e.y - s.y) as u32;
 
-                drop(pass);
+                    if width > 0 && height > 0 {
+                        render_pass.set_scissor_rect(s.x as u32, s.y as u32, width, height);
+                    }
 
-                // self.temperature.paint(&mut encoder, view);
+                    let tile = app_state.tile_cache.try_get_tile(tile_id).unwrap();
+                    let gpu_tile = tile.gpu_tile();
+                    tile.paint(
+                        &mut render_pass,
+                        &self.blend_pipeline,
+                        gpu_tile,
+                        &feature_collection,
+                        i as u32,
+                    );
+                }
+            }
 
-                hud.paint(
-                    app_state,
-                    &self.window,
+            self.viewport.update(
+                &self.queue,
+                Resolution {
+                    width: self.surface_config.width,
+                    height: self.surface_config.height,
+                },
+            );
+
+            let tile_cache = &mut app_state.tile_cache;
+            let screen = &app_state.screen;
+            let zoom = app_state.zoom;
+            for tile_id in &app_state.visible_tiles {
+                let tile = tile_cache.get_tile_mut(tile_id);
+                tile.prepare_text(&mut self.font_system);
+            }
+            let text_areas = app_state.visible_tiles.iter().flat_map(|tile_id| {
+                let tile = tile_cache.get_tile(tile_id);
+                tile.queue_text(screen, zoom)
+            });
+
+            self.text_renderer
+                .prepare(
                     &self.device,
                     &self.queue,
-                    &mut encoder,
-                    &frame,
-                );
-                self.staging_belt.finish();
+                    &mut self.font_system,
+                    &mut self.atlas,
+                    &self.viewport,
+                    text_areas,
+                    &mut self.swash_cache,
+                )
+                .unwrap();
 
-                self.queue.submit([encoder.finish()]);
-                self.queue.present(frame);
-            }
+            let view = &frame
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+
+            let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("tile text pass"),
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+
+            self.text_renderer
+                .render(&self.atlas, &self.viewport, &mut pass)
+                .unwrap();
+
+            drop(pass);
+
+            // self.temperature.paint(&mut encoder, view);
+
+            hud.paint(
+                app_state,
+                &self.window,
+                &self.device,
+                &self.queue,
+                &mut encoder,
+                &frame,
+            );
+            self.staging_belt.finish();
+
+            self.queue.submit([encoder.finish()]);
+            self.queue.present(frame);
+        }
     }
 }
