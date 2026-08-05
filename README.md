@@ -6,16 +6,17 @@ A sailing navigation application.
 
 ## Building
 
-### Building for vulkan & Linux/Windows
+wgpu picks the backend automatically (Vulkan on Linux/Windows, Metal on macOS),
+so the build is the same everywhere:
 
 ```
-cargo build --verbose --bin sailor
+cargo build --bin sailor
 ```
 
-### Building for metal & macOS
+A nix dev shell with the pinned Rust toolchain is provided:
 
 ```
-cargo build --verbose --bin sailor --no-default-features --features metal
+nix develop
 ```
 
 ### Debug the Zurich Landesmuseeum tile
