@@ -24,7 +24,7 @@ impl TileField {
         }
     }
 
-    pub fn iter(&self) -> TileIterator {
+    pub fn iter(&self) -> TileIterator<'_> {
         TileIterator {
             tile_field: self,
             current_tile: self.topleft,

@@ -481,13 +481,6 @@ impl Painter {
         selected_tile_id: u32,
         selected_object_id: u32,
     ) -> Buffer {
-        #[derive(Copy, Clone, Debug, Default)]
-        #[repr(C, packed)]
-        pub struct SelectedData {
-            pub selected_tile_id: u32,
-            pub selected_object_id: u32,
-        }
-
         device.create_buffer_init(&BufferInitDescriptor {
             label: Some("tile selection buffer"),
             contents: as_byte_slice(&[selected_tile_id, selected_object_id]),
@@ -745,8 +738,8 @@ impl Painter {
         }
 
         let features = feature_collection.features();
-        if !features.is_empty() {
-            if let wgpu::CurrentSurfaceTexture::Success(frame)
+        if !features.is_empty()
+            && let wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) = self.surface.get_current_texture()
             {
                 let mut encoder = self
@@ -916,7 +909,7 @@ impl Painter {
                 hud.paint(
                     app_state,
                     &self.window,
-                    &mut self.device,
+                    &self.device,
                     &self.queue,
                     &mut encoder,
                     &frame,
@@ -926,6 +919,5 @@ impl Painter {
                 self.queue.submit([encoder.finish()]);
                 self.queue.present(frame);
             }
-        }
     }
 }

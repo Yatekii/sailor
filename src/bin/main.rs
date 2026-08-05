@@ -56,10 +56,10 @@ fn main() {
         2.0,
     );
 
-    let mut painter = drawing::Painter::init(window, size, &app_state);
+    let painter = drawing::Painter::init(window, size, &app_state);
     let hud = drawing::ui::Hud::new(
         &painter.window,
-        &mut painter.device,
+        &painter.device,
         &painter.surface_config,
     );
 
@@ -144,8 +144,8 @@ impl ApplicationHandler for Application {
             }
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::MouseInput { state, button, .. } => {
-                if !ui_event {
-                    if let MouseButton::Left = button {
+                if !ui_event
+                    && let MouseButton::Left = button {
                         match state {
                             ElementState::Pressed => {
                                 self.mouse_down = true;
@@ -156,7 +156,6 @@ impl ApplicationHandler for Application {
                             }
                         }
                     }
-                }
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 if !ui_event {
@@ -192,8 +191,8 @@ impl ApplicationHandler for Application {
                         .update_hovered_objects((position.x as f32, position.y as f32))
                 }
             }
-            WindowEvent::RedrawRequested => {
-                if !event_loop.exiting() {
+            WindowEvent::RedrawRequested
+                if !event_loop.exiting() => {
                     self.painter.update_shader();
                     // self.app_state.load_tile(TileId::new(13, 4290, 2868));
 
@@ -223,7 +222,6 @@ impl ApplicationHandler for Application {
                         );
                     }
                 }
-            }
             _ => (),
         }
         self.painter.window.request_redraw();
