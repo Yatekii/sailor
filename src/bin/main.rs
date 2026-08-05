@@ -12,7 +12,7 @@ use nalgebra_glm::{vec2, vec4};
 use osm::math::{TileId, deg2num, tile_to_world_space};
 use winit::{
     application::ApplicationHandler,
-    dpi::{LogicalSize, PhysicalPosition, PhysicalSize},
+    dpi::{LogicalSize, PhysicalPosition},
     event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{Key, ModifiersState, NamedKey},
@@ -68,7 +68,6 @@ fn main() {
 
     let modifiers_state = ModifiersState::default();
 
-    let screen = app_state.screen.clone();
     let mut application = Application {
         hud,
         painter,
@@ -78,15 +77,6 @@ fn main() {
         last_pos,
         args,
     };
-
-    // Hack to make the UI scale correctly.
-    application
-        .hud
-        .platform
-        .handle_event(&winit::event::WindowEvent::Resized(PhysicalSize::new(
-            screen.width as u32,
-            screen.height as u32,
-        )));
 
     event_loop.run_app(&mut application).unwrap();
 }
@@ -113,7 +103,7 @@ impl ApplicationHandler for Application {
         event: WindowEvent,
     ) {
         self.app_state.css_cache.update();
-        let ui_event = self.hud.interact(&event);
+        let ui_event = self.hud.interact(&self.painter.window, &event);
         match &event {
             WindowEvent::Destroyed => event_loop.exit(),
             WindowEvent::Resized(physical_size) => {
@@ -203,12 +193,6 @@ impl ApplicationHandler for Application {
                 }
             }
             WindowEvent::RedrawRequested => {
-                self.hud
-                    .platform
-                    .handle_event(&winit::event::WindowEvent::Resized(PhysicalSize::new(
-                        self.app_state.screen.width as u32,
-                        self.app_state.screen.height as u32,
-                    )));
                 if !event_loop.exiting() {
                     self.painter.update_shader();
                     // self.app_state.load_tile(TileId::new(13, 4290, 2868));

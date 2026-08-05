@@ -46,14 +46,14 @@ quick-protobuf = "0.8"
 serde = { version = "1", features = ["derive"] }
 ureq = "3"
 varint = "0.9"
-wgpu = { version = "24", features = ["glsl"] }
-glyphon = { version = "0.8" }
+wgpu = { version = "30", features = ["glsl"] }
+glyphon = "0.12"
 winit = "0.30"
-egui = "0.31"
-egui_wgpu_backend = "0.34"
-egui_winit_platform = "0.26"
-egui_tiles = "0.12.0"
-egui_extras = { version = "0.31.0", features = ["syntect"] }
+egui = "0.36"
+egui-wgpu = "0.36"
+egui-winit = "0.36"
+egui_tiles = "0.17"
+egui_extras = { version = "0.36", features = ["syntect"] }
 human_bytes = "0.4"
 parking_lot = "0.12"
 

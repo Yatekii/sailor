@@ -118,7 +118,7 @@ impl Temperature {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
             lod_min_clamp: -100.0,
             lod_max_clamp: 100.0,
             compare: Some(wgpu::CompareFunction::Always),
@@ -168,8 +168,8 @@ impl Temperature {
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(bind_group_layout)],
+            immediate_size: 0,
         });
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -217,7 +217,7 @@ impl Temperature {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         })
     }
@@ -363,6 +363,7 @@ impl Temperature {
             label: Some("Temperature"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view,
+                depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations::<wgpu::Color> {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -377,6 +378,7 @@ impl Temperature {
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self._bind_group, &[]);

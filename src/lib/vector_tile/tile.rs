@@ -499,7 +499,7 @@ impl Tile {
             .map(|text| {
                 let mut buffer = Buffer::new(font_system, Metrics::relative(12.0, 1.15));
 
-                buffer.set_text(font_system, &text.1, attrs, shaping);
+                buffer.set_text(&text.1, &attrs, shaping, None);
                 buffer.shape_until_scroll(font_system, false);
                 buffer
             })

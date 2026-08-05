@@ -23,7 +23,7 @@ impl LocationFinderWindow {
             let mut valid = false;
             let width = 600.0;
             egui::Window::new("location finder")
-                .default_pos([(ctx.screen_rect().width() - width) / 2.0, 40.0])
+                .default_pos([(ctx.content_rect().width() - width) / 2.0, 40.0])
                 .default_width(width)
                 .default_height(100.0)
                 .open(&mut self.open)

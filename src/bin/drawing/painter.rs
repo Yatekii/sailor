@@ -60,7 +60,8 @@ impl Painter {
     pub fn init(window: Arc<Window>, size: PhysicalSize<u32>, app_state: &AppState) -> Self {
         let factor = window.scale_factor();
 
-        let instance = wgpu::Instance::new(&InstanceDescriptor::default());
+        let instance =
+            wgpu::Instance::new(InstanceDescriptor::new_without_display_handle_from_env());
         let surface = instance.create_surface(window.clone()).unwrap();
 
         let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -71,18 +72,17 @@ impl Painter {
         }))
         .expect("Failed to find an appropiate adapter");
 
-        let (device, queue) = block_on(adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                label: Some("Main Device"),
-                required_features: Features::DEPTH32FLOAT_STENCIL8,
-                required_limits: wgpu::Limits {
-                    max_uniform_buffer_binding_size: 1 << 16,
-                    ..wgpu::Limits::default()
-                },
-                memory_hints: MemoryHints::Performance,
+        let (device, queue) = block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+            label: Some("Main Device"),
+            required_features: Features::DEPTH32FLOAT_STENCIL8,
+            required_limits: wgpu::Limits {
+                max_uniform_buffer_binding_size: 1 << 16,
+                ..wgpu::Limits::default()
             },
-            None,
-        ))
+            memory_hints: MemoryHints::Performance,
+            experimental_features: wgpu::ExperimentalFeatures::default(),
+            trace: wgpu::Trace::Off,
+        }))
         .expect("Failed to create device");
 
         let init_encoder = device.create_command_encoder(&CommandEncoderDescriptor {
@@ -181,6 +181,7 @@ impl Painter {
             present_mode: wgpu::PresentMode::Immediate,
             desired_maximum_frame_latency: 2,
             view_formats: vec![TextureFormat::Bgra8Unorm],
+            color_space: wgpu::SurfaceColorSpace::Auto,
         };
 
         surface.configure(&device, &surface_config);
@@ -229,7 +230,7 @@ impl Painter {
             true,
         );
 
-        let staging_belt = wgpu::util::StagingBelt::new(1024);
+        let staging_belt = wgpu::util::StagingBelt::new(device.clone(), 1024);
 
         let bind_group = Self::create_blend_bind_group(
             &device,
@@ -296,8 +297,8 @@ impl Painter {
     ) -> RenderPipeline {
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("osm layer render pipeline layout"),
-            bind_group_layouts: &[bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(bind_group_layout)],
+            immediate_size: 0,
         });
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
@@ -306,7 +307,7 @@ impl Painter {
             vertex: VertexState {
                 module: vs_module,
                 entry_point: Some("main"),
-                buffers: &[VertexBufferLayout {
+                buffers: &[Some(VertexBufferLayout {
                     array_stride: std::mem::size_of::<Vertex>() as u64,
                     step_mode: VertexStepMode::Vertex,
                     attributes: &[
@@ -331,7 +332,7 @@ impl Painter {
                             shader_location: 3,
                         },
                     ],
-                }],
+                })],
                 compilation_options: PipelineCompilationOptions::default(),
             },
             fragment: Some(FragmentState {
@@ -358,8 +359,8 @@ impl Painter {
             },
             depth_stencil: Some(DepthStencilState {
                 format: TextureFormat::Depth32FloatStencil8,
-                depth_write_enabled,
-                depth_compare: CompareFunction::Greater,
+                depth_write_enabled: Some(depth_write_enabled),
+                depth_compare: Some(CompareFunction::Greater),
                 stencil: wgpu::StencilState {
                     front: StencilFaceState {
                         compare: CompareFunction::NotEqual,
@@ -387,7 +388,7 @@ impl Painter {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         })
     }
@@ -745,7 +746,9 @@ impl Painter {
 
         let features = feature_collection.features();
         if !features.is_empty() {
-            if let Ok(frame) = self.surface.get_current_texture() {
+            if let wgpu::CurrentSurfaceTexture::Success(frame)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(frame) = self.surface.get_current_texture()
+            {
                 let mut encoder = self
                     .device
                     .create_command_encoder(&CommandEncoderDescriptor {
@@ -766,6 +769,7 @@ impl Painter {
                     let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                         label: Some("tile polygons"),
                         color_attachments: &[Some(RenderPassColorAttachment {
+                            depth_slice: None,
                             view: if CONFIG.renderer.msaa_samples > 1 {
                                 &self.multisampled_framebuffer
                             } else {
@@ -794,6 +798,7 @@ impl Painter {
                         }),
                         timestamp_writes: None,
                         occlusion_query_set: None,
+                        multiview_mask: None,
                     });
                     render_pass.set_bind_group(0, &self.bind_group, &[]);
                     let vec = vec4(0.0, 0.0, 0.0, 1.0);
@@ -887,6 +892,7 @@ impl Painter {
                     label: Some("tile text pass"),
                     color_attachments: &[Some(RenderPassColorAttachment {
                         view,
+                        depth_slice: None,
                         resolve_target: None,
                         ops: Operations {
                             load: LoadOp::Load,
@@ -896,6 +902,7 @@ impl Painter {
                     depth_stencil_attachment: None,
                     timestamp_writes: None,
                     occlusion_query_set: None,
+                    multiview_mask: None,
                 });
 
                 self.text_renderer
@@ -917,7 +924,7 @@ impl Painter {
                 self.staging_belt.finish();
 
                 self.queue.submit([encoder.finish()]);
-                frame.present();
+                self.queue.present(frame);
             }
         }
     }

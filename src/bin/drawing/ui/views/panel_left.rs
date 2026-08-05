@@ -36,14 +36,14 @@ impl PanelLeft {
         Self { _open: true, tree }
     }
 
-    pub fn ui(&mut self, ctx: &egui::Context, app_state: &mut AppState) {
-        egui::SidePanel::left("sidepanel")
-            .default_width(300.0)
-            .min_width(300.0)
+    pub fn ui(&mut self, ui: &mut egui::Ui, app_state: &mut AppState) {
+        egui::Panel::left("sidepanel")
+            .default_size(300.0)
+            .min_size(300.0)
             .show_separator_line(false)
-            .exact_width(300.0)
-            .max_width(300.0)
-            .show(ctx, |ui| {
+            .exact_size(300.0)
+            .max_size(300.0)
+            .show(ui, |ui| {
                 let mut behavior = TabsBehavior { app_state };
                 self.tree.ui(&mut behavior, ui);
             });
