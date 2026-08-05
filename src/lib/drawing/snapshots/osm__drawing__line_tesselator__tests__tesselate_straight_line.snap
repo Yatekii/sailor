@@ -10,10 +10,11 @@ VertexBuffers {
                 0,
             ],
             normal: [
-                -4096,
-                4095,
+                0,
+                4096,
             ],
             feature_id: 65536,
+            object_id: 0,
         },
         Vertex {
             position: [
@@ -21,10 +22,11 @@ VertexBuffers {
                 0,
             ],
             normal: [
-                -4095,
+                0,
                 -4096,
             ],
             feature_id: 65536,
+            object_id: 0,
         },
         Vertex {
             position: [
@@ -32,10 +34,11 @@ VertexBuffers {
                 0,
             ],
             normal: [
-                4096,
+                0,
                 4096,
             ],
             feature_id: 65536,
+            object_id: 0,
         },
         Vertex {
             position: [
@@ -43,10 +46,11 @@ VertexBuffers {
                 0,
             ],
             normal: [
-                4095,
+                0,
                 -4096,
             ],
             feature_id: 65536,
+            object_id: 0,
         },
     ],
     indices: [
