@@ -1,0 +1,45 @@
+[advisories]
+# yanked transitive crates shouldn't block CI; real vulnerabilities still fail
+yanked = "warn"
+ignore = [
+    # transitive quick-xml 0.37/0.38 via fontdb + syntect (egui_extras); no
+    # semver-compatible fix, XML parsing is font/syntax metadata only.
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    # unmaintained crates pending replacement/removal in the dep-update pass:
+    "RUSTSEC-2022-0080", # parity-util-mem
+    "RUSTSEC-2024-0436", # paste
+    "RUSTSEC-2024-0320", # yaml-rust
+    "RUSTSEC-2025-0134", # bincode
+    "RUSTSEC-2025-0141", # rustls-pemfile
+    "RUSTSEC-2026-0192", # ttf-parser
+    "RUSTSEC-2026-0206", # rustybuzz
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "0BSD",
+    "ISC",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "allow"
+wildcards = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "allow"
