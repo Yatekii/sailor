@@ -481,6 +481,14 @@ impl Painter {
         selected_tile_id: u32,
         selected_object_id: u32,
     ) -> Buffer {
+        #[expect(dead_code)]
+        #[derive(Copy, Clone, Debug, Default)]
+        #[repr(C, packed)]
+        pub struct SelectedData {
+            pub selected_tile_id: u32,
+            pub selected_object_id: u32,
+        }
+
         device.create_buffer_init(&BufferInitDescriptor {
             label: Some("tile selection buffer"),
             contents: as_byte_slice(&[selected_tile_id, selected_object_id]),
