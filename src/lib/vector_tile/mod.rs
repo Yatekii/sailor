@@ -48,6 +48,7 @@ fn parse_one_to_path(
     gcursor: &mut Point,
 ) -> Path {
     let mut builder = Path::builder();
+    let mut in_subpath = false;
 
     while *cursor < geometry.len() {
         let value = geometry[*cursor];
@@ -62,8 +63,13 @@ fn parse_one_to_path(
                     let dy = ZigZag::<i32>::zigzag(&geometry[*cursor]) as f32;
                     *cursor += 1;
                     *gcursor += vector(dx, dy);
-                    // builder.end(false);
+                    // A move-to starts a new sub-path; close the previous one first,
+                    // otherwise lyon panics on `begin` while already in a sub-path.
+                    if in_subpath {
+                        builder.end(false);
+                    }
                     builder.begin(*gcursor);
+                    in_subpath = true;
                 }
 
                 if let GeomType::POINT = geometry_type {
@@ -91,6 +97,7 @@ fn parse_one_to_path(
             }
             7 => {
                 builder.close();
+                in_subpath = false;
                 match geometry_type {
                     GeomType::POINT => panic!("This is a bug. Please report it."),
                     GeomType::LINESTRING => panic!("This is a bug. Please report it."),
@@ -102,6 +109,9 @@ fn parse_one_to_path(
                 panic!("This is a bug. Please report it.");
             }
         }
+    }
+    if in_subpath {
+        builder.end(false);
     }
     match geometry_type {
         GeomType::POINT => panic!("This is a bug. Please report it."),
