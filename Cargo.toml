@@ -32,9 +32,9 @@ log = { version = "0.4", features = ["serde"] }
 lyon = { version = "1", git = "https://github.com/Yatekii/lyon.git" }
 lru = "0.16"
 malloc_size_of_derive = "0.1"
-nalgebra = "0.33"
-nalgebra-glm = "0.19"
-parry2d = "0.22.1"
+nalgebra = "0.35"
+nalgebra-glm = "0.21"
+parry2d = "0.30"
 nom = "8"
 nom-language = "0.1"
 notify = "8"

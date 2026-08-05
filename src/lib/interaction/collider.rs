@@ -1,5 +1,6 @@
+use nalgebra::Point2 as Point;
 use nalgebra::base::Vector4;
-use parry2d::math::Point;
+use parry2d::math::Vec2;
 use std::{
     ops::Deref,
     sync::{Arc, RwLock},
@@ -42,7 +43,7 @@ impl Collider {
                 point.1 / (screen.height / 2f32) - 1.0,
             );
             let global_point = matrix * Vector4::new(screen_point.x, screen_point.y, 0.0, 1.0);
-            let tile_point = Point::new(global_point.x, global_point.y) * *extent;
+            let tile_point = Vec2::new(global_point.x, global_point.y) * *extent;
 
             if tile_point.x >= 0.0
                 && tile_point.x <= *extent

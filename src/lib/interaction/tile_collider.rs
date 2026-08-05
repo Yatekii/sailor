@@ -1,4 +1,4 @@
-use parry2d::{bounding_volume::Aabb, math::Point, partitioning::Bvh, utils::point_in_poly2d};
+use parry2d::{bounding_volume::Aabb, math::Vec2, partitioning::Bvh, utils::point_in_poly2d};
 use std::{
     sync::{Arc, RwLock},
     thread::spawn,
@@ -7,7 +7,7 @@ use std::{
 use crate::object::Object;
 
 pub struct TileCollider {
-    objects: Vec<Vec<Point<f32>>>,
+    objects: Vec<Vec<Vec2>>,
     bvh: Bvh,
 }
 
@@ -29,15 +29,15 @@ impl TileCollider {
         self.len() == 0
     }
 
-    pub fn get_hovered_objects(&self, cursor_point: &Point<f32>, hovered_objects: &mut Vec<usize>) {
+    pub fn get_hovered_objects(&self, cursor_point: &Vec2, hovered_objects: &mut Vec<usize>) {
         // Broad phase only checks with the aabbs of the individual polys.
         for poly_id in self
             .bvh
-            .leaves(|node| node.aabb().contains_local_point(cursor_point))
+            .leaves(|node| node.aabb().contains_local_point(*cursor_point))
         {
             let poly = &self.objects[poly_id as usize];
             // Narrow phase checks that the point is in the polygon indeed.
-            if point_in_poly2d(cursor_point, poly) {
+            if point_in_poly2d(*cursor_point, poly) {
                 hovered_objects.push(poly_id as usize);
             }
         }
@@ -67,8 +67,8 @@ impl TileColliderLoader for Arc<RwLock<TileCollider>> {
                                 let polygon = object
                                     .points()
                                     .iter()
-                                    .map(|p| Point::new(p.x, p.y))
-                                    .collect::<Vec<Point<f32>>>();
+                                    .map(|p| Vec2::new(p.x, p.y))
+                                    .collect::<Vec<Vec2>>();
                                 let id = collider.objects.len();
                                 collider.objects.push(polygon.clone());
                                 collider.bvh.insert(Aabb::from_points(polygon), id as u32);
