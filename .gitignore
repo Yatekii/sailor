@@ -3,3 +3,4 @@
 **/*.rs.bk
 .DS_Store
 .direnv/
+/dist
