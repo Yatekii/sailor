@@ -85,7 +85,7 @@ impl Hud {
         let raw_input = self.state.take_egui_input(window);
         let ctx = self.ctx.clone();
         let hud_ui = &mut self.ui;
-        let full_output = ctx.run_ui(raw_input, |ui| {
+        let mut full_output = ctx.run_ui(raw_input, |ui| {
             hud_ui.ui(ui, app_state);
         });
         self.state
@@ -136,6 +136,8 @@ impl Hud {
         for id in &full_output.textures_delta.free {
             self.renderer.free_texture(id);
         }
+        // epaint's TexturesDelta panics on drop if not consumed.
+        full_output.textures_delta.clear();
     }
 
     pub fn interact(
