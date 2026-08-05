@@ -8,7 +8,6 @@ use osm::interaction::collider::{Collider, VisibleTile};
 use osm::math::{Screen, TileId, deg2num, tile_to_world_space};
 use osm::object::Object;
 use std::sync::{Arc, Mutex, RwLock};
-use std::thread;
 use winit::dpi::PhysicalSize;
 
 use crate::config::CONFIG;
@@ -189,7 +188,7 @@ impl AppState {
                 objects: tile.objects(),
             });
         }
-        thread::spawn(move || {
+        osm::platform::spawn(async move {
             let objects = Collider::get_hovered_objects(&visible_tiles, &screen, zoom, point);
             let mut hovered_objects = hovered_objects.lock().unwrap();
             *hovered_objects = objects;

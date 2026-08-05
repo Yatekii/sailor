@@ -4,12 +4,10 @@ use parry2d::{
     partitioning::{Bvh, BvhBuildStrategy},
     utils::point_in_poly2d,
 };
-use std::{
-    sync::{Arc, RwLock},
-    thread::spawn,
-};
+use std::sync::{Arc, RwLock};
 
 use crate::object::Object;
+use crate::platform::spawn;
 
 pub struct TileCollider {
     objects: Vec<Vec<Vec2>>,
@@ -66,7 +64,7 @@ pub trait TileColliderLoader {
 impl TileColliderLoader for Arc<RwLock<TileCollider>> {
     fn load(&mut self, objects: Arc<RwLock<Vec<Object>>>) {
         let collider_clone = self.clone();
-        spawn(move || {
+        spawn(async move {
             if let Ok(objects) = objects.read() {
                 let mut polygons: Vec<Vec<Vec2>> = Vec::new();
                 let mut object_ids: Vec<usize> = Vec::new();

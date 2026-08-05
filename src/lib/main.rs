@@ -10,4 +10,5 @@ pub mod fetch;
 pub mod interaction;
 pub mod math;
 pub mod object;
+pub mod platform;
 pub mod vector_tile;

@@ -1,17 +1,21 @@
+use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, RwLock};
-use std::thread::{JoinHandle, spawn};
 
 use lru::LruCache;
 
 use crate::feature::collection::FeatureCollection;
 use crate::fetch::fetch_tile_data;
 use crate::math::TileId;
+use crate::platform::spawn;
 use crate::vector_tile::tile::{Tile, TileStats};
 
 const MAX_CACHE_ENTRIES: NonZeroUsize = NonZeroUsize::new(20).unwrap();
+
+/// A finished loader task's result: the tile id and its tile, or `None` on failure.
+type LoadedTile = (TileId, Option<Tile>);
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -26,10 +30,10 @@ pub struct CacheStats {
 pub struct TileCache {
     /// The cache that holds all the tiles that were loaded to memory.
     cache: LruCache<TileId, Tile>,
-    /// The loader thread handles of all active loaders.
-    loaders: Vec<(TileId, JoinHandle<Option<Tile>>)>,
-    /// The back-channel to signalize the loader when a loader thread finished.
-    channel: (Sender<TileId>, Receiver<TileId>),
+    /// The tiles that currently have a loader task in flight (used to dedupe).
+    loading: HashSet<TileId>,
+    /// The channel over which loader tasks deliver their finished tiles.
+    channel: (Sender<LoadedTile>, Receiver<LoadedTile>),
     /// The directory where all the PBF files for the tiles are stored.
     cache_location: String,
 }
@@ -41,38 +45,18 @@ impl TileCache {
             cache: LruCache::new(MAX_CACHE_ENTRIES),
             // We should rarely ever load many tiles at once.
             // In any regular case (slow zooming & paning) we should have low numbers and in extreme cases it's okay to have some reallocations.
-            loaders: Vec::with_capacity(32),
+            loading: HashSet::with_capacity(32),
             channel: channel(),
             cache_location,
         }
     }
 
-    /// Check loaders for loaded tiles and insert them into the cache if there is any that finished loading.
+    /// Insert any tiles whose loader task finished since the last call into the cache.
     pub fn finalize_loaded_tiles(&mut self) {
-        // Get all pending messages and work them.
-        for id in self.channel.1.try_iter() {
-            let potential_loader = self.loaders.iter().enumerate().find(|(_, l)| l.0 == id);
-
-            // Try finalizing the complete loader.
-            if let Some((i, _)) = potential_loader {
-                let loader = self.loaders.remove(i);
-                if loader.1.is_finished() {
-                    match loader.1.join() {
-                        Ok(tile) => {
-                            if let Some(tile) = tile {
-                                self.cache.put(loader.0, tile);
-                            }
-                        }
-                        Err(e) => {
-                            log::error!("Loading tile {} failed. Reason:\r\n{:?}", loader.0, e);
-                        }
-                    }
-                } else {
-                    log::error!(
-                        "Failed to join tile loader thread for {}. Dropping thread.",
-                        loader.0,
-                    );
-                }
+        for (id, tile) in self.channel.1.try_iter() {
+            self.loading.remove(&id);
+            if let Some(tile) = tile {
+                self.cache.put(id, tile);
             }
         }
     }
@@ -87,39 +71,28 @@ impl TileCache {
         feature_collection: Arc<RwLock<FeatureCollection>>,
         selection_tags: &[String],
     ) {
-        // Find the corresponding loader to the requested tile if there is any.
-        let loader = self.loaders.iter().find(|l| l.0 == *tile_id);
-
         // Check if tile is not in the cache yet and is not currently being loaded.
-        if !self.cache.contains(tile_id) && loader.is_none() {
+        if !self.cache.contains(tile_id) && !self.loading.contains(tile_id) {
             // Make sure we load all tags we want to include.
             let selection_tags = selection_tags.to_vec();
             let cache_location = self.cache_location.clone();
+            let tile_id = *tile_id;
+            let tx = self.channel.0.clone();
 
-            // Spawn a new loader.
-            let handle = {
-                let tile_id = *tile_id;
-                let tx = self.channel.0.clone();
-                spawn(move || {
-                    // Try fetch and work the tile data.
-                    let data = fetch_tile_data(Path::new(&cache_location), &tile_id)?;
+            self.loading.insert(tile_id);
 
-                    // Create a new Tile from the fetched data.
-                    let tile = Tile::from_mbvt(&tile_id, &data, feature_collection, selection_tags);
-
-                    // Signal the end of the tile loading process.
-                    if tx.send(tile_id).is_err() {
-                        log::debug!(
-                            "Could not send the tile load message. This most likely happened because the application process was terminated."
-                        )
-                    }
-
-                    Some(tile)
-                })
-            };
-
-            // Store a new loader.
-            self.loaders.push((*tile_id, handle));
+            // Spawn a loader task that fetches and preprocesses the tile, then
+            // hands the result back to be inserted on the next finalize.
+            spawn(async move {
+                let tile = fetch_tile_data(Path::new(&cache_location), &tile_id).map(|data| {
+                    Tile::from_mbvt(&tile_id, &data, feature_collection, selection_tags)
+                });
+                if tx.send((tile_id, tile)).is_err() {
+                    log::debug!(
+                        "Could not send the tile load message. This most likely happened because the application process was terminated."
+                    )
+                }
+            });
         }
     }
 
@@ -171,7 +144,7 @@ impl TileCache {
         CacheStats {
             cached_tiles: self.cache.len(),
             visible_tiles: visible_tiles.len(),
-            loading_tiles: self.loaders.len(),
+            loading_tiles: self.loading.len(),
             tile_stats: total_stats,
         }
     }
