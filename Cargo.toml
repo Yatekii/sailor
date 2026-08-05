@@ -52,10 +52,6 @@ egui-wgpu = "0.36"
 egui-winit = { version = "0.36", default-features = false }
 egui_tiles = "0.17"
 egui_extras = { version = "0.36", features = ["syntect"] }
-eframe = { version = "0.36", default-features = false, features = [
-    "wgpu",
-    "default_fonts",
-] }
 human_bytes = "0.4"
 parking_lot = "0.12"
 
@@ -70,7 +66,6 @@ notify = "8"
 # clipboard (arboard) and wayland/x11 backends are native-only; on web egui uses
 # the browser clipboard.
 egui-winit = { version = "0.36", features = ["clipboard", "links", "wayland", "x11"] }
-eframe = { version = "0.36", features = ["wayland", "x11"] }
 
 # getrandom (via config -> const-random) needs the js backend to build for wasm.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
