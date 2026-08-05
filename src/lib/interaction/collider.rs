@@ -56,8 +56,11 @@ impl Collider {
                     collider.get_hovered_objects(&tile_point, &mut object_ids);
 
                     for object_id in &object_ids {
-                        let object = (objects.deref())[*object_id].clone();
-                        return_objects.push(object)
+                        // The collider is loaded asynchronously, so it can briefly disagree
+                        // with the object list; skip stale indices instead of panicking.
+                        if let Some(object) = objects.deref().get(*object_id) {
+                            return_objects.push(object.clone())
+                        }
                     }
 
                     object_ids.clear();

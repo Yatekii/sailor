@@ -1,4 +1,9 @@
-use parry2d::{bounding_volume::Aabb, math::Vec2, partitioning::Bvh, utils::point_in_poly2d};
+use parry2d::{
+    bounding_volume::Aabb,
+    math::Vec2,
+    partitioning::{Bvh, BvhBuildStrategy},
+    utils::point_in_poly2d,
+};
 use std::{
     sync::{Arc, RwLock},
     thread::spawn,
@@ -8,6 +13,9 @@ use crate::object::Object;
 
 pub struct TileCollider {
     objects: Vec<Vec<Vec2>>,
+    // Original object id for each collider entry (objects without enough points are skipped,
+    // so collider indices are compacted and don't match the object list one-to-one).
+    object_ids: Vec<usize>,
     bvh: Bvh,
 }
 
@@ -15,6 +23,7 @@ impl TileCollider {
     pub fn new() -> Self {
         Self {
             objects: Vec::new(),
+            object_ids: Vec::new(),
             bvh: Bvh::new(),
         }
     }
@@ -38,7 +47,7 @@ impl TileCollider {
             let poly = &self.objects[poly_id as usize];
             // Narrow phase checks that the point is in the polygon indeed.
             if point_in_poly2d(*cursor_point, poly) {
-                hovered_objects.push(poly_id as usize);
+                hovered_objects.push(self.object_ids[poly_id as usize]);
             }
         }
     }
@@ -59,21 +68,29 @@ impl TileColliderLoader for Arc<RwLock<TileCollider>> {
         let collider_clone = self.clone();
         spawn(move || {
             if let Ok(objects) = objects.read() {
+                let mut polygons: Vec<Vec<Vec2>> = Vec::new();
+                let mut object_ids: Vec<usize> = Vec::new();
+                let mut aabbs: Vec<Aabb> = Vec::new();
+                for (object_id, object) in objects.iter().enumerate() {
+                    if object.points().len() >= 2 {
+                        let polygon: Vec<Vec2> = object
+                            .points()
+                            .iter()
+                            .map(|p| Vec2::new(p.x, p.y))
+                            .collect();
+                        aabbs.push(Aabb::from_points(polygon.iter().copied()));
+                        polygons.push(polygon);
+                        object_ids.push(object_id);
+                    }
+                }
+                // Build the tree in one shot; incremental `insert` leaves the tree unbalanced
+                // and `leaves` then yields internal node indices instead of leaf data.
+                let bvh = Bvh::from_leaves(BvhBuildStrategy::Binned, &aabbs);
                 match collider_clone.write() {
                     Ok(mut collider) => {
-                        for object_id in 0..objects.len() {
-                            let object = &objects[object_id];
-                            if object.points().len() >= 2 {
-                                let polygon = object
-                                    .points()
-                                    .iter()
-                                    .map(|p| Vec2::new(p.x, p.y))
-                                    .collect::<Vec<Vec2>>();
-                                let id = collider.objects.len();
-                                collider.objects.push(polygon.clone());
-                                collider.bvh.insert(Aabb::from_points(polygon), id as u32);
-                            }
-                        }
+                        collider.objects = polygons;
+                        collider.object_ids = object_ids;
+                        collider.bvh = bvh;
                     }
                     Err(_e) => log::error!(
                         "Could not aquire collider lock. Not loading the objects of this tile."
