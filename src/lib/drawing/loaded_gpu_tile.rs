@@ -1,4 +1,4 @@
-use wgpu::{util::DeviceExt, Buffer, Device};
+use wgpu::{Buffer, Device, util::DeviceExt};
 
 use crate::vector_tile::tile::Tile;
 

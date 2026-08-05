@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 
 use std::path::Path;
-use std::sync::mpsc::{channel, Receiver, TryRecvError};
+use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
-use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
 use osm::drawing::as_byte_slice;
 use wgpu::naga::ShaderStage;
 use wgpu::{
-    util::DeviceExt, BindGroup, BindGroupLayout, Device, RenderPipeline, Sampler, ShaderModule,
-    Texture,
+    BindGroup, BindGroupLayout, Device, RenderPipeline, Sampler, ShaderModule, Texture,
+    util::DeviceExt,
 };
 use wgpu::{
     BlendState, ColorTargetState, ColorWrites, FragmentState, FrontFace, MultisampleState,

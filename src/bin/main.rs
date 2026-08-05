@@ -9,7 +9,7 @@ use crate::config::CONFIG;
 use clap::Parser;
 use lyon::geom::euclid::{self};
 use nalgebra_glm::{vec2, vec4};
-use osm::math::{deg2num, tile_to_world_space, TileId};
+use osm::math::{TileId, deg2num, tile_to_world_space};
 use winit::{
     application::ApplicationHandler,
     dpi::{LogicalSize, PhysicalPosition, PhysicalSize},

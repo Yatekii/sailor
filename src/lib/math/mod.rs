@@ -2,7 +2,7 @@ mod screen;
 mod tile_field;
 mod tile_id;
 
-use lyon::math::{point, vector, Point};
+use lyon::math::{Point, point, vector};
 use std::f32::consts::{E, PI};
 
 pub use screen::*;

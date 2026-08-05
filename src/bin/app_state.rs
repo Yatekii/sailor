@@ -1,11 +1,11 @@
 use lyon::math::Point;
-use nalgebra_glm::{vec2, Vec2};
+use nalgebra_glm::{Vec2, vec2};
 use osm::cache::TileCache;
 use osm::config::MAX_TILES;
 use osm::css::RulesCache;
 use osm::feature::collection::FeatureCollection;
 use osm::interaction::collider::{Collider, VisibleTile};
-use osm::math::{deg2num, tile_to_world_space, Screen, TileId};
+use osm::math::{Screen, TileId, deg2num, tile_to_world_space};
 use osm::object::Object;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;

@@ -1,4 +1,5 @@
 use nom::{
+    AsChar, Err, IResult, Input, Parser,
     branch::alt,
     bytes::complete::{tag, take_while, take_while_m_n},
     character::complete::{char, multispace0},
@@ -7,15 +8,14 @@ use nom::{
     multi::many0,
     number::complete::float,
     sequence::{delimited, preceded, separated_pair},
-    AsChar, Err, IResult, Input, Parser,
 };
-use nom_language::error::{convert_error, VerboseError};
-use notify::{event::ModifyKind, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use nom_language::error::{VerboseError, convert_error};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
 use std::{
     collections::BTreeMap,
     num::ParseIntError,
     path::Path,
-    sync::mpsc::{channel, Receiver, TryRecvError},
+    sync::mpsc::{Receiver, TryRecvError, channel},
 };
 
 /// Tries to parse an entire stylesheet.

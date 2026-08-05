@@ -6,8 +6,8 @@ use lyon::lyon_tessellation::{
     VertexId,
 };
 use lyon::tessellation::{
-    geometry_builder::GeometryBuilderError, FillVertex, GeometryBuilder, StrokeVertex,
-    VertexBuffers,
+    FillVertex, GeometryBuilder, StrokeVertex, VertexBuffers,
+    geometry_builder::GeometryBuilderError,
 };
 
 pub struct MeshBuilder<'l> {

@@ -6,7 +6,7 @@ use glyphon::{
 };
 use lyon::{
     path::{ControlPointId, Path},
-    tessellation::{geometry_builder::VertexBuffers, FillOptions, FillTessellator},
+    tessellation::{FillOptions, FillTessellator, geometry_builder::VertexBuffers},
 };
 use quick_protobuf::{BytesReader, MessageRead};
 use std::collections::HashMap;

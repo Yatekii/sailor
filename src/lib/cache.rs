@@ -1,8 +1,8 @@
 use std::num::NonZeroUsize;
 use std::path::Path;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, RwLock};
-use std::thread::{spawn, JoinHandle};
+use std::thread::{JoinHandle, spawn};
 
 use lru::LruCache;
 
@@ -109,7 +109,9 @@ impl TileCache {
 
                     // Signal the end of the tile loading process.
                     if tx.send(tile_id).is_err() {
-                        log::debug!("Could not send the tile load message. This most likely happened because the application process was terminated.")
+                        log::debug!(
+                            "Could not send the tile load message. This most likely happened because the application process was terminated."
+                        )
                     }
 
                     Some(tile)

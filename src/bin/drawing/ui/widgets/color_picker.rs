@@ -1,4 +1,4 @@
-use egui::{color_picker::Alpha, Rgba, Ui};
+use egui::{Rgba, Ui, color_picker::Alpha};
 use osm::css::{CSSValue, Color, Rule};
 
 pub fn add_color_picker(ui: &mut Ui, rule: &mut Rule, attribute: &str) {

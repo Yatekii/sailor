@@ -1,8 +1,9 @@
 use egui::{
+    Color32, Pos2, Rect, Ui,
     containers::Frame,
     emath,
     epaint::{self, PathStroke},
-    pos2, vec2, Color32, Pos2, Rect, Ui,
+    pos2, vec2,
 };
 
 use crate::{app_state::AppState, stats::FPS_SAMPLES};

@@ -1,5 +1,5 @@
 use egui::{Frame, Key, KeyboardShortcut, Margin, Modifiers};
-use egui_extras::syntax_highlighting::{highlight, CodeTheme};
+use egui_extras::syntax_highlighting::{CodeTheme, highlight};
 
 use crate::app_state::AppState;
 
