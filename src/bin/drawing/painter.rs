@@ -137,13 +137,25 @@ impl Painter {
             ],
         });
 
+        // Prefer the low-latency `Immediate` mode, but fall back to `Fifo` (the
+        // only guaranteed mode, and all the web allows).
+        let present_mode = if surface
+            .get_capabilities(&adapter)
+            .present_modes
+            .contains(&wgpu::PresentMode::Immediate)
+        {
+            wgpu::PresentMode::Immediate
+        } else {
+            wgpu::PresentMode::Fifo
+        };
+
         let surface_config = SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: TextureFormat::Bgra8Unorm,
             alpha_mode: CompositeAlphaMode::Auto,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::Immediate,
+            present_mode,
             desired_maximum_frame_latency: 2,
             view_formats: vec![TextureFormat::Bgra8Unorm],
             color_space: wgpu::SurfaceColorSpace::Auto,
