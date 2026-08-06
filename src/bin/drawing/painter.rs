@@ -1,17 +1,13 @@
 use std::num::NonZeroU64;
-use std::path::Path;
 use std::sync::Arc;
-use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
 use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
 use nalgebra_glm::{vec2, vec4};
-use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
 use osm::config::{MAX_FEATURES, MAX_TILES};
 use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
 use osm::math::{Screen, TileId};
-use pollster::block_on;
 use util::StagingBelt;
 use wgpu::naga::ShaderStage;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
@@ -21,7 +17,7 @@ use winit::window::Window;
 
 use crate::app_state::AppState;
 use crate::config::CONFIG;
-use crate::drawing::helpers::load_glsl;
+use crate::drawing::helpers::{ShaderWatcher, load_glsl};
 
 const TILE_DATA_BUFFER_BYTE_SIZE: u64 = 8;
 // TODO: Should be u64::from once stabilized for const.
@@ -44,8 +40,7 @@ pub struct Painter {
     tile_selection_buffer: Buffer,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    rx: Receiver<Result<notify::event::Event, notify::Error>>,
-    _watcher: RecommendedWatcher,
+    shader_watcher: ShaderWatcher,
 
     font_system: FontSystem,
     swash_cache: SwashCache,
@@ -57,77 +52,46 @@ pub struct Painter {
 
 impl Painter {
     /// Initializes the entire draw machinery.
-    pub fn init(window: Arc<Window>, size: PhysicalSize<u32>, app_state: &AppState) -> Self {
+    pub async fn init(window: Arc<Window>, size: PhysicalSize<u32>, app_state: &AppState) -> Self {
         let factor = window.scale_factor();
 
         let instance =
             wgpu::Instance::new(InstanceDescriptor::new_without_display_handle_from_env());
         let surface = instance.create_surface(window.clone()).unwrap();
 
-        let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            // Request an adapter which can render to our surface
-            compatible_surface: Some(&surface),
-            ..Default::default()
-        }))
-        .expect("Failed to find an appropiate adapter");
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                // Request an adapter which can render to our surface
+                compatible_surface: Some(&surface),
+                ..Default::default()
+            })
+            .await
+            .expect("Failed to find an appropiate adapter");
 
-        let (device, queue) = block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: Some("Main Device"),
-            required_features: Features::DEPTH32FLOAT_STENCIL8,
-            required_limits: wgpu::Limits {
-                max_uniform_buffer_binding_size: 1 << 16,
-                ..wgpu::Limits::default()
-            },
-            memory_hints: MemoryHints::Performance,
-            experimental_features: wgpu::ExperimentalFeatures::default(),
-            trace: wgpu::Trace::Off,
-        }))
-        .expect("Failed to create device");
+        let (device, queue) = adapter
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("Main Device"),
+                required_features: Features::DEPTH32FLOAT_STENCIL8,
+                required_limits: wgpu::Limits {
+                    max_uniform_buffer_binding_size: 1 << 16,
+                    ..wgpu::Limits::default()
+                },
+                memory_hints: MemoryHints::Performance,
+                experimental_features: wgpu::ExperimentalFeatures::default(),
+                trace: wgpu::Trace::Off,
+            })
+            .await
+            .expect("Failed to create device");
 
         let init_encoder = device.create_command_encoder(&CommandEncoderDescriptor {
             label: Some("initial command encoder (loading font atlas, etc)"),
         });
 
-        let (tx, rx) = channel();
-
-        let mut watcher: RecommendedWatcher =
-            match notify::recommended_watcher(move |res| tx.send(res).unwrap()) {
-                Ok(watcher) => watcher,
-                Err(err) => {
-                    log::info!("Failed to create a watcher for the vertex shader:");
-                    log::info!("{err}");
-                    panic!("Unable to load a vertex shader.");
-                }
-            };
-
-        match watcher.watch(
-            Path::new(&CONFIG.renderer.vertex_shader),
-            RecursiveMode::Recursive,
-        ) {
-            Ok(_) => {}
-            Err(err) => {
-                log::info!(
-                    "Failed to start watching {}:",
-                    &CONFIG.renderer.vertex_shader
-                );
-                log::info!("{err}");
-            }
-        };
-
-        match watcher.watch(
-            Path::new(&CONFIG.renderer.fragment_shader),
-            RecursiveMode::Recursive,
-        ) {
-            Ok(_) => {}
-            Err(err) => {
-                log::info!(
-                    "Failed to start watching {}:",
-                    &CONFIG.renderer.fragment_shader
-                );
-                log::info!("{err}");
-            }
-        };
+        let shader_watcher = ShaderWatcher::new(&[
+            &CONFIG.renderer.vertex_shader,
+            &CONFIG.renderer.fragment_shader,
+        ]);
 
         let (layer_vs_module, layer_fs_module) = Self::load_shader(
             &device,
@@ -275,8 +239,7 @@ impl Painter {
             tile_selection_buffer,
             bind_group_layout,
             bind_group,
-            _watcher: watcher,
-            rx,
+            shader_watcher,
             font_system,
             swash_cache,
             viewport,
@@ -553,14 +516,27 @@ impl Painter {
         vertex_shader: &str,
         fragment_shader: &str,
     ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
-        let vertex_shader = std::fs::read_to_string(vertex_shader)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        let (vertex_shader, fragment_shader) = (
+            std::fs::read_to_string(vertex_shader)?,
+            std::fs::read_to_string(fragment_shader)?,
+        );
+        // No filesystem on the web: use the shaders embedded at build time.
+        #[cfg(target_arch = "wasm32")]
+        let (vertex_shader, fragment_shader) = {
+            let _ = (vertex_shader, fragment_shader);
+            (
+                include_str!("../../../config/shader.vert").to_string(),
+                include_str!("../../../config/shader.frag").to_string(),
+            )
+        };
+
         let vs_bytes = load_glsl(&vertex_shader, ShaderStage::Vertex);
         let vs_module = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("VertexShader"),
             source: vs_bytes,
         });
 
-        let fragment_shader = std::fs::read_to_string(fragment_shader)?;
         let fs_bytes = load_glsl(&fragment_shader, ShaderStage::Fragment);
         let fs_module = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("FragmentShader"),
@@ -572,62 +548,43 @@ impl Painter {
 
     /// Reloads the shader if the file watcher has detected any change to the shader files.
     pub fn update_shader(&mut self) -> bool {
-        // self.temperature.update_shader(&self.device);
-        match self.rx.try_recv() {
-            Ok(Ok(notify::event::Event {
-                kind: EventKind::Modify(ModifyKind::Data(_)),
-                ..
-            })) => {
-                if let Ok((vs_module, fs_module)) = Self::load_shader(
-                    &self.device,
-                    &CONFIG.renderer.vertex_shader,
-                    &CONFIG.renderer.fragment_shader,
-                ) {
-                    self.blend_pipeline = Self::create_layer_render_pipeline(
-                        &self.device,
-                        &self.bind_group_layout,
-                        &vs_module,
-                        &fs_module,
-                        BlendComponent {
-                            src_factor: BlendFactor::SrcAlpha,
-                            dst_factor: BlendFactor::OneMinusSrcAlpha,
-                            operation: BlendOperation::Add,
-                        },
-                        BlendComponent {
-                            src_factor: BlendFactor::One,
-                            dst_factor: BlendFactor::OneMinusSrcAlpha,
-                            operation: BlendOperation::Add,
-                        },
-                        false,
-                    );
-
-                    self.noblend_pipeline = Self::create_layer_render_pipeline(
-                        &self.device,
-                        &self.bind_group_layout,
-                        &vs_module,
-                        &fs_module,
-                        BlendComponent::REPLACE,
-                        BlendComponent::REPLACE,
-                        true,
-                    );
-                    true
-                } else {
-                    false
-                }
-            }
-            // Everything is alright but file wasn't actually changed.
-            Ok(Ok(_)) => false,
-            // This happens all the time when there is no new message.
-            Err(TryRecvError::Empty) => false,
-            Ok(Err(err)) => {
-                log::info!("Something went wrong with the shader file watcher:\r\n{err:?}");
-                false
-            }
-            Err(err) => {
-                log::info!("Something went wrong with the shader file watcher:\r\n{err:?}");
-                false
-            }
+        if !self.shader_watcher.changed() {
+            return false;
         }
+        let Ok((vs_module, fs_module)) = Self::load_shader(
+            &self.device,
+            &CONFIG.renderer.vertex_shader,
+            &CONFIG.renderer.fragment_shader,
+        ) else {
+            return false;
+        };
+        self.blend_pipeline = Self::create_layer_render_pipeline(
+            &self.device,
+            &self.bind_group_layout,
+            &vs_module,
+            &fs_module,
+            BlendComponent {
+                src_factor: BlendFactor::SrcAlpha,
+                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                operation: BlendOperation::Add,
+            },
+            BlendComponent {
+                src_factor: BlendFactor::One,
+                dst_factor: BlendFactor::OneMinusSrcAlpha,
+                operation: BlendOperation::Add,
+            },
+            false,
+        );
+        self.noblend_pipeline = Self::create_layer_render_pipeline(
+            &self.device,
+            &self.bind_group_layout,
+            &vs_module,
+            &fs_module,
+            BlendComponent::REPLACE,
+            BlendComponent::REPLACE,
+            true,
+        );
+        true
     }
 
     pub fn get_hidpi_factor(&self) -> f64 {

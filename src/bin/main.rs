@@ -14,28 +14,63 @@ use winit::{
     application::ApplicationHandler,
     dpi::{LogicalSize, PhysicalPosition},
     event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent},
-    event_loop::ActiveEventLoop,
+    event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
     keyboard::{Key, ModifiersState, NamedKey},
-    window::{WindowAttributes, WindowId},
+    window::{Window, WindowAttributes, WindowId},
 };
 
+/// Event injected into the loop once the (async) renderer initialization finished.
+/// Only the web path constructs this; natively initialization is synchronous.
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+enum UserEvent {
+    Initialized(Box<Application>),
+}
+
 fn main() {
+    init_logging();
+
+    let event_loop = EventLoop::<UserEvent>::with_user_event().build().unwrap();
+    let mut app = App {
+        proxy: event_loop.create_proxy(),
+        application: None,
+        initializing: false,
+        args: parse_args(),
+    };
+
+    #[cfg(not(target_arch = "wasm32"))]
+    event_loop.run_app(&mut app).unwrap();
+    #[cfg(target_arch = "wasm32")]
+    {
+        use winit::platform::web::EventLoopExtWebSys;
+        event_loop.spawn_app(app);
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn init_logging() {
     log::set_max_level(CONFIG.general.log.level.to_level_filter());
     pretty_env_logger::init();
+}
 
-    let args = Args::parse();
+#[cfg(target_arch = "wasm32")]
+fn init_logging() {
+    console_error_panic_hook::set_once();
+    let _ = console_log::init_with_level(log::Level::Info);
+}
 
-    let tile_coordinate = deg2num(
-        CONFIG.map.initial.center.latitude,
-        CONFIG.map.initial.center.longitude,
-        CONFIG.map.initial.zoom as u32,
-    );
-    let initial_center = tile_to_world_space(&tile_coordinate);
+#[cfg(not(target_arch = "wasm32"))]
+fn parse_args() -> Args {
+    Args::parse()
+}
 
-    let event_loop = winit::event_loop::EventLoop::new().unwrap();
+#[cfg(target_arch = "wasm32")]
+fn parse_args() -> Args {
+    Args::default()
+}
 
-    let attributes = WindowAttributes::default();
-    let window_attributes = match CONFIG.window.size {
+fn window_attributes() -> WindowAttributes {
+    let attributes = WindowAttributes::default().with_title("Sailor");
+    let attributes = match CONFIG.window.size {
         config::WindowSize::Windowed { width, height } => {
             attributes.with_inner_size(LogicalSize { width, height })
         }
@@ -43,38 +78,66 @@ fn main() {
             .with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
             .with_decorations(false),
     };
+    #[cfg(target_arch = "wasm32")]
+    {
+        use winit::platform::web::WindowAttributesExtWebSys;
+        // Let winit create a canvas and append it to the document body.
+        attributes.with_append(true)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    attributes
+}
 
-    #[allow(deprecated)]
-    let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
-    let size = window.inner_size();
+/// The winit handler. Owns the (possibly not-yet-initialized) application and
+/// creates the window plus the renderer when the event loop first resumes.
+struct App {
+    // Only used on the web to deliver the async-initialized application.
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    proxy: EventLoopProxy<UserEvent>,
+    application: Option<Application>,
+    initializing: bool,
+    args: Args,
+}
 
-    let app_state = app_state::AppState::new(
-        CONFIG.renderer.css.clone(),
-        initial_center,
-        size,
-        CONFIG.map.initial.zoom,
-        2.0,
-    );
+impl ApplicationHandler<UserEvent> for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.application.is_some() || self.initializing {
+            return;
+        }
+        self.initializing = true;
 
-    let painter = drawing::Painter::init(window, size, &app_state);
-    let hud = drawing::ui::Hud::new(&painter.window, &painter.device, &painter.surface_config);
+        let window = Arc::new(event_loop.create_window(window_attributes()).unwrap());
+        let args = self.args.clone();
 
-    let mouse_down = false;
-    let last_pos = winit::dpi::PhysicalPosition::new(0.0, 0.0);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.application = Some(pollster::block_on(Application::new(window, args)));
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let proxy = self.proxy.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let application = Application::new(window, args).await;
+                let _ = proxy.send_event(UserEvent::Initialized(Box::new(application)));
+            });
+        }
+    }
 
-    let modifiers_state = ModifiersState::default();
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: UserEvent) {
+        let UserEvent::Initialized(application) = event;
+        self.application = Some(*application);
+    }
 
-    let mut application = Application {
-        hud,
-        painter,
-        app_state,
-        modifiers_state,
-        mouse_down,
-        last_pos,
-        args,
-    };
-
-    event_loop.run_app(&mut application).unwrap();
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        if let Some(application) = self.application.as_mut() {
+            application.window_event(event_loop, event);
+        }
+    }
 }
 
 pub struct Application {
@@ -87,17 +150,39 @@ pub struct Application {
     args: Args,
 }
 
-impl ApplicationHandler for Application {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let _ = event_loop;
+impl Application {
+    async fn new(window: Arc<Window>, args: Args) -> Self {
+        let tile_coordinate = deg2num(
+            CONFIG.map.initial.center.latitude,
+            CONFIG.map.initial.center.longitude,
+            CONFIG.map.initial.zoom as u32,
+        );
+        let initial_center = tile_to_world_space(&tile_coordinate);
+        let size = window.inner_size();
+
+        let app_state = app_state::AppState::new(
+            CONFIG.renderer.css.clone(),
+            initial_center,
+            size,
+            CONFIG.map.initial.zoom,
+            2.0,
+        );
+
+        let painter = drawing::Painter::init(window, size, &app_state).await;
+        let hud = drawing::ui::Hud::new(&painter.window, &painter.device, &painter.surface_config);
+
+        Self {
+            hud,
+            painter,
+            app_state,
+            modifiers_state: ModifiersState::default(),
+            mouse_down: false,
+            last_pos: PhysicalPosition::new(0.0, 0.0),
+            args,
+        }
     }
 
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        _window_id: WindowId,
-        event: WindowEvent,
-    ) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, event: WindowEvent) {
         self.app_state.css_cache.update();
         let ui_event = self.hud.interact(&self.painter.window, &event);
         match &event {
@@ -223,7 +308,7 @@ impl ApplicationHandler for Application {
 }
 
 /// Render a map beautifully and ultra fast with CSS styling
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default, Clone)]
 #[command(version, about, long_about = None)]
 struct Args {
     /// Tile to load (this argument can be given multiple times to load multiple tiles)

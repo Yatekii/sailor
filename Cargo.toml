@@ -40,7 +40,6 @@ nom-language = "0.1"
 once_cell = "1"
 parity-util-mem = "0.12"
 pollster = "1"
-pretty_env_logger = "0.5"
 quick-protobuf = "0.8"
 serde = { version = "1", features = ["derive"] }
 varint = "0.9"
@@ -49,7 +48,6 @@ glyphon = "0.12"
 winit = "0.30"
 egui = "0.36"
 egui-wgpu = "0.36"
-egui-winit = { version = "0.36", default-features = false }
 egui_tiles = "0.17"
 egui_extras = { version = "0.36", features = ["syntect"] }
 # cross-platform async http: native uses hyper/tokio, web uses the browser fetch.
@@ -67,15 +65,18 @@ insta = "1"
 notify = "8"
 reqwest = { version = "0.12", features = ["rustls-tls"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }
-# clipboard (arboard) and wayland/x11 backends are native-only; on web egui uses
-# the browser clipboard.
-egui-winit = { version = "0.36", features = ["clipboard", "links", "wayland", "x11"] }
+pretty_env_logger = "0.5"
+# egui-winit (winit<->egui input bridge) is native-only; the web build uses a
+# manual winit->egui input shim instead.
+egui-winit = "0.36"
 
 # getrandom (via config -> const-random) needs the js backend to build for wasm.
 # wasm-bindgen-futures drives spawned tasks on the browser event loop.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"
+console_log = "1"
 
 [profile.release]
 debug = true
