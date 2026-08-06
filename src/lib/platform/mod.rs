@@ -16,7 +16,7 @@ mod native;
 #[cfg(not(target_arch = "wasm32"))]
 pub use native::{
     FileWatcher, init_logging, origin, read_bytes, read_optional, read_to_string, spawn,
-    spawn_task, write_bytes,
+    spawn_task, viewport_size, write_bytes,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -24,5 +24,5 @@ mod web;
 #[cfg(target_arch = "wasm32")]
 pub use web::{
     FileWatcher, init_logging, origin, read_bytes, read_optional, read_to_string, spawn,
-    spawn_task, write_bytes,
+    spawn_task, viewport_size, write_bytes,
 };

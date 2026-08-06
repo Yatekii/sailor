@@ -146,7 +146,21 @@ impl Application {
             CONFIG.map.initial.zoom as u32,
         );
         let initial_center = tile_to_world_space(&tile_coordinate);
-        let size = window.inner_size();
+
+        // On the web winit reports the freshly-appended canvas as 0x0; size the
+        // surface from the browser viewport instead (and tell winit about it).
+        let size = match osm::platform::viewport_size() {
+            Some((width, height)) => {
+                let factor = window.scale_factor();
+                let size = winit::dpi::PhysicalSize::new(
+                    (width as f64 * factor) as u32,
+                    (height as f64 * factor) as u32,
+                );
+                let _ = window.request_inner_size(size);
+                size
+            }
+            None => window.inner_size(),
+        };
 
         let app_state = app_state::AppState::new(
             CONFIG.renderer.css.clone(),

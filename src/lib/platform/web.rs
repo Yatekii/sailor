@@ -10,6 +10,15 @@ pub fn origin() -> Option<String> {
     web_sys::window().and_then(|window| window.location().origin().ok())
 }
 
+/// The browser viewport size in CSS pixels. winit reports the canvas as 0x0 until
+/// it is sized, so the caller uses this to size the surface at startup.
+pub fn viewport_size() -> Option<(u32, u32)> {
+    let window = web_sys::window()?;
+    let width = window.inner_width().ok()?.as_f64()? as u32;
+    let height = window.inner_height().ok()?.as_f64()? as u32;
+    Some((width.max(1), height.max(1)))
+}
+
 /// Initialize logging: route `log` to the browser console and install a panic
 /// hook so Rust panics show up with a readable message.
 pub fn init_logging(level: log::Level) {

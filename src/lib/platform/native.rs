@@ -10,6 +10,12 @@ pub fn origin() -> Option<String> {
     None
 }
 
+/// The browser viewport size in CSS pixels; `None` natively (the window reports
+/// its own size).
+pub fn viewport_size() -> Option<(u32, u32)> {
+    None
+}
+
 /// Initialize logging: `pretty_env_logger` to stderr, capped at `level`.
 pub fn init_logging(level: log::Level) {
     log::set_max_level(level.to_level_filter());
