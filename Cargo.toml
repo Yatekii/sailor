@@ -52,6 +52,9 @@ egui_tiles = "0.17"
 egui_extras = { version = "0.36", features = ["syntect"] }
 # cross-platform async http: native uses hyper/tokio, web uses the browser fetch.
 reqwest = { version = "0.12", default-features = false }
+# spawned-task handles (RemoteHandle) and a portable clock that works on wasm.
+futures = "0.3"
+web-time = "1"
 human_bytes = "0.4"
 parking_lot = "0.12"
 
