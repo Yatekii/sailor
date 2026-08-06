@@ -79,10 +79,24 @@ pub struct InitialCenterPoint {
 }
 
 impl Config {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Result<Self, config::ConfigError> {
         let config = config::Config::builder()
             .add_source(config::File::with_name("config/default"))
             .add_source(config::File::with_name("config/local").required(false))
+            .build()?;
+
+        config.try_deserialize()
+    }
+
+    // No filesystem on the web: use the default config embedded at build time.
+    #[cfg(target_arch = "wasm32")]
+    pub fn new() -> Result<Self, config::ConfigError> {
+        let config = config::Config::builder()
+            .add_source(config::File::from_str(
+                include_str!("../../config/default.yaml"),
+                config::FileFormat::Yaml,
+            ))
             .build()?;
 
         config.try_deserialize()
