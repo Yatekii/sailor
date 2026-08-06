@@ -25,8 +25,11 @@ impl Screen {
 
     pub fn get_tile_boundaries_for_zoom_level(&self, z: f32, scale: u32) -> TileField {
         let z = z.min(14.0);
-        let px_to_world = self.width / self.tile_size() / 2.0 / 2f32.powi(z as i32) / scale as f32;
-        let py_to_world = self.height / self.tile_size() / 2.0 / 2f32.powi(z as i32) / scale as f32;
+        // Use the same fractional zoom as `global_to_screen` so the visible extent
+        // matches what is actually rendered; using the integer floor here would
+        // over-estimate the extent (up to 2x) and pull in far more than 3x3 tiles.
+        let px_to_world = self.width / self.tile_size() / 2.0 / 2f32.powf(z) / scale as f32;
+        let py_to_world = self.height / self.tile_size() / 2.0 / 2f32.powf(z) / scale as f32;
 
         let top_left: TileId =
             world_to_tile_space(&(self.center - vector(px_to_world, py_to_world)), z as u32).into();
