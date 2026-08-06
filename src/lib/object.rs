@@ -91,17 +91,10 @@ impl Object {
 
     /// Returns the estimated memory size used by the object.
     pub fn size(&self) -> usize {
-        use parity_util_mem::MallocSizeOfExt;
+        use deepsize::DeepSizeOf;
         self.selector.size()
-            + self.tags.malloc_size_of()
-            + std::mem::size_of_val(&self.tags)
-            + self
-                .tags
-                .iter()
-                .map(|(k, v)| k.len() + v.len())
-                .sum::<usize>()
+            + self.tags.deep_size_of()
             + self.points.capacity() * std::mem::size_of::<Point>()
-            + 8
             + std::mem::size_of::<ObjectType>()
     }
 }

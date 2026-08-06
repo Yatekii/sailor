@@ -31,14 +31,14 @@ log = { version = "0.4", features = ["serde"] }
 # lyon = { version = "1", path = "../lyon/crates/lyon" }
 lyon = { version = "1", git = "https://github.com/Yatekii/lyon.git" }
 lru = "0.18"
-malloc_size_of_derive = "0.1"
+# heap-size estimation for the debug stats; wasm-friendly, unlike parity-util-mem.
+deepsize = "0.2"
 nalgebra = "0.35"
 nalgebra-glm = "0.21"
 parry2d = "0.30"
 nom = "8"
 nom-language = "0.1"
 once_cell = "1"
-parity-util-mem = "0.12"
 pollster = "1"
 quick-protobuf = "0.8"
 serde = { version = "1", features = ["derive"] }

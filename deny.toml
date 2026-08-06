@@ -7,7 +7,6 @@ ignore = [
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",
     # unmaintained crates pending replacement/removal in the dep-update pass:
-    "RUSTSEC-2022-0080", # parity-util-mem
     "RUSTSEC-2024-0436", # paste
     "RUSTSEC-2024-0320", # yaml-rust
     "RUSTSEC-2025-0134", # bincode
