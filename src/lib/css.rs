@@ -10,14 +10,12 @@ use nom::{
     sequence::{delimited, preceded, separated_pair},
 };
 use nom_language::error::{VerboseError, convert_error};
-#[cfg(not(target_arch = "wasm32"))]
-use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher, event::ModifyKind};
 use std::{collections::BTreeMap, num::ParseIntError};
-#[cfg(not(target_arch = "wasm32"))]
-use std::{
-    path::Path,
-    sync::mpsc::{Receiver, TryRecvError, channel},
-};
+
+use crate::platform::{self, FileWatcher, Watcher};
+
+/// The default stylesheet, embedded so it is available on the web.
+const DEFAULT_STYLE: &str = include_str!("../../config/style.css");
 
 /// Tries to parse an entire stylesheet.
 pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
@@ -37,66 +35,27 @@ pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
 
 pub struct RulesCache {
     buffer: String,
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     file_path: String,
     pub rules: Vec<Rule>,
-    #[cfg(not(target_arch = "wasm32"))]
-    rx: Receiver<std::result::Result<notify::event::Event, notify::Error>>,
-    #[cfg(not(target_arch = "wasm32"))]
-    _watcher: RecommendedWatcher,
+    watcher: FileWatcher,
 }
 
 impl RulesCache {
     /// Tries to create a new CSS rule cache from a given CSS file path.
     ///
     /// Natively the file is read from disk and watched for hot-reloading; on the
-    /// web a default stylesheet is embedded at compile time and never reloaded.
-    #[cfg(not(target_arch = "wasm32"))]
+    /// web the embedded default stylesheet is used and there is nothing to watch.
     pub fn try_load_from_file(file_path: impl Into<String>) -> Option<Self> {
         let file_path = file_path.into();
-
-        let buffer: String = std::fs::read_to_string(std::path::Path::new(&file_path))
-            .expect("Something went wrong reading the file");
-
-        let (tx, rx) = channel();
-        let mut _watcher: RecommendedWatcher =
-            match notify::recommended_watcher(move |res| tx.send(res).unwrap()) {
-                Ok(watcher) => watcher,
-                Err(err) => {
-                    log::info!("Failed to create a watcher for the stylesheet:");
-                    log::info!("{err}");
-                    return None;
-                }
-            };
-
-        match _watcher.watch(Path::new(&file_path), RecursiveMode::Recursive) {
-            Ok(_) => {}
-            Err(err) => {
-                log::info!("Failed to start watching {file_path}:");
-                log::info!("{err}");
-                return None;
-            }
-        };
-
+        let buffer = platform::read_to_string(&file_path, DEFAULT_STYLE);
         let rules = try_parse_styles(&buffer)?;
+        let watcher = FileWatcher::watch(&[&file_path]);
 
         Some(Self {
             buffer,
             file_path,
             rules,
-            rx,
-            _watcher,
-        })
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn try_load_from_file(file_path: impl Into<String>) -> Option<Self> {
-        let buffer = include_str!("../../config/style.css").to_string();
-        let rules = try_parse_styles(&buffer)?;
-        Some(Self {
-            buffer,
-            file_path: file_path.into(),
-            rules,
+            watcher,
         })
     }
 
@@ -126,71 +85,28 @@ impl RulesCache {
         self.rules.iter_mut().find(|rule| selector == rule.selector)
     }
 
-    /// Updates the CSS cache from the watched file if there was any changes.
+    /// Reloads the stylesheet if the watcher reported a change.
     ///
-    /// Returns whether a successful update happened.
-    /// Returns false if there was no changes or if the update failed.
-    #[cfg(not(target_arch = "wasm32"))]
+    /// Returns whether a successful update happened (always `false` on the web,
+    /// where nothing is watched).
     pub fn update(&mut self) -> bool {
-        match self.rx.try_recv() {
-            Ok(Ok(notify::event::Event {
-                kind: EventKind::Modify(ModifyKind::Data(_)),
-                paths,
-                ..
-            })) => self.try_reload_from_file(paths[0].as_path()),
-            // Everything is alright but file wasn't actually changed.
-            Ok(Ok(_)) => false,
-            Ok(Err(err)) => {
-                log::info!("Something went wrong with the CSS file watcher:\r\n{err:?}");
-                false
+        if !self.watcher.changed() {
+            return false;
+        }
+        let buffer = platform::read_to_string(&self.file_path, DEFAULT_STYLE);
+        match try_parse_styles(&buffer) {
+            Some(rules) => {
+                self.buffer = buffer;
+                self.rules = rules;
+                true
             }
-            // This happens all the time when there is no new message.
-            Err(TryRecvError::Empty) => false,
-            Err(err) => {
-                log::info!("Something went wrong with the CSS file watcher:\r\n{err:?}");
-                false
-            }
+            None => false,
         }
     }
 
-    /// On the web there is no filesystem to watch, so styles never change.
-    #[cfg(target_arch = "wasm32")]
-    pub fn update(&mut self) -> bool {
-        false
-    }
-
-    /// Tries reloading the cached styles from a file.
-    ///
-    /// Returns `true` if it succeeded.
-    /// Returns `false` in any error case.
-    #[cfg(not(target_arch = "wasm32"))]
-    fn try_reload_from_file(&mut self, filename: &std::path::Path) -> bool {
-        match std::fs::read_to_string(filename) {
-            Ok(contents) => {
-                self.buffer = contents;
-                self.rules = match try_parse_styles(&self.buffer) {
-                    Some(rules) => rules,
-                    None => return false,
-                };
-            }
-            Err(err) => {
-                log::info!("Failed to read file at {filename:?}:");
-                log::info!("{err}");
-                return false;
-            }
-        }
-        true
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn try_save_to_file(&mut self) -> std::io::Result<()> {
-        std::fs::write(&self.file_path, &self.buffer)
-    }
-
-    // No filesystem on the web; saving the edited stylesheet is a no-op.
-    #[cfg(target_arch = "wasm32")]
-    pub fn try_save_to_file(&mut self) -> std::io::Result<()> {
-        Ok(())
+    /// Saves the edited stylesheet back to disk (a no-op on the web).
+    pub fn try_save_to_file(&mut self) {
+        platform::write_bytes(&self.file_path, self.buffer.as_bytes());
     }
 
     pub fn buffer_mut(&mut self) -> &mut String {

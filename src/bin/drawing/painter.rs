@@ -8,6 +8,7 @@ use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
 use osm::math::{Screen, TileId};
+use osm::platform::{self, FileWatcher, Watcher};
 use util::StagingBelt;
 use wgpu::naga::ShaderStage;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
@@ -17,7 +18,7 @@ use winit::window::Window;
 
 use crate::app_state::AppState;
 use crate::config::CONFIG;
-use crate::drawing::helpers::{ShaderWatcher, load_glsl};
+use crate::drawing::helpers::load_glsl;
 
 const TILE_DATA_BUFFER_BYTE_SIZE: u64 = 8;
 // TODO: Should be u64::from once stabilized for const.
@@ -40,7 +41,7 @@ pub struct Painter {
     tile_selection_buffer: Buffer,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    shader_watcher: ShaderWatcher,
+    shader_watcher: FileWatcher,
 
     font_system: FontSystem,
     swash_cache: SwashCache,
@@ -88,7 +89,7 @@ impl Painter {
             label: Some("initial command encoder (loading font atlas, etc)"),
         });
 
-        let shader_watcher = ShaderWatcher::new(&[
+        let shader_watcher = FileWatcher::watch(&[
             &CONFIG.renderer.vertex_shader,
             &CONFIG.renderer.fragment_shader,
         ]);
@@ -516,20 +517,10 @@ impl Painter {
         vertex_shader: &str,
         fragment_shader: &str,
     ) -> Result<(ShaderModule, ShaderModule), std::io::Error> {
-        #[cfg(not(target_arch = "wasm32"))]
-        let (vertex_shader, fragment_shader) = (
-            std::fs::read_to_string(vertex_shader)?,
-            std::fs::read_to_string(fragment_shader)?,
-        );
-        // No filesystem on the web: use the shaders embedded at build time.
-        #[cfg(target_arch = "wasm32")]
-        let (vertex_shader, fragment_shader) = {
-            let _ = (vertex_shader, fragment_shader);
-            (
-                include_str!("../../../config/shader.vert").to_string(),
-                include_str!("../../../config/shader.frag").to_string(),
-            )
-        };
+        let vertex_shader =
+            platform::read_to_string(vertex_shader, include_str!("../../../config/shader.vert"));
+        let fragment_shader =
+            platform::read_to_string(fragment_shader, include_str!("../../../config/shader.frag"));
 
         let vs_bytes = load_glsl(&vertex_shader, ShaderStage::Vertex);
         let vs_module = device.create_shader_module(ShaderModuleDescriptor {

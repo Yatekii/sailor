@@ -3,7 +3,7 @@ use std::time::Duration;
 pub const FPS_SAMPLES: usize = 3000;
 
 pub struct Stats {
-    stamp: std::time::Instant,
+    stamp: web_time::Instant,
     last_frametimes: std::collections::VecDeque<Duration>,
     frames: u64,
 }
@@ -11,7 +11,7 @@ pub struct Stats {
 impl Stats {
     pub fn new() -> Self {
         Self {
-            stamp: std::time::Instant::now(),
+            stamp: web_time::Instant::now(),
             last_frametimes: {
                 let mut dq = std::collections::VecDeque::new();
                 for _ in 0..FPS_SAMPLES {
@@ -27,7 +27,7 @@ impl Stats {
         self.last_frametimes.pop_front();
         self.last_frametimes.push_back(self.stamp.elapsed());
         self.frames += 1;
-        self.stamp = std::time::Instant::now();
+        self.stamp = web_time::Instant::now();
     }
 
     pub fn get_average(&self) -> Duration {

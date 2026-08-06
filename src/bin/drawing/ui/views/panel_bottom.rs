@@ -10,7 +10,7 @@ pub fn panel_bottom(ui: &mut egui::Ui, app_state: &mut AppState) {
         .show(ui, |ui| {
             ui.input_mut(|input| {
                 if input.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::S)) {
-                    app_state.css_cache.try_save_to_file().unwrap();
+                    app_state.css_cache.try_save_to_file();
                 }
             });
 

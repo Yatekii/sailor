@@ -27,7 +27,7 @@ enum UserEvent {
 }
 
 fn main() {
-    init_logging();
+    osm::platform::init_logging(CONFIG.general.log.level);
 
     let event_loop = EventLoop::<UserEvent>::with_user_event().build().unwrap();
     let mut app = App {
@@ -44,18 +44,6 @@ fn main() {
         use winit::platform::web::EventLoopExtWebSys;
         event_loop.spawn_app(app);
     }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn init_logging() {
-    log::set_max_level(CONFIG.general.log.level.to_level_filter());
-    pretty_env_logger::init();
-}
-
-#[cfg(target_arch = "wasm32")]
-fn init_logging() {
-    console_error_panic_hook::set_once();
-    let _ = console_log::init_with_level(log::Level::Info);
 }
 
 #[cfg(not(target_arch = "wasm32"))]

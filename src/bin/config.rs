@@ -79,26 +79,20 @@ pub struct InitialCenterPoint {
 }
 
 impl Config {
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Result<Self, config::ConfigError> {
-        let config = config::Config::builder()
-            .add_source(config::File::with_name("config/default"))
-            .add_source(config::File::with_name("config/local").required(false))
-            .build()?;
+        // The default config is read from disk natively and embedded on the web;
+        // a `config/local.yaml` override is applied when present (native only).
+        let default = osm::platform::read_to_string(
+            "config/default.yaml",
+            include_str!("../../config/default.yaml"),
+        );
+        let mut builder = config::Config::builder()
+            .add_source(config::File::from_str(&default, config::FileFormat::Yaml));
 
-        config.try_deserialize()
-    }
+        if let Some(local) = osm::platform::read_optional("config/local.yaml") {
+            builder = builder.add_source(config::File::from_str(&local, config::FileFormat::Yaml));
+        }
 
-    // No filesystem on the web: use the default config embedded at build time.
-    #[cfg(target_arch = "wasm32")]
-    pub fn new() -> Result<Self, config::ConfigError> {
-        let config = config::Config::builder()
-            .add_source(config::File::from_str(
-                include_str!("../../config/default.yaml"),
-                config::FileFormat::Yaml,
-            ))
-            .build()?;
-
-        config.try_deserialize()
+        builder.build()?.try_deserialize()
     }
 }
