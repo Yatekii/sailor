@@ -16,7 +16,7 @@ renderer:
   fragment-shader: "config/shader.frag"
   css: "config/style.css"
   ui-font: "config/Ruda-Bold.ttf"
-  tile-size: 512
+  tile-size: 384
   msaa-samples: 4
   selection-tags: []
   temperature:
