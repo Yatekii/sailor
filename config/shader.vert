@@ -33,7 +33,7 @@ layout(std140) struct TileData {
 };
 
 layout(std140, set = 0, binding = 1) uniform Transform {
-    TileData tile_datas[10];
+    TileData tile_datas[32];
 };
 
 layout(std140, set = 0, binding = 2) uniform Selected {
