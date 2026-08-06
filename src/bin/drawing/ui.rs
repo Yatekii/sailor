@@ -1,3 +1,5 @@
+#[cfg(target_arch = "wasm32")]
+mod egui_shim;
 pub mod state;
 pub mod views;
 pub mod widgets;
@@ -8,9 +10,12 @@ use egui::Layout;
 use egui::Style;
 use egui::Visuals;
 use egui::vec2;
+#[cfg(target_arch = "wasm32")]
+use egui_shim::EguiState;
 use egui_wgpu::Renderer;
 use egui_wgpu::RendererOptions;
 use egui_wgpu::ScreenDescriptor;
+#[cfg(not(target_arch = "wasm32"))]
 use egui_winit::State as EguiState;
 use views::fps::view_fps;
 use views::location_finder::LocationFinderWindow;
