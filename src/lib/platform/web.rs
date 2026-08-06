@@ -4,6 +4,12 @@ use futures::future::FutureExt;
 
 use super::{Task, Watcher};
 
+/// The page origin, used to fetch tiles from a same-origin (proxied) URL so the
+/// browser does not block them with CORS.
+pub fn origin() -> Option<String> {
+    web_sys::window().and_then(|window| window.location().origin().ok())
+}
+
 /// Initialize logging: route `log` to the browser console and install a panic
 /// hook so Rust panics show up with a readable message.
 pub fn init_logging(level: log::Level) {

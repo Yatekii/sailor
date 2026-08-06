@@ -4126,6 +4126,7 @@ dependencies = [
  "tokio",
  "varint",
  "wasm-bindgen-futures",
+ "web-sys",
  "web-time",
  "wgpu",
  "winit",

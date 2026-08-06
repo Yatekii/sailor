@@ -4,6 +4,12 @@ use futures::future::FutureExt;
 
 use super::{Task, Watcher};
 
+/// The page origin to resolve same-origin URLs against; `None` natively (requests
+/// go straight to their absolute URL, unaffected by CORS).
+pub fn origin() -> Option<String> {
+    None
+}
+
 /// Initialize logging: `pretty_env_logger` to stderr, capped at `level`.
 pub fn init_logging(level: log::Level) {
     log::set_max_level(level.to_level_filter());

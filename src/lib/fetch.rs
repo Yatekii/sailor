@@ -23,7 +23,12 @@ pub async fn fetch_tile_data(cache_location: &Path, tile_id: &TileId) -> Option<
 /// Fetch a tile from the tile server. reqwest is async on both native (tokio) and
 /// web (browser fetch), so this is a single cross-platform implementation.
 async fn fetch_tile_from_server(tile_id: &TileId) -> Option<Vec<u8>> {
-    let request_url = format!("https://d17gef4m69t9r4.cloudfront.net/planet/{tile_id}.mvt");
+    // On the web the tiles are fetched from a same-origin path that the dev
+    // server proxies to the CDN, so the browser does not block them with CORS.
+    let request_url = match platform::origin() {
+        Some(origin) => format!("{origin}/planet/{tile_id}.mvt"),
+        None => format!("https://d17gef4m69t9r4.cloudfront.net/planet/{tile_id}.mvt"),
+    };
 
     match reqwest::get(&request_url).await {
         Ok(response) if response.status().is_success() => match response.bytes().await {

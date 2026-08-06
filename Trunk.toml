@@ -1,0 +1,4 @@
+# Proxy tile requests through the dev server so the browser sees them as
+# same-origin (the tile CDN does not send CORS headers).
+[[proxy]]
+backend = "https://d17gef4m69t9r4.cloudfront.net/planet"
