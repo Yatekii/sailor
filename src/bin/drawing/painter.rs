@@ -217,7 +217,22 @@ impl Painter {
             &tile_selection_buffer,
         );
 
-        let font_system = FontSystem::new();
+        // Load the bundled Ruda font and use it for the default families. This
+        // makes text deterministic and works on the web, which has no system fonts.
+        let mut font_system = FontSystem::new_with_fonts([
+            glyphon::fontdb::Source::Binary(Arc::new(
+                include_bytes!("../../../config/Ruda-Regular.ttf").to_vec(),
+            )),
+            glyphon::fontdb::Source::Binary(Arc::new(
+                include_bytes!("../../../config/Ruda-Bold.ttf").to_vec(),
+            )),
+        ]);
+        {
+            let db = font_system.db_mut();
+            db.set_sans_serif_family("Ruda");
+            db.set_serif_family("Ruda");
+            db.set_monospace_family("Ruda");
+        }
         let swash_cache = SwashCache::new();
         let cache = Cache::new(&device);
         let viewport = Viewport::new(&device, &cache);
