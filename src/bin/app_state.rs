@@ -2,7 +2,7 @@ use lyon::math::Point;
 use nalgebra_glm::{Vec2, vec2};
 use osm::css::RulesCache;
 use osm::feature::collection::FeatureCollection;
-use osm::math::{Coord, Geo, Screen, TileId, deg2num, tile_to_world_space};
+use osm::math::{Coord, Geo, Camera, TileId, deg2num, tile_to_world_space};
 use osm::cache::CacheStats;
 use osm::object::Object;
 use std::sync::{Arc, Mutex, RwLock};
@@ -14,7 +14,7 @@ use crate::stats::Stats;
 
 pub struct AppState {
     pub css_cache: RulesCache,
-    pub screen: Screen,
+    pub screen: Camera,
     pub zoom: f32,
     pub hovered_objects: Arc<Mutex<Vec<Object>>>,
     selected_objects: Vec<EditableObject>,
@@ -40,7 +40,7 @@ impl AppState {
         Self {
             css_cache: RulesCache::try_load_from_file(style)
                 .expect("Unable to load the style file. Please consult the log."),
-            screen: Screen::new(
+            screen: Camera::new(
                 center,
                 size.width as f32,
                 size.height as f32,
@@ -120,7 +120,7 @@ impl AppState {
     }
 
     pub(crate) fn scale_factor_updated(&mut self, scale_factor: f32) {
-        self.screen = Screen::new(
+        self.screen = Camera::new(
             self.screen.center,
             self.screen.width,
             self.screen.height,

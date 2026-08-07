@@ -8,7 +8,7 @@ use crate::*;
 use self::drawing::loaded_gpu_tile::LoadedGPUTile;
 use self::feature::collection::FeatureCollection;
 use self::interaction::tile_collider::{TileCollider, TileColliderLoader};
-use self::math::{Screen, TileId};
+use self::math::{Camera, TileId};
 use self::object::Object;
 
 pub struct VisibleTile<'t> {
@@ -104,7 +104,7 @@ impl<'t> VisibleTile<'t> {
         }
     }
 
-    pub fn queue_text(&self, glyph_brush: &mut GlyphBrush<()>, screen: &Screen, z: f32) {
+    pub fn queue_text(&self, glyph_brush: &mut GlyphBrush<()>, screen: &Camera, z: f32) {
         let matrix = screen.tile_to_global_space(z, &self.tile.tile_id());
         for text in self.tile.text() {
             let position = matrix * glm::vec4((text.0).0, (text.0).1, 0.0, 1.0);

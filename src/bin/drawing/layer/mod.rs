@@ -7,7 +7,7 @@ use wgpu::{
     QuerySetDescriptor, QueryType, Queue, RenderPassTimestampWrites, TextureView,
 };
 
-use osm::math::{Screen, TileId};
+use osm::math::{Camera, TileId};
 
 pub mod map;
 pub mod temperature;
@@ -138,7 +138,7 @@ pub struct LayerCtx<'a> {
     pub device: &'a Device,
     pub queue: &'a Queue,
     pub encoder: &'a mut CommandEncoder,
-    pub screen: &'a Screen,
+    pub screen: &'a Camera,
     pub zoom: f32,
     pub selection: Option<Selection>,
     /// Physical render-target resolution (width, height).
@@ -155,7 +155,7 @@ pub struct FramePass<'a> {
     /// Multisample color target, when MSAA is on.
     pub msaa: Option<&'a TextureView>,
     pub depth_stencil: &'a TextureView,
-    pub screen: &'a Screen,
+    pub screen: &'a Camera,
     pub zoom: f32,
     pub gpu_timing: Option<&'a GpuTiming>,
     pub record_gpu: bool,

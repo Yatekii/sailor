@@ -1,4 +1,4 @@
-mod screen;
+mod camera;
 mod space;
 mod tile_field;
 mod tile_id;
@@ -6,7 +6,7 @@ mod tile_id;
 use lyon::math::{Point, point, vector};
 use std::f32::consts::PI;
 
-pub use screen::*;
+pub use camera::*;
 pub use space::*;
 pub use tile_field::*;
 pub use tile_id::*;

@@ -10,7 +10,7 @@ use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
 use osm::interaction::collider::{Collider, VisibleTile};
-use osm::math::{Coord, Screen, TileId, TileLocal};
+use osm::math::{Coord, Camera, TileId, TileLocal};
 use osm::object::Object;
 use osm::platform::{FileWatcher, Watcher};
 use wgpu::naga::ShaderStage;
@@ -71,7 +71,7 @@ impl MapLayer {
     pub fn new(
         device: &Device,
         queue: &Queue,
-        screen: &Screen,
+        screen: &Camera,
         zoom: f32,
         feature_collection: Arc<RwLock<FeatureCollection>>,
     ) -> Self {
@@ -216,7 +216,7 @@ impl MapLayer {
 
     /// Load the tiles covering the viewport at the given camera, dropping tiles
     /// that scrolled out. Restyles features via the app-owned stylesheet cache.
-    pub fn load_visible(&mut self, screen: &Screen, zoom: f32, css_cache: &mut RulesCache) {
+    pub fn load_visible(&mut self, screen: &Camera, zoom: f32, css_cache: &mut RulesCache) {
         let tile_field = screen.get_tile_boundaries_for_zoom_level(zoom, 1);
 
         // Remove old bigger tiles which are not in the FOV anymore.
@@ -320,7 +320,7 @@ impl MapLayer {
     /// objects under the point. The map owns the colliders; the app owns the result.
     pub fn update_hovered_objects(
         &self,
-        screen: &Screen,
+        screen: &Camera,
         zoom: f32,
         point: (f32, f32),
         hovered: Arc<Mutex<Vec<Object>>>,
@@ -453,7 +453,7 @@ impl MapLayer {
     /// Creates a new bind group containing all the relevant uniform buffers.
     fn create_uniform_buffers(
         device: &Device,
-        screen: &Screen,
+        screen: &Camera,
         feature_collection: &FeatureCollection,
     ) -> [(Buffer, usize); 2] {
         let canvas_size_len = 4 * 4;
@@ -498,7 +498,7 @@ impl MapLayer {
     /// Ensures that the buffer has the size configured in the config, to match the size configured in the shader.
     fn create_tile_transform_buffer(
         device: &Device,
-        screen: &Screen,
+        screen: &Camera,
         z: f32,
         visible_tiles: impl Iterator<Item = (TileId, f32)>,
     ) -> (Buffer, u64) {
@@ -669,7 +669,7 @@ impl MapLayer {
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
-        screen: &Screen,
+        screen: &Camera,
         zoom: f32,
         selection: Option<Selection>,
         feature_collection: &FeatureCollection,

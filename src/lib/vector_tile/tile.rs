@@ -24,7 +24,7 @@ use self::{
     feature::collection::FeatureCollection,
     geometry::{Geometry, Polygon},
     interaction::tile_collider::{TileCollider, TileColliderLoader},
-    math::{Screen, TileId},
+    math::{Camera, TileId},
     object::Object,
 };
 
@@ -503,7 +503,7 @@ impl Tile {
 
     pub fn queue_text<'a>(
         &'a self,
-        screen: &'a Screen,
+        screen: &'a Camera,
         z: f32,
     ) -> impl Iterator<Item = TextArea<'a>> {
         let matrix = screen.tile_to_screen(z, &self.tile_id());

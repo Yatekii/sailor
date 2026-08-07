@@ -6,7 +6,7 @@ use wgpu::*;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
-use osm::math::Screen;
+use osm::math::Camera;
 
 use super::layer::{FramePass, GpuTiming, Layer, LayerCtx, LayerStack, Selection, Spans, StatSink};
 use crate::config::CONFIG;
@@ -192,7 +192,7 @@ impl Painter {
         &mut self,
         map: &mut dyn Layer,
         overlays: &mut LayerStack,
-        screen: &Screen,
+        screen: &Camera,
         zoom: f32,
         selection: Option<Selection>,
         stats: &mut dyn StatSink,

@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    math::{Coord, Gpu, Screen, TileId},
+    math::{Coord, Gpu, Camera, TileId},
     object::Object,
 };
 
@@ -19,7 +19,7 @@ impl Collider {
     /// * point: The pointer in logical coordinates (divided by DPI ratio)
     pub fn get_hovered_objects(
         visible_tiles: &[VisibleTile],
-        screen: &Screen,
+        screen: &Camera,
         zoom: f32,
         point: (f32, f32),
     ) -> Vec<Object> {

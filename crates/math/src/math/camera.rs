@@ -2,14 +2,14 @@ use super::*;
 use nalgebra_glm as glm;
 
 #[derive(Debug, Clone)]
-pub struct Screen {
+pub struct Camera {
     pub center: Point,
     pub width: f32,
     pub height: f32,
     tile_size: f32,
 }
 
-impl Screen {
+impl Camera {
     pub fn new(center: Point, width: f32, height: f32, tile_size: f32, hidpi_factor: f32) -> Self {
         Self {
             center,
@@ -126,7 +126,7 @@ mod tests {
         // View centered mid-world so both operands of the subtraction are ~0.5.
         let center = point(0.5187345, 0.5093721);
         let tile = TileId::new(tz, (0.5187 / scale) as u32, (0.5093 / scale) as u32);
-        let screen = Screen::new(center, 2400.0, 1400.0, 384.0, 2.0);
+        let screen = Camera::new(center, 2400.0, 1400.0, 384.0, 2.0);
 
         let m = screen.tile_to_screen(z, &tile);
         // Transform the tile-center vertex.
@@ -151,7 +151,7 @@ mod tests {
     // world_to_screen is a uniform similarity: same scale on x and y (in pixels).
     #[test]
     fn world_to_screen_is_uniform() {
-        let s = Screen::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0);
+        let s = Camera::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0);
         let t = s.world_to_screen(3.0);
         let o = t.apply(Coord::<World>::new(0.3, 0.7)); // the center -> origin
         let dx = t.apply(Coord::<World>::new(0.4, 0.7));
@@ -164,7 +164,7 @@ mod tests {
     // The split reproduces the old combined world->gpu matrix.
     #[test]
     fn world_to_gpu_equals_split() {
-        let s = Screen::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0);
+        let s = Camera::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0);
         let combined = s.world_to_gpu(3.0);
         let split = s.world_to_screen(3.0).then(s.screen_to_gpu());
         let p = Coord::<World>::new(0.55, 0.42);
@@ -175,7 +175,7 @@ mod tests {
     // pixel -> world -> gpu -> pixel roundtrips.
     #[test]
     fn pixel_world_roundtrip() {
-        let s = Screen::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0);
+        let s = Camera::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0);
         let world = s.pixel_to_world(5.0).apply(Coord::<Pixel>::new(410.0, 295.0));
         let gpu = s.world_to_gpu(5.0).apply(world);
         let px = (gpu.x() + 1.0) * s.width / 2.0;
