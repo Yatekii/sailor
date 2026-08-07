@@ -3869,6 +3869,7 @@ dependencies = [
  "reqwest",
  "sailor-math",
  "sailor-platform",
+ "sailor-style",
  "serde",
  "tokio",
  "varint",
@@ -3904,6 +3905,17 @@ dependencies = [
  "tokio",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "sailor-style"
+version = "0.1.0"
+dependencies = [
+ "deepsize",
+ "log",
+ "nom",
+ "nom-language",
+ "sailor-platform",
 ]
 
 [[package]]

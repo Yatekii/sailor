@@ -1,0 +1,14 @@
+[package]
+name = "sailor-style"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "sailor_style"
+
+[dependencies]
+sailor-platform = { path = "../platform" }
+nom = "8"
+nom-language = "0.1"
+log = { version = "0.4", features = ["serde"] }
+deepsize = "0.2"

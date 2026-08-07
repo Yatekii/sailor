@@ -40,6 +40,7 @@ config = "0.15"
 log = { version = "0.4", features = ["serde"] }
 sailor-math = { path = "crates/math" }
 sailor-platform = { path = "crates/platform" }
+sailor-style = { path = "crates/style" }
 lyon = { workspace = true }
 lru = "0.18"
 # heap-size estimation for the debug stats; wasm-friendly, unlike parity-util-mem.

@@ -1,6 +1,5 @@
 pub mod cache;
 pub mod config;
-pub mod css;
 pub mod drawing;
 pub mod feature;
 pub mod interaction;
@@ -12,3 +11,4 @@ pub mod vector_tile;
 // during the crate split.
 pub use sailor_math::{geometry, math};
 pub use sailor_platform::{fetch, platform};
+pub use sailor_style::css;

@@ -12,10 +12,10 @@ use nom::{
 use nom_language::error::{VerboseError, convert_error};
 use std::{collections::BTreeMap, num::ParseIntError};
 
-use crate::platform::{self, FileWatcher, Watcher};
+use sailor_platform::platform::{self, FileWatcher, Watcher};
 
 /// The default stylesheet, embedded so it is available on the web.
-const DEFAULT_STYLE: &str = include_str!("../../config/style.css");
+const DEFAULT_STYLE: &str = include_str!("../../../config/style.css");
 
 /// Tries to parse an entire stylesheet.
 pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
