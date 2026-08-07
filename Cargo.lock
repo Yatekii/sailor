@@ -3867,6 +3867,7 @@ dependencies = [
  "pretty_env_logger",
  "quick-protobuf",
  "reqwest",
+ "sailor-math",
  "serde",
  "tokio",
  "varint",
@@ -3875,6 +3876,16 @@ dependencies = [
  "web-time",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "sailor-math"
+version = "0.1.0"
+dependencies = [
+ "lyon",
+ "nalgebra",
+ "nalgebra-glm",
+ "parry2d",
 ]
 
 [[package]]

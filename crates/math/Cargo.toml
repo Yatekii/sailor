@@ -1,0 +1,13 @@
+[package]
+name = "sailor-math"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "sailor_math"
+
+[dependencies]
+lyon = { workspace = true }
+nalgebra = { workspace = true }
+nalgebra-glm = { workspace = true }
+parry2d = { workspace = true }
