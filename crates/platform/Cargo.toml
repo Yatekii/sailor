@@ -1,0 +1,25 @@
+[package]
+name = "sailor-platform"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "sailor_platform"
+
+[dependencies]
+sailor-math = { path = "../math" }
+futures = "0.3"
+log = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+notify = "8"
+reqwest = { version = "0.12", features = ["rustls-tls"] }
+tokio = { version = "1", features = ["rt-multi-thread"] }
+pretty_env_logger = "0.5"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"
+console_log = "1"
+web-sys = { version = "0.3", features = ["Window", "Location"] }

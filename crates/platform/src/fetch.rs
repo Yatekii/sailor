@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::math::TileId;
 use crate::platform;
+use sailor_math::math::TileId;
 
 /// Fetch the raw vector-tile bytes for a tile.
 ///

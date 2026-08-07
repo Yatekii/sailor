@@ -3868,6 +3868,7 @@ dependencies = [
  "quick-protobuf",
  "reqwest",
  "sailor-math",
+ "sailor-platform",
  "serde",
  "tokio",
  "varint",
@@ -3886,6 +3887,23 @@ dependencies = [
  "nalgebra",
  "nalgebra-glm",
  "parry2d",
+]
+
+[[package]]
+name = "sailor-platform"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "console_log",
+ "futures",
+ "log",
+ "notify",
+ "pretty_env_logger",
+ "reqwest",
+ "sailor-math",
+ "tokio",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
