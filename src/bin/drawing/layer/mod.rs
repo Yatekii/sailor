@@ -198,14 +198,18 @@ mod tests {
         name: &'static str,
         visible: bool,
     }
+
     impl Layer for Dummy {
         fn name(&self) -> &str {
             self.name
         }
+
         fn visible(&self) -> bool {
             self.visible
         }
+
         fn update(&mut self, _ctx: &mut LayerCtx) {}
+
         fn paint(&self, _frame: &mut FramePass) {}
     }
 
