@@ -39,10 +39,19 @@ impl Screen {
     }
 
     pub fn tile_to_screen(&self, z: f32, coordinate: &TileId) -> glm::TMat4<f32> {
-        let zoom = 1.0 / 2f32.powi(coordinate.z as i32);
-        let zoom = glm::scaling(&glm::vec3(zoom, zoom, 1.0));
-        let pos = glm::translation(&glm::vec3(coordinate.x as f32, coordinate.y as f32, 0.0));
-        self.global_to_screen(z) * zoom * pos
+        let scale = 1.0 / 2f32.powi(coordinate.z as i32);
+        // Offset the tile from the view center in world space (small numbers)
+        // BEFORE applying the large 2^z zoom. Baking -center into the zoomed
+        // matrix instead (global_to_screen * pos) makes the translation column
+        // a difference of two large products that cancels in f32 and jitters
+        // the tiles by ~1px as you zoom at high z.
+        let rel_x = coordinate.x as f32 * scale - self.center.x;
+        let rel_y = coordinate.y as f32 * scale - self.center.y;
+        let zoom_x = 2.0f32.powf(z) / (self.width / 2.0) * self.tile_size();
+        let zoom_y = 2.0f32.powf(z) / (self.height / 2.0) * self.tile_size();
+        glm::scaling(&glm::vec3(zoom_x, zoom_y, 1.0))
+            * glm::translation(&glm::vec3(rel_x, rel_y, 0.0))
+            * glm::scaling(&glm::vec3(scale, scale, 1.0))
     }
 
     pub fn global_to_screen(&self, z: f32) -> glm::TMat4<f32> {
@@ -86,5 +95,41 @@ impl Screen {
 
     pub fn global_to_tile_space(&self, z: f32, coordinate: &TileId) -> glm::TMat4<f32> {
         self.tile_to_screen(z, coordinate).try_inverse().unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Regression guard: at high zoom the tile transform must not lose precision
+    // to catastrophic cancellation. Baking -center into the zoomed matrix (the
+    // old `global_to_screen * pos` grouping) put ~2e-4 NDC of f32 error here,
+    // ~0.1px, which jittered per-tile as you zoomed. Subtracting in world space
+    // first keeps it near f64.
+    #[test]
+    fn tile_transform_stays_precise_at_high_zoom() {
+        let z = 18.0;
+        let tz = 14u32;
+        let scale = 1.0 / 2f64.powi(tz as i32);
+        // View centered mid-world so both operands of the subtraction are ~0.5.
+        let center = point(0.5187345, 0.5093721);
+        let tile = TileId::new(tz, (0.5187 / scale) as u32, (0.5093 / scale) as u32);
+        let screen = Screen::new(center, 2400.0, 1400.0, 384.0, 2.0);
+
+        let m = screen.tile_to_screen(z, &tile);
+        // Transform the tile-center vertex.
+        let ndc = m * glm::vec4(0.5, 0.5, 0.0, 1.0);
+
+        // f64 reference of the same math.
+        let zoom_x = 2.0f64.powf(z as f64) / (2400.0 / 2.0) * (384.0 * 2.0);
+        let ref_x = zoom_x * ((tile.x as f64 + 0.5) * scale - center.x as f64);
+        assert!(
+            (ndc.x as f64 - ref_x).abs() < 1e-5,
+            "ndc.x={} ref={} err={}",
+            ndc.x,
+            ref_x,
+            (ndc.x as f64 - ref_x).abs()
+        );
     }
 }

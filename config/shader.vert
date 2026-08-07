@@ -36,9 +36,11 @@ layout(std140, set = 0, binding = 1) uniform Transform {
     TileData tile_datas[32];
 };
 
+// One highlight slot per visible tile, packed as uvec4 to satisfy std140
+// (32 tiles = 8 uvec4). A vertex highlights when its object_id equals the slot
+// for its tile. Sentinel values never match a real slot.
 layout(std140, set = 0, binding = 2) uniform Selected {
-    uint selected_tile_id;
-    uint selected_object_id;
+    uvec4 selected_object_ids[8];
 };
 
 void main() {
@@ -98,7 +100,8 @@ void main() {
 
     gl_Position.z = layer_data.z_index / 1000 + 0.001;
 
-    if(( selected_tile_id == tile_id && selected_object_id == object_id)) {
+    uint selected_object_id = selected_object_ids[tile_id >> 2][tile_id & 3];
+    if(selected_object_id == object_id) {
         outColor = vec4(1.0, 0.0, 0.0, 0.5);
     }
     gl_Position.z = 1;

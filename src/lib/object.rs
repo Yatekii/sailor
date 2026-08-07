@@ -1,82 +1,88 @@
+use crate::geometry::Geometry;
 use crate::math::TileId;
 
 use super::css::Selector;
 
-use lyon::math::Point;
 use std::collections::HashMap;
-
-/// Classifies an object as one of three possible types.
-#[derive(Debug, Clone)]
-pub enum ObjectType {
-    Polygon,
-    Line,
-    Point,
-}
 
 /// Represents any object on the map.
 #[derive(Debug, Clone)]
 pub struct Object {
     /// The CSS selector that fully describes the object.
     selector: Selector,
-    /// All the points that belong to the object.
-    /// If this is a polygon, the points describe the outline in order.
-    /// If this is a line, the points describe the line in order.
-    /// For a point there is only one point contained.
-    points: Vec<Point>,
+    /// The geometry (polygon / line / point) of the object.
+    geometry: Geometry,
     /// All the OSM tags that are attached to this object.
     tags: HashMap<String, String>,
-    /// The object type.
-    _object_type: ObjectType,
     pub title: Option<String>,
+    /// Index of this object within its tile (collider -> object lookup).
     pub id: u32,
     pub tile_id: TileId,
+    /// Stable feature id from the source tile (the OSM id). Shared by every part
+    /// of a multipolygon and by the same feature across tiles. 0 when absent.
+    pub feature_id: u64,
+    /// Dense per-tile slot of this object's feature, written into the vertices
+    /// and used by the shader to highlight the whole feature. Shared by all parts.
+    pub feature_slot: u32,
+    /// Which part of the feature this object is (0 for the first / only part).
+    pub part: u32,
 }
 
 impl Object {
     /// Creates a new object with no tags.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         selector: Selector,
-        points: Vec<Point>,
-        object_type: ObjectType,
+        geometry: Geometry,
         tile_id: TileId,
         id: u32,
         title: Option<String>,
+        feature_id: u64,
+        feature_slot: u32,
+        part: u32,
     ) -> Self {
         Self {
             selector,
-            points,
+            geometry,
             tags: HashMap::new(),
-            _object_type: object_type,
             title,
             tile_id,
             id,
+            feature_id,
+            feature_slot,
+            part,
         }
     }
 
     /// Creates a new object with an initial set of tags.
+    #[allow(clippy::too_many_arguments)]
     pub fn new_with_tags(
         selector: Selector,
-        points: Vec<Point>,
+        geometry: Geometry,
         tags: HashMap<String, String>,
-        object_type: ObjectType,
         tile_id: TileId,
         id: u32,
         title: Option<String>,
+        feature_id: u64,
+        feature_slot: u32,
+        part: u32,
     ) -> Self {
         Self {
             selector,
-            points,
+            geometry,
             tags,
-            _object_type: object_type,
             title,
             tile_id,
             id,
+            feature_id,
+            feature_slot,
+            part,
         }
     }
 
-    /// Returns the set of points contained in the object.
-    pub fn points(&self) -> &Vec<Point> {
-        &self.points
+    /// Returns the geometry of the object.
+    pub fn geometry(&self) -> &Geometry {
+        &self.geometry
     }
 
     /// Returns the set of tags contained in the object.
@@ -94,7 +100,6 @@ impl Object {
         use deepsize::DeepSizeOf;
         self.selector.size()
             + self.tags.deep_size_of()
-            + self.points.capacity() * std::mem::size_of::<Point>()
-            + std::mem::size_of::<ObjectType>()
+            + self.geometry.point_count() * std::mem::size_of::<parry2d::math::Vec2>()
     }
 }

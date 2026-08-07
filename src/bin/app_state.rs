@@ -199,7 +199,7 @@ impl AppState {
         let hovered_objects = self.hovered_objects.lock().unwrap();
         self.selected_objects = hovered_objects
             .iter()
-            .map(|o| EditableObject::new(o.id, o.tile_id, o.clone()))
+            .map(|o| EditableObject::new(o.tile_id, o.clone()))
             .collect();
         drop(hovered_objects);
         self.selected_object = 0;
@@ -270,17 +270,12 @@ impl AppState {
 }
 
 pub struct EditableObject {
-    pub id: u32,
     pub tile_id: TileId,
     pub object: Object,
 }
 
 impl EditableObject {
-    pub fn new(id: u32, tile_id: TileId, object: Object) -> Self {
-        Self {
-            id,
-            tile_id,
-            object,
-        }
+    pub fn new(tile_id: TileId, object: Object) -> Self {
+        Self { tile_id, object }
     }
 }

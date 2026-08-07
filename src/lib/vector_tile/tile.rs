@@ -22,9 +22,10 @@ use self::{
         vertex::{LayerVertexCtor, Vertex},
     },
     feature::collection::FeatureCollection,
+    geometry::{Geometry, Polygon},
     interaction::tile_collider::{TileCollider, TileColliderLoader},
     math::{Screen, TileId},
-    object::{Object, ObjectType},
+    object::Object,
 };
 
 use super::{geometry_commands_to_paths, paths_to_drawable};
@@ -82,6 +83,9 @@ pub struct Tile {
     extent: u16,
     objects: Arc<RwLock<Vec<Object>>>,
     features: Vec<(u32, Range<u32>)>,
+    // Maps a stable feature id (OSM id) to its dense per-tile slot, so a selected
+    // feature can be highlighted in every tile it spans.
+    feature_slots: HashMap<u64, u32>,
     collider: Arc<RwLock<TileCollider>>,
     gpu_tile: Option<LoadedGPUTile>,
     text: Vec<((f32, f32), String)>,
@@ -140,11 +144,16 @@ impl Tile {
         features.push((current_feature_id, range));
         objects.push(object);
 
+        // Dense per-feature slot written into the vertices for selection highlight,
+        // and the stable-id -> slot map used to highlight a feature across tiles.
+        let mut next_feature_slot: u32 = 0;
+        let mut feature_slots: HashMap<u64, u32> = HashMap::new();
+
         // Transform all features of the tile.
         for layer in tile.layers {
             let mut fc = feature_collection.write().unwrap();
             let layers = fc.layers_mut();
-            let mut map: HashMap<Selector, Vec<(GeomType, usize, Vec<Path>)>> =
+            let mut map: HashMap<Selector, Vec<(GeomType, u32, Vec<Path>)>> =
                 HashMap::with_capacity(200);
             let layer_name = layer.name.to_string();
             let layer_id = if let Some(layer) = layers.iter().find(|l| l.name == layer_name) {
@@ -178,46 +187,76 @@ impl Tile {
                     title = Some(tag.clone());
                 }
 
-                // If we have a valid object at hand, insert it into the object list
+                // Every part of the feature shares one dense slot; features with a
+                // real id also register it so other tiles can find the same feature.
+                let feature_slot = next_feature_slot;
+                next_feature_slot += 1;
+                if feature.id != 0 {
+                    feature_slots.insert(feature.id, feature_slot);
+                }
 
-                let object_type = match feature.type_pb {
-                    GeomType::POLYGON => Some(ObjectType::Polygon),
-                    GeomType::LINESTRING => Some(ObjectType::Line),
-                    GeomType::POINT => Some(ObjectType::Point),
-                    _ => unreachable!(),
-                };
-
-                if let Some(ot) = object_type {
-                    objects.push(Object::new_with_tags(
+                // Insert one object per part. Multipolygons split so each part is
+                // independently hit-testable while still sharing the feature slot.
+                match feature.type_pb {
+                    GeomType::POLYGON => {
+                        for (part, polygon) in
+                            Polygon::parts_from_path(&paths[0]).into_iter().enumerate()
+                        {
+                            objects.push(Object::new_with_tags(
+                                selector.clone(),
+                                Geometry::Polygon(polygon),
+                                tags.clone(),
+                                *tile_id,
+                                objects.len() as u32,
+                                title.clone(),
+                                feature.id,
+                                feature_slot,
+                                part as u32,
+                            ));
+                        }
+                    }
+                    GeomType::LINESTRING => objects.push(Object::new_with_tags(
                         selector.clone(),
-                        paths[0].points().to_vec(),
-                        tags,
-                        ot,
+                        Geometry::line(&paths[0]),
+                        tags.clone(),
                         *tile_id,
                         objects.len() as u32,
-                        title,
-                    ));
-                } else {
-                    println!("FUCK")
+                        title.clone(),
+                        feature.id,
+                        feature_slot,
+                        0,
+                    )),
+                    GeomType::POINT => objects.push(Object::new_with_tags(
+                        selector.clone(),
+                        Geometry::point(&paths[0]),
+                        tags.clone(),
+                        *tile_id,
+                        objects.len() as u32,
+                        title.clone(),
+                        feature.id,
+                        feature_slot,
+                        0,
+                    )),
+                    _ => unreachable!(),
                 }
 
                 let entry = map
                     .entry(selector)
                     .or_insert_with(|| Vec::with_capacity(1024));
-                entry.push((feature.type_pb, objects.len() - 1, paths));
+                entry.push((feature.type_pb, feature_slot, paths));
             }
 
             // Transform all the features on a per selector basis.
             for (selector, feats) in map {
                 let index_start_before = builder.get_current_index();
-                for (kind, object_id, path) in feats {
+                for (kind, feature_slot, path) in feats {
                     // Set the current feature id.
                     current_feature_id = {
                         // Scope the lock guard real tight to ensure it's released quickly.
                         let mut feature_collection = feature_collection.write().unwrap();
                         feature_collection.ensure_feature(&selector, layer_id)
                     };
-                    builder.set_current_feature_and_object_id(current_feature_id, object_id as u32);
+                    builder.set_current_feature_and_object_id(current_feature_id, feature_slot);
 
                     paths_to_drawable(&mut builder, kind, &path, layer.extent as f32, tile_id);
                 }
@@ -262,6 +301,7 @@ impl Tile {
             extent,
             objects,
             features,
+            feature_slots,
             collider,
             gpu_tile: None,
             text,
@@ -280,6 +320,12 @@ impl Tile {
 
     pub fn objects(&self) -> Arc<RwLock<Vec<Object>>> {
         self.objects.clone()
+    }
+
+    /// The dense per-tile slot for a stable feature id, if that feature is in
+    /// this tile. Used to highlight a selected feature across tiles.
+    pub fn feature_slot(&self, feature_id: u64) -> Option<u32> {
+        self.feature_slots.get(&feature_id).copied()
     }
 
     pub fn mesh(&self) -> &VertexBuffers<Vertex, u32> {
@@ -341,11 +387,15 @@ impl Tile {
 
         let object = Object::new(
             selector,
-            path.points().to_vec(),
-            ObjectType::Polygon,
+            Geometry::polygon(&path),
             TileId::new(0, 0, 0),
             u32::MAX,
             Some("background".to_string()),
+            0,
+            // Reserved slot: matches the object_id the background vertices carry,
+            // and stays clear of real feature slots and the "nothing selected" sentinel.
+            u32::MAX,
+            0,
         );
 
         (

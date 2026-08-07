@@ -6,6 +6,7 @@ pub mod css;
 pub mod drawing;
 pub mod feature;
 pub mod fetch;
+pub mod geometry;
 pub mod interaction;
 pub mod math;
 pub mod object;

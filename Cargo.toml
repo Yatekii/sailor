@@ -59,7 +59,7 @@ human_bytes = "0.4"
 parking_lot = "0.12"
 
 [dev-dependencies]
-insta = "1"
+insta = { version = "1", features = ["glob"] }
 
 # Shader/css file-watching (notify) is native-only; on web there is no hot-reload.
 # Native reqwest needs a TLS backend and a tokio runtime to drive its futures;

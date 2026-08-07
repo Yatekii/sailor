@@ -5,4 +5,5 @@ pub mod location_finder;
 pub mod panel_bottom;
 pub mod panel_left;
 pub mod panel_right;
+pub mod profiler;
 pub mod stats;

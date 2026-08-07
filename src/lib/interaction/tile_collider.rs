@@ -2,18 +2,24 @@ use parry2d::{
     bounding_volume::Aabb,
     math::Vec2,
     partitioning::{Bvh, BvhBuildStrategy},
-    utils::point_in_poly2d,
 };
 use std::sync::{Arc, RwLock};
 
+use crate::geometry::{Geometry, Polygon};
 use crate::object::Object;
 use crate::platform::spawn;
 
+/// One collidable object: the index of the source object plus the polygon we
+/// hit-test against. Non-polygon objects don't produce a collision object.
+struct CollisionObject {
+    object_id: usize,
+    polygon: Polygon,
+}
+
 pub struct TileCollider {
-    objects: Vec<Vec<Vec2>>,
-    // Original object id for each collider entry (objects without enough points are skipped,
-    // so collider indices are compacted and don't match the object list one-to-one).
-    object_ids: Vec<usize>,
+    // One entry per collidable object. The BVH leaf index addresses this vector,
+    // and each entry carries the id of the object it came from.
+    objects: Vec<CollisionObject>,
     bvh: Bvh,
 }
 
@@ -21,7 +27,6 @@ impl TileCollider {
     pub fn new() -> Self {
         Self {
             objects: Vec::new(),
-            object_ids: Vec::new(),
             bvh: Bvh::new(),
         }
     }
@@ -37,15 +42,14 @@ impl TileCollider {
     }
 
     pub fn get_hovered_objects(&self, cursor_point: &Vec2, hovered_objects: &mut Vec<usize>) {
-        // Broad phase only checks with the aabbs of the individual polys.
-        for poly_id in self
+        // Broad phase against the object aabbs, narrow phase against the polygon itself.
+        for leaf in self
             .bvh
             .leaves(|node| node.aabb().contains_local_point(*cursor_point))
         {
-            let poly = &self.objects[poly_id as usize];
-            // Narrow phase checks that the point is in the polygon indeed.
-            if point_in_poly2d(*cursor_point, poly) {
-                hovered_objects.push(self.object_ids[poly_id as usize]);
+            let object = &self.objects[leaf as usize];
+            if object.polygon.contains(*cursor_point) {
+                hovered_objects.push(object.object_id);
             }
         }
     }
@@ -66,28 +70,31 @@ impl TileColliderLoader for Arc<RwLock<TileCollider>> {
         let collider_clone = self.clone();
         spawn(async move {
             if let Ok(objects) = objects.read() {
-                let mut polygons: Vec<Vec<Vec2>> = Vec::new();
-                let mut object_ids: Vec<usize> = Vec::new();
+                let mut collision_objects: Vec<CollisionObject> = Vec::new();
                 let mut aabbs: Vec<Aabb> = Vec::new();
                 for (object_id, object) in objects.iter().enumerate() {
-                    if object.points().len() >= 2 {
-                        let polygon: Vec<Vec2> = object
-                            .points()
-                            .iter()
-                            .map(|p| Vec2::new(p.x, p.y))
-                            .collect();
-                        aabbs.push(Aabb::from_points(polygon.iter().copied()));
-                        polygons.push(polygon);
-                        object_ids.push(object_id);
+                    // Only polygons enclose an area. Points (e.g. multipoint housenumber
+                    // features) and lines would otherwise be treated as fake polygons.
+                    let Geometry::Polygon(polygon) = object.geometry() else {
+                        continue;
+                    };
+
+                    if polygon.is_empty() {
+                        continue;
                     }
+
+                    aabbs.push(polygon.aabb());
+                    collision_objects.push(CollisionObject {
+                        object_id,
+                        polygon: polygon.clone(),
+                    });
                 }
                 // Build the tree in one shot; incremental `insert` leaves the tree unbalanced
                 // and `leaves` then yields internal node indices instead of leaf data.
                 let bvh = Bvh::from_leaves(BvhBuildStrategy::Binned, &aabbs);
                 match collider_clone.write() {
                     Ok(mut collider) => {
-                        collider.objects = polygons;
-                        collider.object_ids = object_ids;
+                        collider.objects = collision_objects;
                         collider.bvh = bvh;
                     }
                     Err(_e) => log::error!(

@@ -1,5 +1,7 @@
 use std::num::NonZeroU64;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
 use nalgebra_glm::{vec2, vec4};
@@ -18,11 +20,111 @@ use winit::window::Window;
 
 use crate::app_state::AppState;
 use crate::config::CONFIG;
+
+/// Highlight slot value meaning "nothing selected in this tile". Distinct from
+/// real feature slots (small) and from the background's reserved slot (u32::MAX).
+const NOT_SELECTED: u32 = u32::MAX - 1;
 use crate::drawing::helpers::load_glsl;
 
-const TILE_DATA_BUFFER_BYTE_SIZE: u64 = 8;
+// One u32 highlight slot per visible tile (must match `Selected` in the shader).
+const SELECTION_BUFFER_SIZE: u64 = MAX_TILES as u64 * 4;
 // TODO: Should be u64::from once stabilized for const.
 const UNIFORM_BUFFER_SIZE: u64 = 4 * 4 + 12 * 4 * (MAX_FEATURES as u64);
+
+// Two timestamps (begin/end) for each instrumented pass: polygon, then text.
+const GPU_TS_COUNT: u32 = 4;
+
+/// Per-pass GPU timing via timestamp queries. Results are read back one frame
+/// late without blocking, so the measured frametime stays honest. Only present
+/// when the adapter supports `TIMESTAMP_QUERY`.
+struct GpuTiming {
+    query_set: QuerySet,
+    resolve: Buffer,
+    readback: Buffer,
+    period: f32,
+    ready: Arc<AtomicBool>,
+    pending: bool,
+}
+
+impl GpuTiming {
+    fn new(device: &Device, period: f32) -> Self {
+        let query_set = device.create_query_set(&wgpu::QuerySetDescriptor {
+            label: Some("pass timestamps"),
+            ty: wgpu::QueryType::Timestamp,
+            count: GPU_TS_COUNT,
+        });
+        let size = GPU_TS_COUNT as u64 * 8;
+        let resolve = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("ts resolve"),
+            size,
+            usage: BufferUsages::QUERY_RESOLVE | BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let readback = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("ts readback"),
+            size,
+            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        Self {
+            query_set,
+            resolve,
+            readback,
+            period,
+            ready: Arc::new(AtomicBool::new(false)),
+            pending: false,
+        }
+    }
+
+    /// timestamp_writes for a pass, given its begin/end query indices.
+    fn writes(&self, begin: u32, end: u32) -> wgpu::RenderPassTimestampWrites<'_> {
+        wgpu::RenderPassTimestampWrites {
+            query_set: &self.query_set,
+            beginning_of_pass_write_index: Some(begin),
+            end_of_pass_write_index: Some(end),
+        }
+    }
+
+    fn resolve(&self, encoder: &mut CommandEncoder) {
+        encoder.resolve_query_set(&self.query_set, 0..GPU_TS_COUNT, &self.resolve, 0);
+        encoder.copy_buffer_to_buffer(&self.resolve, 0, &self.readback, 0, GPU_TS_COUNT as u64 * 8);
+    }
+
+    fn map(&mut self) {
+        let ready = self.ready.clone();
+        self.readback
+            .slice(..)
+            .map_async(wgpu::MapMode::Read, move |_| {
+                ready.store(true, Ordering::Release);
+            });
+        self.pending = true;
+    }
+
+    /// If the previous frame's readback has landed, return the raw ticks and
+    /// free the buffer for reuse. Non-blocking.
+    fn take(&mut self, device: &Device) -> Option<[u64; GPU_TS_COUNT as usize]> {
+        if !self.pending {
+            return None;
+        }
+        let _ = device.poll(wgpu::PollType::Poll);
+        if !self.ready.load(Ordering::Acquire) {
+            return None;
+        }
+        let out = {
+            let view = self.readback.slice(..).get_mapped_range().unwrap();
+            let mut out = [0u64; GPU_TS_COUNT as usize];
+            for (i, o) in out.iter_mut().enumerate() {
+                let b: [u8; 8] = view[i * 8..i * 8 + 8].try_into().unwrap();
+                *o = u64::from_le_bytes(b);
+            }
+            out
+        };
+        self.readback.unmap();
+        self.ready.store(false, Ordering::Release);
+        self.pending = false;
+        Some(out)
+    }
+}
 
 pub struct Painter {
     pub window: Arc<Window>,
@@ -48,6 +150,7 @@ pub struct Painter {
     viewport: glyphon::Viewport,
     atlas: glyphon::TextAtlas,
     text_renderer: glyphon::TextRenderer,
+    gpu_timing: Option<GpuTiming>,
     // temperature: crate::drawing::weather::Temperature,
 }
 
@@ -70,10 +173,18 @@ impl Painter {
             .await
             .expect("Failed to find an appropiate adapter");
 
+        // Opt into GPU timestamps when the adapter supports them; otherwise the
+        // per-pass histograms simply won't appear.
+        let timestamps_supported = adapter.features().contains(Features::TIMESTAMP_QUERY);
+        let mut required_features = Features::DEPTH32FLOAT_STENCIL8;
+        if timestamps_supported {
+            required_features |= Features::TIMESTAMP_QUERY;
+        }
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("Main Device"),
-                required_features: Features::DEPTH32FLOAT_STENCIL8,
+                required_features,
                 required_limits: wgpu::Limits {
                     max_uniform_buffer_binding_size: 1 << 16,
                     ..wgpu::Limits::default()
@@ -177,7 +288,8 @@ impl Painter {
             app_state.zoom,
             std::iter::empty(),
         );
-        let tile_selection_buffer = Self::create_tile_selection_buffer(&device, 0, 0);
+        let tile_selection_buffer =
+            Self::create_tile_selection_buffer(&device, &[NOT_SELECTED; MAX_TILES]);
 
         let blend_pipeline = Self::create_layer_render_pipeline(
             &device,
@@ -242,6 +354,9 @@ impl Painter {
 
         // let mut temperature = crate::drawing::weather::Temperature::init(&mut device, &mut queue);
 
+        let gpu_timing =
+            timestamps_supported.then(|| GpuTiming::new(&device, queue.get_timestamp_period()));
+
         let init_command_buf = init_encoder.finish();
         queue.submit([init_command_buf]); // TODO this fix is bad
 
@@ -273,6 +388,7 @@ impl Painter {
             viewport,
             atlas,
             text_renderer,
+            gpu_timing,
             // temperature,
         }
     }
@@ -467,22 +583,10 @@ impl Painter {
         )
     }
 
-    fn create_tile_selection_buffer(
-        device: &Device,
-        selected_tile_id: u32,
-        selected_object_id: u32,
-    ) -> Buffer {
-        #[expect(dead_code)]
-        #[derive(Copy, Clone, Debug, Default)]
-        #[repr(C, packed)]
-        pub struct SelectedData {
-            pub selected_tile_id: u32,
-            pub selected_object_id: u32,
-        }
-
+    fn create_tile_selection_buffer(device: &Device, selected_object_ids: &[u32; MAX_TILES]) -> Buffer {
         device.create_buffer_init(&BufferInitDescriptor {
             label: Some("tile selection buffer"),
-            contents: as_byte_slice(&[selected_tile_id, selected_object_id]),
+            contents: as_byte_slice(selected_object_ids.as_slice()),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         })
     }
@@ -531,7 +635,7 @@ impl Painter {
                     resource: BindingResource::Buffer(BufferBinding {
                         buffer: tile_selection_buffer,
                         offset: 0,
-                        size: NonZeroU64::new(TILE_DATA_BUFFER_BYTE_SIZE),
+                        size: NonZeroU64::new(SELECTION_BUFFER_SIZE),
                     }),
                 },
             ],
@@ -639,17 +743,27 @@ impl Painter {
             visible_tile_info.push((tile_id, tile.extent() as f32));
         }
 
-        let (selected_tile_id, selected_object_id) = app_state
-            .selected_object()
-            .and_then(|object| {
-                visible_tile_info
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, (id, _))| {
-                        (id == &object.tile_id).then_some((i as u32, object.id))
-                    })
-            })
-            .unwrap_or((u32::MAX, u32::MAX));
+        // One highlight slot per visible tile. Sentinel = nothing to highlight in
+        // that tile. For the selected feature we translate its stable id into each
+        // tile's own local slot, so a feature spanning tiles lights up in all of them.
+        let mut selected_object_ids = [NOT_SELECTED; MAX_TILES];
+        if let Some(selected) = app_state.selected_object() {
+            let feature_id = selected.object.feature_id;
+            for (i, (id, _)) in visible_tile_info.iter().enumerate() {
+                let slot = if *id == selected.tile_id {
+                    // Same tile as the click: use the object's slot directly (also
+                    // covers features without a stable id, which can't cross tiles).
+                    Some(selected.object.feature_slot)
+                } else if feature_id != 0 {
+                    app_state.tile_cache.get_tile(id).feature_slot(feature_id)
+                } else {
+                    None
+                };
+                if let Some(slot) = slot {
+                    selected_object_ids[i] = slot;
+                }
+            }
+        }
 
         self.tile_transform_buffer = Self::create_tile_transform_buffer(
             &self.device,
@@ -659,7 +773,7 @@ impl Painter {
         );
 
         self.tile_selection_buffer =
-            Self::create_tile_selection_buffer(&self.device, selected_tile_id, selected_object_id);
+            Self::create_tile_selection_buffer(&self.device, &selected_object_ids);
     }
 
     fn create_multisampled_framebuffer(
@@ -712,13 +826,46 @@ impl Painter {
     }
 
     pub fn paint(&mut self, hud: &mut super::ui::Hud, app_state: &mut AppState) {
-        let feature_collection = app_state.feature_collection().read().unwrap().clone();
-
-        for tile_id in &mut app_state.visible_tiles {
-            let tile = app_state.tile_cache.try_get_tile_mut(tile_id).unwrap();
-            tile.load_to_gpu(&self.device);
-            app_state.tile_cache.promote(tile_id);
+        // Read back last frame's GPU pass timings (non-blocking) and record them.
+        if let Some(gt) = self.gpu_timing.as_mut() {
+            if let Some(raw) = gt.take(&self.device) {
+                let p = gt.period;
+                let poly = (raw[1].saturating_sub(raw[0])) as f32 * p;
+                let text = (raw[3].saturating_sub(raw[2])) as f32 * p;
+                app_state
+                    .stats
+                    .record("gpu.polygon_pass", Duration::from_nanos(poly as u64));
+                app_state
+                    .stats
+                    .record("gpu.text_pass", Duration::from_nanos(text as u64));
+            }
         }
+        // Only instrument the GPU this frame if last frame's readback is done,
+        // so we never copy into a still-mapped buffer.
+        let record_gpu = self.gpu_timing.as_ref().is_some_and(|g| !g.pending);
+
+        let mut spans: Vec<(&'static str, Duration)> = Vec::new();
+        macro_rules! span {
+            ($name:expr, $body:expr) => {{
+                let __t = web_time::Instant::now();
+                let __r = $body;
+                spans.push(($name, __t.elapsed()));
+                __r
+            }};
+        }
+
+        let feature_collection = span!(
+            "cpu.fc_clone",
+            app_state.feature_collection().read().unwrap().clone()
+        );
+
+        span!("cpu.gpu_upload", {
+            for tile_id in &mut app_state.visible_tiles {
+                let tile = app_state.tile_cache.try_get_tile_mut(tile_id).unwrap();
+                tile.load_to_gpu(&self.device);
+                app_state.tile_cache.promote(tile_id);
+            }
+        });
 
         let features = feature_collection.features();
         if !features.is_empty()
@@ -730,18 +877,25 @@ impl Painter {
                 .create_command_encoder(&CommandEncoderDescriptor {
                     label: Some("tile polygon encoder"),
                 });
-            self.update_uniforms(&mut encoder, app_state, &feature_collection);
-            self.bind_group = Self::create_blend_bind_group(
-                &self.device,
-                &self.bind_group_layout,
-                &self.uniform_buffer,
-                &self.tile_transform_buffer,
-                &self.tile_selection_buffer,
-            );
-            {
+            span!("cpu.uniforms", {
+                self.update_uniforms(&mut encoder, app_state, &feature_collection);
+                self.bind_group = Self::create_blend_bind_group(
+                    &self.device,
+                    &self.bind_group_layout,
+                    &self.uniform_buffer,
+                    &self.tile_transform_buffer,
+                    &self.tile_selection_buffer,
+                );
+            });
+            span!("cpu.encode_polygons", {
                 let view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
+                let poly_ts = if record_gpu {
+                    self.gpu_timing.as_ref().map(|g| g.writes(0, 1))
+                } else {
+                    None
+                };
                 let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                     label: Some("tile polygons"),
                     color_attachments: &[Some(RenderPassColorAttachment {
@@ -772,7 +926,7 @@ impl Painter {
                             store: StoreOp::Store,
                         }),
                     }),
-                    timestamp_writes: None,
+                    timestamp_writes: poly_ts,
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
@@ -824,8 +978,13 @@ impl Painter {
                         i as u32,
                     );
                 }
-            }
-
+            });
+            let text_ts = if record_gpu {
+                self.gpu_timing.as_ref().map(|g| g.writes(2, 3))
+            } else {
+                None
+            };
+            span!("cpu.text", {
             self.viewport.update(
                 &self.queue,
                 Resolution {
@@ -874,7 +1033,7 @@ impl Painter {
                     },
                 })],
                 depth_stencil_attachment: None,
-                timestamp_writes: None,
+                timestamp_writes: text_ts,
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
@@ -884,21 +1043,41 @@ impl Painter {
                 .unwrap();
 
             drop(pass);
+            });
 
             // self.temperature.paint(&mut encoder, view);
 
-            hud.paint(
-                app_state,
-                &self.window,
-                &self.device,
-                &self.queue,
-                &mut encoder,
-                &frame,
-            );
-            self.staging_belt.finish();
+            span!("cpu.hud", {
+                hud.paint(
+                    app_state,
+                    &self.window,
+                    &self.device,
+                    &self.queue,
+                    &mut encoder,
+                    &frame,
+                );
+            });
 
-            self.queue.submit([encoder.finish()]);
-            self.queue.present(frame);
+            if record_gpu {
+                if let Some(gt) = self.gpu_timing.as_mut() {
+                    gt.resolve(&mut encoder);
+                }
+            }
+
+            span!("cpu.submit", {
+                self.staging_belt.finish();
+                self.queue.submit([encoder.finish()]);
+                self.queue.present(frame);
+                if record_gpu {
+                    if let Some(gt) = self.gpu_timing.as_mut() {
+                        gt.map();
+                    }
+                }
+            });
+        }
+
+        for (name, dur) in spans {
+            app_state.stats.record(name, dur);
         }
     }
 }
