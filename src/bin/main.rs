@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 use crate::config::CONFIG;
 use clap::Parser;
-use lyon::geom::euclid::{self};
 use nalgebra_glm::vec2;
 use osm::math::{Coord, Geo, Pixel, TileId, deg2num, tile_to_world_space};
 use winit::{
@@ -134,7 +133,8 @@ pub struct Application {
     app_state: app_state::AppState,
     modifiers_state: ModifiersState,
     mouse_down: bool,
-    last_pos: PhysicalPosition<f64>,
+    drag_moved: bool,
+    last_position: Coord<Pixel>,
     args: Args,
 }
 
@@ -181,7 +181,8 @@ impl Application {
             app_state,
             modifiers_state: ModifiersState::default(),
             mouse_down: false,
-            last_pos: PhysicalPosition::new(0.0, 0.0),
+            drag_moved: false,
+            last_position: Coord::<Pixel>::new(0.0, 0.0),
             args,
         }
     }
@@ -233,41 +234,48 @@ impl Application {
                     match state {
                         ElementState::Pressed => {
                             self.mouse_down = true;
+                            self.drag_moved = false;
                         }
                         ElementState::Released => {
                             self.mouse_down = false;
-                            self.app_state.update_selected_from_hover_objects();
+                            // a drag is a pan, not a selection
+                            if !self.drag_moved {
+                                self.app_state.update_selected_from_hover_objects();
+                            }
                         }
                     }
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 if !ui_event {
+                    let cursor = self.last_position;
+                    let from = self.app_state.zoom;
                     match delta {
                         MouseScrollDelta::LineDelta(_, y) => self.app_state.zoom += 0.1 * y,
                         MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => {
                             self.app_state.zoom += 0.001 * *y as f32
                         }
                     }
+                    self.app_state
+                        .screen
+                        .zoom_to_cursor(cursor, from, self.app_state.zoom);
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
                 let logical_position = position.to_logical(self.painter.get_hidpi_factor());
 
-                let p2w = self.app_state.screen.pixel_to_world(self.app_state.zoom);
-                let new_pos = p2w.apply(Coord::<Pixel>::new(position.x as f32, position.y as f32));
-                let old_pos =
-                    p2w.apply(Coord::<Pixel>::new(self.last_pos.x as f32, self.last_pos.y as f32));
-                let delta_new = new_pos.coords() - old_pos.coords();
+                let from = self.last_position;
+                let to = Coord::<Pixel>::new(position.x as f32, position.y as f32);
 
-                self.last_pos = *position;
+                self.last_position = to;
 
                 self.app_state
                     .set_cursor(vec2(logical_position.x, logical_position.y));
 
                 if !ui_event {
                     if self.mouse_down {
-                        self.app_state.screen.center -= euclid::vec2(delta_new.x, delta_new.y);
+                        self.drag_moved = true;
+                        self.app_state.screen.pan(from, to, self.app_state.zoom);
                     }
 
                     self.app_state

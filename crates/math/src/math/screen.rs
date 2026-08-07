@@ -93,6 +93,20 @@ impl Screen {
     pub fn global_to_tile_space(&self, z: f32, coordinate: &TileId) -> Transform<Gpu, TileLocal> {
         self.tile_to_screen(z, coordinate).inverse()
     }
+
+    /// Pan the view by a pixel-space drag from `from` to `to` at zoom `z`.
+    pub fn pan(&mut self, from: Coord<Pixel>, to: Coord<Pixel>, z: f32) {
+        let p2w = self.pixel_to_world(z);
+        let delta = p2w.apply(to).coords() - p2w.apply(from).coords();
+        self.center -= vector(delta.x, delta.y);
+    }
+
+    /// Recenter so the world point under `cursor` stays fixed as zoom goes `from` -> `to`.
+    pub fn zoom_to_cursor(&mut self, cursor: Coord<Pixel>, from: f32, to: f32) {
+        let before = self.pixel_to_world(from).apply(cursor);
+        let after = self.pixel_to_world(to).apply(cursor);
+        self.center += vector(before.x() - after.x(), before.y() - after.y());
+    }
 }
 
 #[cfg(test)]
