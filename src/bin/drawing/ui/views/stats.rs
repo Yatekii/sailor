@@ -18,8 +18,8 @@ pub fn view_stats(ui: &mut Ui, app_state: &mut AppState) {
         let data = [
             ("mouse x", app_state.cursor().x.to_string()),
             ("mouse y", app_state.cursor().y.to_string()),
-            ("mouse lat", latlon.y.to_string()),
-            ("mouse lon", latlon.x.to_string()),
+            ("mouse lat", latlon.y().to_string()),
+            ("mouse lon", latlon.x().to_string()),
             ("cached tiles", tile_stats.cached_tiles.to_string()),
             ("visible tiles", tile_stats.visible_tiles.to_string()),
             ("loading tiles", tile_stats.loading_tiles.to_string()),

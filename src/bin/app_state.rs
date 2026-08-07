@@ -5,7 +5,7 @@ use osm::config::MAX_TILES;
 use osm::css::RulesCache;
 use osm::feature::collection::FeatureCollection;
 use osm::interaction::collider::{Collider, VisibleTile};
-use osm::math::{Screen, TileId, deg2num, tile_to_world_space};
+use osm::math::{Coord, Geo, Screen, TileId, deg2num, tile_to_world_space};
 use osm::object::Object;
 use std::sync::{Arc, Mutex, RwLock};
 use winit::dpi::PhysicalSize;
@@ -246,7 +246,7 @@ impl AppState {
     }
 
     pub fn set_center(&mut self, center: (f32, f32)) {
-        let tile_coordinate = deg2num(center.0, center.1, self.zoom as u32);
+        let tile_coordinate = deg2num(Coord::<Geo>::new(center.1, center.0), self.zoom as u32);
         self.screen.center = tile_to_world_space(&tile_coordinate);
     }
 

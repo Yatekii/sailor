@@ -9,7 +9,7 @@ use crate::config::CONFIG;
 use clap::Parser;
 use lyon::geom::euclid::{self};
 use nalgebra_glm::vec2;
-use osm::math::{Coord, Pixel, TileId, deg2num, tile_to_world_space};
+use osm::math::{Coord, Geo, Pixel, TileId, deg2num, tile_to_world_space};
 use winit::{
     application::ApplicationHandler,
     dpi::{LogicalSize, PhysicalPosition},
@@ -141,8 +141,10 @@ pub struct Application {
 impl Application {
     async fn new(window: Arc<Window>, args: Args) -> Self {
         let tile_coordinate = deg2num(
-            CONFIG.map.initial.center.latitude,
-            CONFIG.map.initial.center.longitude,
+            Coord::<Geo>::new(
+                CONFIG.map.initial.center.longitude,
+                CONFIG.map.initial.center.latitude,
+            ),
             CONFIG.map.initial.zoom as u32,
         );
         let initial_center = tile_to_world_space(&tile_coordinate);
