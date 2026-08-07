@@ -187,7 +187,7 @@ impl HudUi {
                         ui.label(format!(
                             "Frametime {:.2?} at zoom {:.2}",
                             app_state.stats.get_average(),
-                            app_state.zoom
+                            app_state.screen.zoom
                         ));
 
                         ui.label(format!(

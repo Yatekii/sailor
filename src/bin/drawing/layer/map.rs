@@ -71,8 +71,7 @@ impl MapLayer {
     pub fn new(
         device: &Device,
         queue: &Queue,
-        screen: &Camera,
-        zoom: f32,
+        camera: &Camera,
         feature_collection: Arc<RwLock<FeatureCollection>>,
     ) -> Self {
         let shader_watcher = FileWatcher::watch(&[
@@ -125,7 +124,7 @@ impl MapLayer {
 
         let uniform_buffer = Self::create_uniform_buffer(device);
         let tile_transform_buffer =
-            Self::create_tile_transform_buffer(device, screen, zoom, std::iter::empty());
+            Self::create_tile_transform_buffer(device, camera, std::iter::empty());
         let tile_selection_buffer =
             Self::create_tile_selection_buffer(device, &[NOT_SELECTED; MAX_TILES]);
 
@@ -216,11 +215,12 @@ impl MapLayer {
 
     /// Load the tiles covering the viewport at the given camera, dropping tiles
     /// that scrolled out. Restyles features via the app-owned stylesheet cache.
-    pub fn load_visible(&mut self, screen: &Camera, zoom: f32, css_cache: &mut RulesCache) {
-        let tile_field = screen.get_tile_boundaries_for_zoom_level(zoom, 1);
+    pub fn load_visible(&mut self, camera: &Camera, css_cache: &mut RulesCache) {
+        let zoom = camera.zoom;
+        let tile_field = camera.get_tile_boundaries_for_zoom_level(zoom, 1);
 
         // Remove old bigger tiles which are not in the FOV anymore.
-        let old_tile_field = screen.get_tile_boundaries_for_zoom_level(zoom - 1.0, 2);
+        let old_tile_field = camera.get_tile_boundaries_for_zoom_level(zoom - 1.0, 2);
         for tile_id in &self.visible_tiles.clone() {
             if tile_id.z == (zoom - 1.0) as u32 {
                 if !old_tile_field.contains(tile_id) {
@@ -289,7 +289,8 @@ impl MapLayer {
     }
 
     /// Load a single explicit tile (used by the `--tile` debug override).
-    pub fn load_tile(&mut self, tile_id: TileId, zoom: f32, css_cache: &mut RulesCache) {
+    pub fn load_tile(&mut self, tile_id: TileId, camera: &Camera, css_cache: &mut RulesCache) {
+        let zoom = camera.zoom;
         self.tile_cache.finalize_loaded_tiles();
         if !self.visible_tiles.contains(&tile_id) {
             self.tile_cache.load_tile(
@@ -320,12 +321,11 @@ impl MapLayer {
     /// objects under the point. The map owns the colliders; the app owns the result.
     pub fn update_hovered_objects(
         &self,
-        screen: &Camera,
-        zoom: f32,
+        camera: &Camera,
         point: (f32, f32),
         hovered: Arc<Mutex<Vec<Object>>>,
     ) {
-        let screen = screen.clone();
+        let camera = camera.clone();
         let mut visible_tiles = Vec::with_capacity(MAX_TILES);
         for tile_id in self.visible_tiles.iter() {
             let tile = self.tile_cache.try_get_tile(tile_id).unwrap();
@@ -337,7 +337,7 @@ impl MapLayer {
             });
         }
         osm::platform::spawn(async move {
-            let objects = Collider::get_hovered_objects(&visible_tiles, &screen, zoom, point);
+            let objects = Collider::get_hovered_objects(&visible_tiles, &camera, point);
             let mut hovered = hovered.lock().unwrap();
             *hovered = objects;
         });
@@ -498,8 +498,7 @@ impl MapLayer {
     /// Ensures that the buffer has the size configured in the config, to match the size configured in the shader.
     fn create_tile_transform_buffer(
         device: &Device,
-        screen: &Camera,
-        z: f32,
+        camera: &Camera,
         visible_tiles: impl Iterator<Item = (TileId, f32)>,
     ) -> (Buffer, u64) {
         #[derive(Copy, Clone, Debug, Default)]
@@ -517,7 +516,7 @@ impl MapLayer {
         let mut data = [TileData::default(); MAX_TILES];
 
         for (i, (tile_id, extent)) in visible_tiles.enumerate() {
-            let matrix = screen.tile_to_screen(z, &tile_id);
+            let matrix = camera.tile_to_screen(&tile_id);
             data[i].transform.copy_from_slice(matrix.matrix().as_slice());
             data[i].extent = extent;
         }
@@ -669,14 +668,13 @@ impl MapLayer {
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
-        screen: &Camera,
-        zoom: f32,
+        camera: &Camera,
         selection: Option<Selection>,
         feature_collection: &FeatureCollection,
     ) {
         Self::copy_uniform_buffers(
             encoder,
-            &Self::create_uniform_buffers(device, screen, feature_collection),
+            &Self::create_uniform_buffers(device, camera, feature_collection),
             &self.uniform_buffer,
         );
 
@@ -708,7 +706,7 @@ impl MapLayer {
         }
 
         self.tile_transform_buffer =
-            Self::create_tile_transform_buffer(device, screen, zoom, visible_tile_info.into_iter());
+            Self::create_tile_transform_buffer(device, camera, visible_tile_info.into_iter());
 
         self.tile_selection_buffer =
             Self::create_tile_selection_buffer(device, &selected_object_ids);
@@ -751,7 +749,6 @@ impl Layer for MapLayer {
                 ctx.device,
                 ctx.encoder,
                 ctx.screen,
-                ctx.zoom,
                 ctx.selection,
                 &frame_features,
             );
@@ -777,12 +774,11 @@ impl Layer for MapLayer {
                 let tile = self.tile_cache.get_tile_mut(tile_id);
                 tile.prepare_text(&mut self.font_system);
             }
-            let screen = ctx.screen;
-            let zoom = ctx.zoom;
+            let camera = ctx.screen;
             let tile_cache = &self.tile_cache;
             let text_areas = self.visible_tiles.iter().flat_map(|tile_id| {
                 let tile = tile_cache.get_tile(tile_id);
-                tile.queue_text(screen, zoom)
+                tile.queue_text(camera)
             });
 
             self.text_renderer
@@ -837,7 +833,7 @@ impl Layer for MapLayer {
             let screen_dimensions = vec2(frame.screen.width, frame.screen.height) / 2.0;
 
             for (i, tile_id) in self.visible_tiles.iter().enumerate() {
-                let matrix = frame.screen.tile_to_screen(frame.zoom, tile_id);
+                let matrix = frame.screen.tile_to_screen(tile_id);
                 let start = matrix.apply(corner).coords() + vec2(1.0, 1.0);
                 let s = vec2(
                     (start.x * screen_dimensions.x)
@@ -851,7 +847,7 @@ impl Layer for MapLayer {
                 );
                 let matrix = frame
                     .screen
-                    .tile_to_screen(frame.zoom, &(*tile_id + TileId::new(tile_id.z, 1, 1)));
+                    .tile_to_screen(&(*tile_id + TileId::new(tile_id.z, 1, 1)));
                 let end = matrix.apply(corner).coords() + vec2(1.0, 1.0);
                 let e = vec2(
                     (end.x * screen_dimensions.x)

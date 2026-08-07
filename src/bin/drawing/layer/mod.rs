@@ -139,7 +139,6 @@ pub struct LayerCtx<'a> {
     pub queue: &'a Queue,
     pub encoder: &'a mut CommandEncoder,
     pub screen: &'a Camera,
-    pub zoom: f32,
     pub selection: Option<Selection>,
     /// Physical render-target resolution (width, height).
     pub resolution: (u32, u32),
@@ -156,7 +155,6 @@ pub struct FramePass<'a> {
     pub msaa: Option<&'a TextureView>,
     pub depth_stencil: &'a TextureView,
     pub screen: &'a Camera,
-    pub zoom: f32,
     pub gpu_timing: Option<&'a GpuTiming>,
     pub record_gpu: bool,
     pub spans: &'a mut Spans,

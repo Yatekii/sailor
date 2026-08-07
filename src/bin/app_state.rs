@@ -15,7 +15,6 @@ use crate::stats::Stats;
 pub struct AppState {
     pub css_cache: RulesCache,
     pub screen: Camera,
-    pub zoom: f32,
     pub hovered_objects: Arc<Mutex<Vec<Object>>>,
     selected_objects: Vec<EditableObject>,
     selected_object: usize,
@@ -46,8 +45,8 @@ impl AppState {
                 size.height as f32,
                 CONFIG.renderer.tile_size as f32,
                 hidpi_factor as f32,
+                zoom,
             ),
-            zoom,
             hovered_objects: Arc::new(Mutex::new(Vec::new())),
             selected_objects: Vec::with_capacity(64),
             selected_object: 0,
@@ -115,7 +114,7 @@ impl AppState {
     }
 
     pub fn set_center(&mut self, center: (f32, f32)) {
-        let tile_coordinate = deg2num(Coord::<Geo>::new(center.1, center.0), self.zoom as u32);
+        let tile_coordinate = deg2num(Coord::<Geo>::new(center.1, center.0), self.screen.zoom as u32);
         let p = tile_to_world_space(&tile_coordinate);
         self.screen.center = PointF64::new(p.x as f64, p.y as f64);
     }
@@ -130,6 +129,7 @@ impl AppState {
             self.screen.height,
             self.screen.tile_size(),
             scale_factor,
+            self.screen.zoom,
         );
         self.screen.center = center;
     }

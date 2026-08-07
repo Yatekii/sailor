@@ -19,8 +19,7 @@ impl Collider {
     /// * point: The pointer in logical coordinates (divided by DPI ratio)
     pub fn get_hovered_objects(
         visible_tiles: &[VisibleTile],
-        screen: &Camera,
-        zoom: f32,
+        camera: &Camera,
         point: (f32, f32),
     ) -> Vec<Object> {
         let mut object_ids = Vec::with_capacity(200);
@@ -33,11 +32,11 @@ impl Collider {
             objects,
         } in visible_tiles
         {
-            let inv = screen.tile_to_screen(zoom, tile_id).inverse();
+            let inv = camera.tile_to_screen(tile_id).inverse();
             // The point in GPU coordinates.
             let screen_point = Coord::<Gpu>::new(
-                point.0 / (screen.width / 2f32) - 1.0,
-                point.1 / (screen.height / 2f32) - 1.0,
+                point.0 / (camera.width / 2f32) - 1.0,
+                point.1 / (camera.height / 2f32) - 1.0,
             );
             let global_point = inv.apply(screen_point);
             let tile_point = Vec2::new(global_point.x(), global_point.y()) * *extent;

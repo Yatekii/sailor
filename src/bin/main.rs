@@ -188,7 +188,6 @@ impl Application {
             &painter.device,
             &painter.queue,
             &app_state.screen,
-            app_state.zoom,
             feature_collection,
         );
         let mut overlays = drawing::layer::LayerStack::new();
@@ -271,16 +270,13 @@ impl Application {
             WindowEvent::MouseWheel { delta, .. } => {
                 if !ui_event {
                     let cursor = self.last_position;
-                    let from = self.app_state.zoom;
-                    match delta {
-                        MouseScrollDelta::LineDelta(_, y) => self.app_state.zoom += 0.1 * y,
+                    let to = match delta {
+                        MouseScrollDelta::LineDelta(_, y) => self.app_state.screen.zoom + 0.1 * y,
                         MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => {
-                            self.app_state.zoom += 0.001 * *y as f32
+                            self.app_state.screen.zoom + 0.001 * *y as f32
                         }
-                    }
-                    self.app_state
-                        .screen
-                        .zoom_to_cursor(cursor, from, self.app_state.zoom);
+                    };
+                    self.app_state.screen.zoom_to_cursor(cursor, to);
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
@@ -297,12 +293,11 @@ impl Application {
                 if !ui_event {
                     if self.mouse_down {
                         self.drag_moved = true;
-                        self.app_state.screen.pan(from, to, self.app_state.zoom);
+                        self.app_state.screen.pan(from, to);
                     }
 
                     self.map.update_hovered_objects(
                         &self.app_state.screen,
-                        self.app_state.zoom,
                         (position.x as f32, position.y as f32),
                         self.app_state.hovered_objects.clone(),
                     )
@@ -310,11 +305,8 @@ impl Application {
             }
             WindowEvent::RedrawRequested if !event_loop.exiting() => {
                 if self.args.tile.is_empty() {
-                    self.map.load_visible(
-                        &self.app_state.screen,
-                        self.app_state.zoom,
-                        &mut self.app_state.css_cache,
-                    );
+                    self.map
+                        .load_visible(&self.app_state.screen, &mut self.app_state.css_cache);
                 } else {
                     for tile in &self.args.tile {
                         let coords: Vec<u32> =
@@ -325,7 +317,7 @@ impl Application {
 
                         self.map.load_tile(
                             TileId::new(coords[0], coords[1], coords[2]),
-                            self.app_state.zoom,
+                            &self.app_state.screen,
                             &mut self.app_state.css_cache,
                         );
                     }
@@ -345,7 +337,6 @@ impl Application {
                     &mut self.map,
                     &mut self.overlays,
                     &self.app_state.screen,
-                    self.app_state.zoom,
                     selection,
                     &mut self.app_state.stats,
                 ) {
@@ -367,7 +358,7 @@ impl Application {
                     println!(
                         "Frametime {:.2?} at zoom {:.2}",
                         self.app_state.stats.get_average(),
-                        self.app_state.zoom
+                        self.app_state.screen.zoom
                     );
                 }
             }

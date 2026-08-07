@@ -503,18 +503,17 @@ impl Tile {
 
     pub fn queue_text<'a>(
         &'a self,
-        screen: &'a Camera,
-        z: f32,
+        camera: &'a Camera,
     ) -> impl Iterator<Item = TextArea<'a>> {
-        let matrix = screen.tile_to_screen(z, &self.tile_id());
+        let matrix = camera.tile_to_screen(&self.tile_id());
         self.text
             .iter()
             .zip(self.text_buffers.iter())
             .map(move |(((x, y), _), buffer)| {
                 let position = matrix.apply(math::Coord::<math::TileLocal>::new(*x, *y));
 
-                let left = (position.x() + 1.0) * screen.width / 2.0;
-                let top = (position.y() + 1.0) * screen.height / 2.0;
+                let left = (position.x() + 1.0) * camera.width / 2.0;
+                let top = (position.y() + 1.0) * camera.height / 2.0;
 
                 TextArea {
                     buffer,
@@ -525,7 +524,7 @@ impl Tile {
                         left: left as i32,
                         top: top.floor() as i32,
                         right: left as i32 + 1000,
-                        bottom: top.floor() as i32 + screen.height as i32,
+                        bottom: top.floor() as i32 + camera.height as i32,
                     },
                     default_color: Color::rgb(0, 0, 0),
                     custom_glyphs: &[],

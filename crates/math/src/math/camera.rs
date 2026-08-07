@@ -6,15 +6,24 @@ pub struct Camera {
     pub center: PointF64,
     pub width: f32,
     pub height: f32,
+    pub zoom: f32,
     tile_size: f32,
 }
 
 impl Camera {
-    pub fn new(center: Point, width: f32, height: f32, tile_size: f32, hidpi_factor: f32) -> Self {
+    pub fn new(
+        center: Point,
+        width: f32,
+        height: f32,
+        tile_size: f32,
+        hidpi_factor: f32,
+        zoom: f32,
+    ) -> Self {
         Self {
             center: PointF64::new(center.x as f64, center.y as f64),
             width,
             height,
+            zoom,
             tile_size: tile_size * hidpi_factor,
         }
     }
@@ -23,6 +32,8 @@ impl Camera {
         self.tile_size
     }
 
+    /// Tile field covering the view at zoom level `z` (a level query, so it keeps
+    /// an explicit `z`: callers ask for `zoom` and `zoom - 1` to manage the pyramid).
     pub fn get_tile_boundaries_for_zoom_level(&self, z: f32, scale: u32) -> TileField {
         let z = z.min(14.0);
         // Use the same fractional zoom as `global_to_screen` so the visible extent
@@ -40,7 +51,7 @@ impl Camera {
         TileField::new(top_left, bottom_right + TileId::new(z as u32, 1, 0))
     }
 
-    pub fn tile_to_screen(&self, z: f32, coordinate: &TileId) -> Transform<TileLocal, Gpu> {
+    pub fn tile_to_screen(&self, coordinate: &TileId) -> Transform<TileLocal, Gpu> {
         let scale = 1.0 / 2f32.powi(coordinate.z as i32);
         // Offset the tile from the view center in world space (small numbers)
         // BEFORE applying the large 2^z zoom. Baking -center into the zoomed
@@ -52,8 +63,8 @@ impl Camera {
         // cancels catastrophically (both operands ~0.5) and jitters.
         let rel_x = (coordinate.x as f64 * scale as f64 - self.center.x) as f32;
         let rel_y = (coordinate.y as f64 * scale as f64 - self.center.y) as f32;
-        let zoom_x = 2.0f32.powf(z) / (self.width / 2.0) * self.tile_size();
-        let zoom_y = 2.0f32.powf(z) / (self.height / 2.0) * self.tile_size();
+        let zoom_x = 2.0f32.powf(self.zoom) / (self.width / 2.0) * self.tile_size();
+        let zoom_y = 2.0f32.powf(self.zoom) / (self.height / 2.0) * self.tile_size();
         Transform::from_mat(
             glm::scaling(&glm::vec3(zoom_x, zoom_y, 1.0))
                 * glm::translation(&glm::vec3(rel_x, rel_y, 0.0))
@@ -62,8 +73,8 @@ impl Camera {
     }
 
     /// World -> pixels. Uniform similarity: scale `2^z · tile_size`, translate `-center`.
-    pub fn world_to_screen(&self, z: f32) -> Transform<World, Pixel> {
-        let s = 2.0f32.powf(z) * self.tile_size();
+    pub fn world_to_screen(&self) -> Transform<World, Pixel> {
+        let s = 2.0f32.powf(self.zoom) * self.tile_size();
         Transform::from_mat(
             glm::scaling(&glm::vec3(s, s, 1.0))
                 * glm::translation(&glm::vec3(-self.center.x as f32, -self.center.y as f32, 0.0)),
@@ -79,13 +90,13 @@ impl Camera {
         )))
     }
 
-    pub fn world_to_gpu(&self, z: f32) -> Transform<World, Gpu> {
-        self.world_to_screen(z).then(self.screen_to_gpu())
+    pub fn world_to_gpu(&self) -> Transform<World, Gpu> {
+        self.world_to_screen().then(self.screen_to_gpu())
     }
 
     /// Transforms coordinates from pixel space to world space.
-    pub fn pixel_to_world(&self, z: f32) -> Transform<Pixel, World> {
-        let screen_to_global = glm::inverse(self.world_to_gpu(z).matrix());
+    pub fn pixel_to_world(&self) -> Transform<Pixel, World> {
+        let screen_to_global = glm::inverse(self.world_to_gpu().matrix());
         let translate_screen = glm::translation(&glm::vec3(-1.0, -1.0, 0.0));
         let scale_to_screen = glm::scaling(&glm::vec3(
             1.0 / (self.width / 2.0),
@@ -95,34 +106,36 @@ impl Camera {
         Transform::from_mat(screen_to_global * translate_screen * scale_to_screen)
     }
 
-    pub fn global_to_tile_space(&self, z: f32, coordinate: &TileId) -> Transform<Gpu, TileLocal> {
-        self.tile_to_screen(z, coordinate).inverse()
+    pub fn global_to_tile_space(&self, coordinate: &TileId) -> Transform<Gpu, TileLocal> {
+        self.tile_to_screen(coordinate).inverse()
     }
 
-    /// Pan the view by a pixel-space drag from `from` to `to` at zoom `z`.
+    /// Pan the view by a pixel-space drag from `from` to `to` at the current zoom.
     ///
     /// The world delta is `(to - from) / s`; the `center` term of `pixel_to_world`
     /// cancels analytically, so we compute it directly in f64 instead of
     /// subtracting two absolute world positions (which cancel in f32).
-    pub fn pan(&mut self, from: Coord<Pixel>, to: Coord<Pixel>, z: f32) {
-        let s = 2f64.powf(z as f64) * self.tile_size() as f64;
+    pub fn pan(&mut self, from: Coord<Pixel>, to: Coord<Pixel>) {
+        let s = 2f64.powf(self.zoom as f64) * self.tile_size() as f64;
         self.center.x -= (to.x() as f64 - from.x() as f64) / s;
         self.center.y -= (to.y() as f64 - from.y() as f64) / s;
     }
 
-    /// Recenter so the world point under `cursor` stays fixed as zoom goes `from` -> `to`.
+    /// Recenter so the world point under `cursor` stays fixed as zoom goes from the
+    /// current zoom to `to`, then adopt `to`.
     ///
     /// `before - after` equals `(cursor - screen_center) * (1/s_from - 1/s_to)`;
     /// the shared `center` cancels analytically, so we compute the tiny delta
     /// directly in f64 and accumulate it into the f64 `center`. Doing it via two
     /// absolute world positions cancels in f32 and, together with an f32 center,
     /// snapped the view as you zoomed.
-    pub fn zoom_to_cursor(&mut self, cursor: Coord<Pixel>, from: f32, to: f32) {
-        let s_from = 2f64.powf(from as f64) * self.tile_size() as f64;
+    pub fn zoom_to_cursor(&mut self, cursor: Coord<Pixel>, to: f32) {
+        let s_from = 2f64.powf(self.zoom as f64) * self.tile_size() as f64;
         let s_to = 2f64.powf(to as f64) * self.tile_size() as f64;
         let inv = 1.0 / s_from - 1.0 / s_to;
         self.center.x += (cursor.x() as f64 - self.width as f64 / 2.0) * inv;
         self.center.y += (cursor.y() as f64 - self.height as f64 / 2.0) * inv;
+        self.zoom = to;
     }
 }
 
@@ -143,9 +156,9 @@ mod tests {
         // View centered mid-world so both operands of the subtraction are ~0.5.
         let center = point(0.5187345, 0.5093721);
         let tile = TileId::new(tz, (0.5187 / scale) as u32, (0.5093 / scale) as u32);
-        let screen = Camera::new(center, 2400.0, 1400.0, 384.0, 2.0);
+        let camera = Camera::new(center, 2400.0, 1400.0, 384.0, 2.0, z);
 
-        let m = screen.tile_to_screen(z, &tile);
+        let m = camera.tile_to_screen(&tile);
         // Transform the tile-center vertex.
         let ndc = m.apply(Coord::<TileLocal>::new(0.5, 0.5));
 
@@ -167,23 +180,22 @@ mod tests {
     #[test]
     fn zoom_to_cursor_accumulates_precisely() {
         let cursor = Coord::<Pixel>::new(1700.0, 300.0); // well off-centre
-        let make = || Camera::new(point(0.5187345, 0.5093721), 2400.0, 1400.0, 384.0, 2.0);
+        let make = || Camera::new(point(0.5187345, 0.5093721), 2400.0, 1400.0, 384.0, 2.0, 14.0);
 
         // Many small scroll steps from z14 up to ~z18.
         let mut stepwise = make();
-        let mut z = 14.0f32;
         for _ in 0..2000 {
-            let to = z + 0.002;
-            stepwise.zoom_to_cursor(cursor, z, to);
-            z = to;
+            let to = stepwise.zoom + 0.002;
+            stepwise.zoom_to_cursor(cursor, to);
         }
+        let end_zoom = stepwise.zoom;
 
         // One big step to the exact same end zoom.
         let mut oneshot = make();
-        oneshot.zoom_to_cursor(cursor, 14.0, z);
+        oneshot.zoom_to_cursor(cursor, end_zoom);
 
         // Difference in world space, expressed in pixels at the final zoom.
-        let s = 2f64.powf(z as f64) * oneshot.tile_size() as f64;
+        let s = 2f64.powf(end_zoom as f64) * oneshot.tile_size() as f64;
         let err_px = ((oneshot.center.x - stepwise.center.x).powi(2)
             + (oneshot.center.y - stepwise.center.y).powi(2))
         .sqrt()
@@ -198,8 +210,8 @@ mod tests {
     // world_to_screen is a uniform similarity: same scale on x and y (in pixels).
     #[test]
     fn world_to_screen_is_uniform() {
-        let s = Camera::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0);
-        let t = s.world_to_screen(3.0);
+        let s = Camera::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0, 3.0);
+        let t = s.world_to_screen();
         let o = t.apply(Coord::<World>::new(0.3, 0.7)); // the center -> origin
         let dx = t.apply(Coord::<World>::new(0.4, 0.7));
         let dy = t.apply(Coord::<World>::new(0.3, 0.8));
@@ -211,9 +223,9 @@ mod tests {
     // The split reproduces the old combined world->gpu matrix.
     #[test]
     fn world_to_gpu_equals_split() {
-        let s = Camera::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0);
-        let combined = s.world_to_gpu(3.0);
-        let split = s.world_to_screen(3.0).then(s.screen_to_gpu());
+        let s = Camera::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0, 3.0);
+        let combined = s.world_to_gpu();
+        let split = s.world_to_screen().then(s.screen_to_gpu());
         let p = Coord::<World>::new(0.55, 0.42);
         approx(combined.apply(p).x(), split.apply(p).x());
         approx(combined.apply(p).y(), split.apply(p).y());
@@ -222,9 +234,9 @@ mod tests {
     // pixel -> world -> gpu -> pixel roundtrips.
     #[test]
     fn pixel_world_roundtrip() {
-        let s = Camera::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0);
-        let world = s.pixel_to_world(5.0).apply(Coord::<Pixel>::new(410.0, 295.0));
-        let gpu = s.world_to_gpu(5.0).apply(world);
+        let s = Camera::new(point(0.3, 0.7), 800.0, 600.0, 256.0, 1.0, 5.0);
+        let world = s.pixel_to_world().apply(Coord::<Pixel>::new(410.0, 295.0));
+        let gpu = s.world_to_gpu().apply(world);
         let px = (gpu.x() + 1.0) * s.width / 2.0;
         let py = (gpu.y() + 1.0) * s.height / 2.0;
         approx(px, 410.0);
