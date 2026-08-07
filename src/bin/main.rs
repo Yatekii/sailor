@@ -274,7 +274,6 @@ impl Application {
                 }
             }
             WindowEvent::RedrawRequested if !event_loop.exiting() => {
-                self.painter.update_shader();
                 // self.app_state.load_tile(TileId::new(13, 4290, 2868));
 
                 if self.args.tile.is_empty() {
