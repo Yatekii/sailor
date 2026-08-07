@@ -862,7 +862,11 @@ impl Painter {
         span!("cpu.gpu_upload", {
             for tile_id in &mut app_state.visible_tiles {
                 let tile = app_state.tile_cache.try_get_tile_mut(tile_id).unwrap();
-                tile.load_to_gpu(&self.device);
+                // Mesh is static after tessellation; only upload once. Selection
+                // and pan/zoom go through uniforms, not the vertex buffer.
+                if !tile.is_loaded_to_gpu() {
+                    tile.load_to_gpu(&self.device);
+                }
                 app_state.tile_cache.promote(tile_id);
             }
         });
