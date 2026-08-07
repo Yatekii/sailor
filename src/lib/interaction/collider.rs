@@ -1,5 +1,3 @@
-use nalgebra::Point2 as Point;
-use nalgebra::base::Vector4;
 use parry2d::math::Vec2;
 use std::{
     ops::Deref,
@@ -7,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    math::{Screen, TileId},
+    math::{Coord, Gpu, Screen, TileId},
     object::Object,
 };
 
@@ -35,15 +33,14 @@ impl Collider {
             objects,
         } in visible_tiles
         {
-            let matrix = screen.tile_to_screen(zoom, tile_id);
-            let matrix = nalgebra_glm::inverse(&matrix);
+            let inv = screen.tile_to_screen(zoom, tile_id).inverse();
             // The point in GPU coordinates.
-            let screen_point = Point::new(
+            let screen_point = Coord::<Gpu>::new(
                 point.0 / (screen.width / 2f32) - 1.0,
                 point.1 / (screen.height / 2f32) - 1.0,
             );
-            let global_point = matrix * Vector4::new(screen_point.x, screen_point.y, 0.0, 1.0);
-            let tile_point = Vec2::new(global_point.x, global_point.y) * *extent;
+            let global_point = inv.apply(screen_point);
+            let tile_point = Vec2::new(global_point.x(), global_point.y()) * *extent;
 
             if tile_point.x >= 0.0
                 && tile_point.x <= *extent

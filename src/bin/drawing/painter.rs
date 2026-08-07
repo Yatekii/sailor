@@ -187,7 +187,12 @@ impl Painter {
         self.stencil = Self::create_stencil(&self.device, &self.surface_config);
     }
 
-    pub fn paint(&mut self, hud: &mut super::ui::Hud, app_state: &mut AppState) {
+    /// Renders the layer stack into a fresh surface frame and hands it back so the
+    /// app can composite UI on top, then call `present`. Returns `None` when there
+    /// is nothing to draw yet or the surface is unavailable.
+    ///
+    /// The map is UI-agnostic: the HUD is drawn by the app, not here.
+    pub fn paint(&mut self, app_state: &mut AppState) -> Option<Frame> {
         // Read back last frame's GPU pass timings (non-blocking) and record them.
         if let Some(gt) = self.gpu_timing.as_mut() {
             if let Some(raw) = gt.take(&self.device) {
@@ -206,16 +211,6 @@ impl Painter {
         // so we never copy into a still-mapped buffer.
         let record_gpu = self.gpu_timing.as_ref().is_some_and(|g| !g.pending);
 
-        let mut spans: Spans = Vec::new();
-        macro_rules! span {
-            ($name:expr, $body:expr) => {{
-                let __t = web_time::Instant::now();
-                let __r = $body;
-                spans.push(($name, __t.elapsed()));
-                __r
-            }};
-        }
-
         // Nothing to draw until at least one tile's features have loaded; hold the
         // frame (and the HUD) until then, matching the pre-layer behaviour.
         let has_features = !app_state
@@ -224,17 +219,25 @@ impl Painter {
             .unwrap()
             .features()
             .is_empty();
+        if !has_features {
+            return None;
+        }
 
-        if has_features
-            && let wgpu::CurrentSurfaceTexture::Success(frame)
-            | wgpu::CurrentSurfaceTexture::Suboptimal(frame) = self.surface.get_current_texture()
+        let (wgpu::CurrentSurfaceTexture::Success(surface)
+        | wgpu::CurrentSurfaceTexture::Suboptimal(surface)) =
+            self.surface.get_current_texture()
+        else {
+            return None;
+        };
+
+        let mut spans: Spans = Vec::new();
+        let mut encoder = self
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("tile polygon encoder"),
+            });
+
         {
-            let mut encoder = self
-                .device
-                .create_command_encoder(&CommandEncoderDescriptor {
-                    label: Some("tile polygon encoder"),
-                });
-
             let mut ctx = LayerCtx {
                 device: &self.device,
                 queue: &self.queue,
@@ -245,8 +248,10 @@ impl Painter {
                 time: Default::default(),
             };
             self.stack.update_all(&mut ctx);
+        }
 
-            let view = frame
+        {
+            let view = surface
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
             let msaa = (CONFIG.renderer.msaa_samples > 1).then_some(&self.multisampled_framebuffer);
@@ -262,38 +267,54 @@ impl Painter {
                 spans: &mut spans,
             };
             self.stack.paint_all(&mut frame_pass);
-
-            span!("cpu.hud", {
-                hud.paint(
-                    app_state,
-                    &self.window,
-                    &self.device,
-                    &self.queue,
-                    &mut encoder,
-                    &frame,
-                );
-            });
-
-            if record_gpu {
-                if let Some(gt) = self.gpu_timing.as_ref() {
-                    gt.resolve(&mut encoder);
-                }
-            }
-
-            span!("cpu.submit", {
-                self.staging_belt.finish();
-                self.queue.submit([encoder.finish()]);
-                self.queue.present(frame);
-                if record_gpu {
-                    if let Some(gt) = self.gpu_timing.as_mut() {
-                        gt.map();
-                    }
-                }
-            });
         }
 
-        for (name, dur) in spans {
+        Some(Frame {
+            surface,
+            encoder,
+            record_gpu,
+            spans,
+        })
+    }
+
+    /// Finishes a frame: resolves GPU timings, submits, presents, and records the
+    /// remaining CPU spans. Call after the app has drawn its UI into the frame.
+    pub fn present(&mut self, mut frame: Frame, app_state: &mut AppState) {
+        if frame.record_gpu {
+            if let Some(gt) = self.gpu_timing.as_ref() {
+                gt.resolve(&mut frame.encoder);
+            }
+        }
+
+        let submit = web_time::Instant::now();
+        self.staging_belt.finish();
+        self.queue.submit([frame.encoder.finish()]);
+        self.queue.present(frame.surface);
+        if frame.record_gpu {
+            if let Some(gt) = self.gpu_timing.as_mut() {
+                gt.map();
+            }
+        }
+        frame.spans.push(("cpu.submit", submit.elapsed()));
+
+        for (name, dur) in frame.spans {
             app_state.stats.record(name, dur);
         }
+    }
+}
+
+/// An in-flight surface frame: the layer stack has been recorded into `encoder`;
+/// the app draws UI into it, then hands it to `Painter::present`.
+pub struct Frame {
+    pub surface: SurfaceTexture,
+    pub encoder: CommandEncoder,
+    record_gpu: bool,
+    spans: Spans,
+}
+
+impl Frame {
+    /// Records a named CPU span (e.g. the app's UI pass) for this frame.
+    pub fn push_span(&mut self, name: &'static str, dur: Duration) {
+        self.spans.push((name, dur));
     }
 }

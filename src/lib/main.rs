@@ -1,5 +1,3 @@
-use nalgebra_glm as glm;
-
 pub mod cache;
 pub mod config;
 pub mod css;

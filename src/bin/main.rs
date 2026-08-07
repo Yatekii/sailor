@@ -8,8 +8,8 @@ use std::sync::Arc;
 use crate::config::CONFIG;
 use clap::Parser;
 use lyon::geom::euclid::{self};
-use nalgebra_glm::{vec2, vec4};
-use osm::math::{TileId, deg2num, tile_to_world_space};
+use nalgebra_glm::vec2;
+use osm::math::{Coord, Pixel, TileId, deg2num, tile_to_world_space};
 use winit::{
     application::ApplicationHandler,
     dpi::{LogicalSize, PhysicalPosition},
@@ -252,12 +252,11 @@ impl Application {
             WindowEvent::CursorMoved { position, .. } => {
                 let logical_position = position.to_logical(self.painter.get_hidpi_factor());
 
-                let screen_to_global = self.app_state.screen.pixel_to_world(self.app_state.zoom);
-                let new_pos =
-                    screen_to_global * vec4(position.x as f32, position.y as f32, 0.0, 0.0);
-                let old_pos = screen_to_global
-                    * vec4(self.last_pos.x as f32, self.last_pos.y as f32, 0.0, 0.0);
-                let delta_new = new_pos - old_pos;
+                let p2w = self.app_state.screen.pixel_to_world(self.app_state.zoom);
+                let new_pos = p2w.apply(Coord::<Pixel>::new(position.x as f32, position.y as f32));
+                let old_pos =
+                    p2w.apply(Coord::<Pixel>::new(self.last_pos.x as f32, self.last_pos.y as f32));
+                let delta_new = new_pos.coords() - old_pos.coords();
 
                 self.last_pos = *position;
 
@@ -291,7 +290,19 @@ impl Application {
                     }
                 }
 
-                self.painter.paint(&mut self.hud, &mut self.app_state);
+                if let Some(mut frame) = self.painter.paint(&mut self.app_state) {
+                    let hud_start = web_time::Instant::now();
+                    self.hud.paint(
+                        &mut self.app_state,
+                        &self.painter.window,
+                        &self.painter.device,
+                        &self.painter.queue,
+                        &mut frame.encoder,
+                        &frame.surface,
+                    );
+                    frame.push_span("cpu.hud", hud_start.elapsed());
+                    self.painter.present(frame, &mut self.app_state);
+                }
 
                 self.app_state.stats.capture_frame();
                 if CONFIG.general.display_framerate {

@@ -2,12 +2,12 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
-use nalgebra_glm::{vec2, vec4};
+use nalgebra_glm::vec2;
 use osm::config::{MAX_FEATURES, MAX_TILES};
 use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
-use osm::math::{Screen, TileId};
+use osm::math::{Coord, Screen, TileId, TileLocal};
 use osm::platform::{FileWatcher, Watcher};
 use wgpu::naga::ShaderStage;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
@@ -371,7 +371,7 @@ impl MapLayer {
 
         for (i, (tile_id, extent)) in visible_tiles.enumerate() {
             let matrix = screen.tile_to_screen(z, &tile_id);
-            data[i].transform.copy_from_slice(matrix.as_slice());
+            data[i].transform.copy_from_slice(matrix.matrix().as_slice());
             data[i].extent = extent;
         }
         (
@@ -684,12 +684,12 @@ impl Layer for MapLayer {
                 multiview_mask: None,
             });
             render_pass.set_bind_group(0, &self.bind_group, &[]);
-            let vec = vec4(0.0, 0.0, 0.0, 1.0);
+            let corner = Coord::<TileLocal>::new(0.0, 0.0);
             let screen_dimensions = vec2(app_state.screen.width, app_state.screen.height) / 2.0;
 
             for (i, tile_id) in app_state.visible_tiles().iter().enumerate() {
                 let matrix = app_state.screen.tile_to_screen(app_state.zoom, tile_id);
-                let start = (matrix * vec).xy() + vec2(1.0, 1.0);
+                let start = matrix.apply(corner).coords() + vec2(1.0, 1.0);
                 let s = vec2(
                     (start.x * screen_dimensions.x)
                         .round()
@@ -703,7 +703,7 @@ impl Layer for MapLayer {
                 let matrix = app_state
                     .screen
                     .tile_to_screen(app_state.zoom, &(*tile_id + TileId::new(tile_id.z, 1, 1)));
-                let end = (matrix * vec).xy() + vec2(1.0, 1.0);
+                let end = matrix.apply(corner).coords() + vec2(1.0, 1.0);
                 let e = vec2(
                     (end.x * screen_dimensions.x)
                         .round()

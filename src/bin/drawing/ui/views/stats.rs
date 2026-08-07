@@ -1,8 +1,7 @@
 use egui::{Frame, Ui};
 use human_bytes::human_bytes;
 use lyon::geom::point;
-use nalgebra_glm::vec4;
-use osm::math::{num2deg, world_to_tile_space};
+use osm::math::{Coord, Pixel, num2deg, world_to_tile_space};
 
 use crate::{app_state::AppState, drawing::ui::widgets::key_value_table::widget_key_value_table};
 
@@ -10,18 +9,12 @@ pub fn view_stats(ui: &mut Ui, app_state: &mut AppState) {
     Frame::default().outer_margin(5.0).show(ui, |ui| {
         let tile_stats = app_state.tile_cache.get_stats(&app_state.visible_tiles);
         let z = app_state.zoom;
-        let screen_to_global = app_state.screen.pixel_to_world(z);
-        // w must be 1.0: this is an absolute position, so the transform's
-        // translation has to apply. With w=0 only the linear part survives and
-        // the lat/lon readout is constant garbage.
-        let p = screen_to_global
-            * vec4(
-                app_state.cursor().x * 2.0,
-                app_state.cursor().y * 2.0,
-                0.0,
-                1.0,
-            );
-        let latlon = num2deg(world_to_tile_space(&point(p.x, p.y), z.floor() as u32));
+        let p2w = app_state.screen.pixel_to_world(z);
+        let p = p2w.apply(Coord::<Pixel>::new(
+            app_state.cursor().x * 2.0,
+            app_state.cursor().y * 2.0,
+        ));
+        let latlon = num2deg(world_to_tile_space(&point(p.x(), p.y()), z.floor() as u32));
         let data = [
             ("mouse x", app_state.cursor().x.to_string()),
             ("mouse y", app_state.cursor().y.to_string()),

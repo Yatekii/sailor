@@ -511,10 +511,10 @@ impl Tile {
             .iter()
             .zip(self.text_buffers.iter())
             .map(move |(((x, y), _), buffer)| {
-                let position = matrix * glm::vec4(*x, *y, 0.0, 1.0);
+                let position = matrix.apply(math::Coord::<math::TileLocal>::new(*x, *y));
 
-                let left = (position.x + 1.0) * screen.width / 2.0;
-                let top = (position.y + 1.0) * screen.height / 2.0;
+                let left = (position.x() + 1.0) * screen.width / 2.0;
+                let top = (position.y() + 1.0) * screen.height / 2.0;
 
                 TextArea {
                     buffer,
