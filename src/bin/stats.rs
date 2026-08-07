@@ -91,3 +91,9 @@ impl Stats {
         &self.series
     }
 }
+
+impl crate::drawing::layer::StatSink for Stats {
+    fn record(&mut self, name: &'static str, dur: Duration) {
+        Stats::record(self, name, dur);
+    }
+}

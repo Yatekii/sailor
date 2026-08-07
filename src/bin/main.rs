@@ -130,6 +130,8 @@ impl ApplicationHandler<UserEvent> for App {
 pub struct Application {
     hud: drawing::ui::Hud,
     painter: drawing::Painter,
+    map: drawing::layer::map::MapLayer,
+    overlays: drawing::layer::LayerStack,
     app_state: app_state::AppState,
     modifiers_state: ModifiersState,
     mouse_down: bool,
@@ -164,20 +166,40 @@ impl Application {
             None => window.inner_size(),
         };
 
+        // The map owns its tile/feature data; the app shares the feature-collection
+        // handle so the UI (layer toggles) can reach it too.
+        let feature_collection = std::sync::Arc::new(std::sync::RwLock::new(
+            osm::feature::collection::FeatureCollection::new(),
+        ));
+
         let app_state = app_state::AppState::new(
             CONFIG.renderer.css.clone(),
             initial_center,
             size,
             CONFIG.map.initial.zoom,
             2.0,
+            feature_collection.clone(),
         );
 
-        let painter = drawing::Painter::init(window, size, &app_state).await;
+        let painter = drawing::Painter::init(window, size).await;
         let hud = drawing::ui::Hud::new(&painter.window, &painter.device, &painter.surface_config);
+
+        let map = drawing::layer::map::MapLayer::new(
+            &painter.device,
+            &painter.queue,
+            &app_state.screen,
+            app_state.zoom,
+            feature_collection,
+        );
+        let mut overlays = drawing::layer::LayerStack::new();
+        overlays.push(Box::new(drawing::layer::wind::WindLayer::default()));
+        overlays.push(Box::new(drawing::layer::temperature::TemperatureLayer::default()));
 
         Self {
             hud,
             painter,
+            map,
+            overlays,
             app_state,
             modifiers_state: ModifiersState::default(),
             mouse_down: false,
@@ -278,15 +300,21 @@ impl Application {
                         self.app_state.screen.pan(from, to, self.app_state.zoom);
                     }
 
-                    self.app_state
-                        .update_hovered_objects((position.x as f32, position.y as f32))
+                    self.map.update_hovered_objects(
+                        &self.app_state.screen,
+                        self.app_state.zoom,
+                        (position.x as f32, position.y as f32),
+                        self.app_state.hovered_objects.clone(),
+                    )
                 }
             }
             WindowEvent::RedrawRequested if !event_loop.exiting() => {
-                // self.app_state.load_tile(TileId::new(13, 4290, 2868));
-
                 if self.args.tile.is_empty() {
-                    self.app_state.load_tiles();
+                    self.map.load_visible(
+                        &self.app_state.screen,
+                        self.app_state.zoom,
+                        &mut self.app_state.css_cache,
+                    );
                 } else {
                     for tile in &self.args.tile {
                         let coords: Vec<u32> =
@@ -295,12 +323,32 @@ impl Application {
                             continue;
                         }
 
-                        self.app_state
-                            .load_tile(TileId::new(coords[0], coords[1], coords[2]));
+                        self.map.load_tile(
+                            TileId::new(coords[0], coords[1], coords[2]),
+                            self.app_state.zoom,
+                            &mut self.app_state.css_cache,
+                        );
                     }
                 }
 
-                if let Some(mut frame) = self.painter.paint(&mut self.app_state) {
+                self.app_state.tile_stats = self.map.tile_stats();
+
+                let selection = self.app_state.selected_object().map(|s| {
+                    drawing::layer::Selection {
+                        tile_id: s.tile_id,
+                        feature_id: s.object.feature_id,
+                        feature_slot: s.object.feature_slot,
+                    }
+                });
+
+                if let Some(mut frame) = self.painter.paint(
+                    &mut self.map,
+                    &mut self.overlays,
+                    &self.app_state.screen,
+                    self.app_state.zoom,
+                    selection,
+                    &mut self.app_state.stats,
+                ) {
                     let hud_start = web_time::Instant::now();
                     self.hud.paint(
                         &mut self.app_state,
@@ -311,7 +359,7 @@ impl Application {
                         &frame.surface,
                     );
                     frame.push_span("cpu.hud", hud_start.elapsed());
-                    self.painter.present(frame, &mut self.app_state);
+                    self.painter.present(frame, &mut self.app_state.stats);
                 }
 
                 self.app_state.stats.capture_frame();

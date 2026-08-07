@@ -1,20 +1,23 @@
 use std::num::NonZeroU64;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, RwLock};
 
 use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
 use nalgebra_glm::vec2;
+use osm::cache::{CacheStats, TileCache};
 use osm::config::{MAX_FEATURES, MAX_TILES};
+use osm::css::RulesCache;
 use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
+use osm::interaction::collider::{Collider, VisibleTile};
 use osm::math::{Coord, Screen, TileId, TileLocal};
+use osm::object::Object;
 use osm::platform::{FileWatcher, Watcher};
 use wgpu::naga::ShaderStage;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
 
-use super::{FramePass, Layer, LayerCtx};
-use crate::app_state::AppState;
+use super::{FramePass, Layer, LayerCtx, Selection};
 use crate::config::CONFIG;
 use crate::drawing::helpers::load_glsl;
 
@@ -54,13 +57,24 @@ pub struct MapLayer {
     atlas: TextAtlas,
     text_renderer: TextRenderer,
 
-    /// Feature styles for the current frame, snapshotted in `update`, drawn in `paint`.
-    feature_collection: FeatureCollection,
+    /// The map owns its data: the tile cache, the shared feature/style collection
+    /// (a handle the app's UI also holds), and the current visible tile set.
+    tile_cache: TileCache,
+    feature_collection: Arc<RwLock<FeatureCollection>>,
+    visible_tiles: Vec<TileId>,
+    /// Feature styles snapshot for the current frame, taken in `update`, drawn in `paint`.
+    frame_features: FeatureCollection,
     visible: bool,
 }
 
 impl MapLayer {
-    pub fn new(device: &Device, queue: &Queue, app_state: &AppState) -> Self {
+    pub fn new(
+        device: &Device,
+        queue: &Queue,
+        screen: &Screen,
+        zoom: f32,
+        feature_collection: Arc<RwLock<FeatureCollection>>,
+    ) -> Self {
         let shader_watcher = FileWatcher::watch(&[
             &CONFIG.renderer.vertex_shader,
             &CONFIG.renderer.fragment_shader,
@@ -110,12 +124,8 @@ impl MapLayer {
         });
 
         let uniform_buffer = Self::create_uniform_buffer(device);
-        let tile_transform_buffer = Self::create_tile_transform_buffer(
-            device,
-            &app_state.screen,
-            app_state.zoom,
-            std::iter::empty(),
-        );
+        let tile_transform_buffer =
+            Self::create_tile_transform_buffer(device, screen, zoom, std::iter::empty());
         let tile_selection_buffer =
             Self::create_tile_selection_buffer(device, &[NOT_SELECTED; MAX_TILES]);
 
@@ -191,9 +201,146 @@ impl MapLayer {
             viewport,
             atlas,
             text_renderer,
-            feature_collection: FeatureCollection::new(),
+            tile_cache: TileCache::new(CONFIG.general.data_root.clone()),
+            feature_collection,
+            visible_tiles: Vec::new(),
+            frame_features: FeatureCollection::new(),
             visible: true,
         }
+    }
+
+    /// Tile cache stats for the current visible set (for the debug stats view).
+    pub fn tile_stats(&self) -> CacheStats {
+        self.tile_cache.get_stats(&self.visible_tiles)
+    }
+
+    /// Load the tiles covering the viewport at the given camera, dropping tiles
+    /// that scrolled out. Restyles features via the app-owned stylesheet cache.
+    pub fn load_visible(&mut self, screen: &Screen, zoom: f32, css_cache: &mut RulesCache) {
+        let tile_field = screen.get_tile_boundaries_for_zoom_level(zoom, 1);
+
+        // Remove old bigger tiles which are not in the FOV anymore.
+        let old_tile_field = screen.get_tile_boundaries_for_zoom_level(zoom - 1.0, 2);
+        for tile_id in &self.visible_tiles.clone() {
+            if tile_id.z == (zoom - 1.0) as u32 {
+                if !old_tile_field.contains(tile_id) {
+                    self.remove_visible_tile(tile_id);
+                }
+            } else if !tile_field.contains(tile_id) {
+                self.remove_visible_tile(tile_id);
+            }
+        }
+
+        self.tile_cache.finalize_loaded_tiles();
+        for tile_id in tile_field.iter() {
+            if !self.visible_tiles.contains(&tile_id) {
+                self.tile_cache.load_tile(
+                    &tile_id,
+                    self.feature_collection.clone(),
+                    &CONFIG.renderer.selection_tags.clone(),
+                );
+
+                if let Some(tile) = self.tile_cache.try_get_tile_mut(&tile_id) {
+                    tile.load_collider();
+
+                    self.visible_tiles.push(tile_id);
+
+                    // Remove old bigger tile when all 4 smaller tiles are loaded.
+                    let mut count = 0;
+                    let num_x = (tile_id.x / 2) * 2;
+                    let num_y = (tile_id.y / 2) * 2;
+                    for tile_id in &[
+                        TileId::new(tile_id.z, num_x, num_y),
+                        TileId::new(tile_id.z, num_x + 1, num_y),
+                        TileId::new(tile_id.z, num_x + 1, num_y + 1),
+                        TileId::new(tile_id.z, num_x, num_y + 1),
+                    ] {
+                        if !tile_field.contains(tile_id) {
+                            count += 1;
+                            continue;
+                        }
+                        if self.visible_tiles.contains(tile_id) {
+                            count += 1;
+                        }
+                    }
+                    if count == 4 {
+                        let tile_id = TileId::new(tile_id.z - 1, num_x / 2, num_y / 2);
+                        self.remove_visible_tile(&tile_id);
+                    }
+
+                    // Remove old smaller tiles when all 4 smaller tiles are loaded.
+                    for tile_id in &[
+                        TileId::new(tile_id.z + 1, tile_id.x * 2, tile_id.y * 2),
+                        TileId::new(tile_id.z + 1, tile_id.x * 2 + 1, tile_id.y * 2),
+                        TileId::new(tile_id.z + 1, tile_id.x * 2 + 1, tile_id.y * 2 + 1),
+                        TileId::new(tile_id.z + 1, tile_id.x * 2, tile_id.y * 2 + 1),
+                    ] {
+                        self.remove_visible_tile(tile_id);
+                    }
+                } else {
+                    log::trace!("Could not read tile {tile_id} from cache.");
+                }
+            }
+        }
+
+        if let Ok(mut feature_collection) = self.feature_collection.try_write() {
+            feature_collection.load_styles(zoom, css_cache);
+        }
+    }
+
+    /// Load a single explicit tile (used by the `--tile` debug override).
+    pub fn load_tile(&mut self, tile_id: TileId, zoom: f32, css_cache: &mut RulesCache) {
+        self.tile_cache.finalize_loaded_tiles();
+        if !self.visible_tiles.contains(&tile_id) {
+            self.tile_cache.load_tile(
+                &tile_id,
+                self.feature_collection.clone(),
+                &CONFIG.renderer.selection_tags.clone(),
+            );
+
+            if let Some(tile) = self.tile_cache.try_get_tile_mut(&tile_id) {
+                tile.load_collider();
+                self.visible_tiles.push(tile_id);
+            }
+        }
+
+        if let Ok(mut feature_collection) = self.feature_collection.try_write() {
+            feature_collection.load_styles(zoom, css_cache);
+        }
+    }
+
+    #[track_caller]
+    fn remove_visible_tile(&mut self, tile_id: &TileId) {
+        if let Some(index) = self.visible_tiles.iter().position(|x| x == tile_id) {
+            self.visible_tiles.swap_remove(index);
+        }
+    }
+
+    /// Kick off async hit-testing for the cursor, filling `hovered` with the
+    /// objects under the point. The map owns the colliders; the app owns the result.
+    pub fn update_hovered_objects(
+        &self,
+        screen: &Screen,
+        zoom: f32,
+        point: (f32, f32),
+        hovered: Arc<Mutex<Vec<Object>>>,
+    ) {
+        let screen = screen.clone();
+        let mut visible_tiles = Vec::with_capacity(MAX_TILES);
+        for tile_id in self.visible_tiles.iter() {
+            let tile = self.tile_cache.try_get_tile(tile_id).unwrap();
+            visible_tiles.push(VisibleTile {
+                tile_id: *tile_id,
+                extent: tile.extent() as f32,
+                collider: tile.collider(),
+                objects: tile.objects(),
+            });
+        }
+        osm::platform::spawn(async move {
+            let objects = Collider::get_hovered_objects(&visible_tiles, &screen, zoom, point);
+            let mut hovered = hovered.lock().unwrap();
+            *hovered = objects;
+        });
     }
 
     fn create_render_pipeline(
@@ -522,18 +669,20 @@ impl MapLayer {
         &mut self,
         device: &Device,
         encoder: &mut CommandEncoder,
-        app_state: &mut AppState,
+        screen: &Screen,
+        zoom: f32,
+        selection: Option<Selection>,
         feature_collection: &FeatureCollection,
     ) {
         Self::copy_uniform_buffers(
             encoder,
-            &Self::create_uniform_buffers(device, &app_state.screen, feature_collection),
+            &Self::create_uniform_buffers(device, screen, feature_collection),
             &self.uniform_buffer,
         );
 
         let mut visible_tile_info = Vec::with_capacity(MAX_TILES);
-        for tile_id in app_state.visible_tiles().to_vec() {
-            let tile = app_state.tile_cache.get_tile(&tile_id);
+        for tile_id in self.visible_tiles.clone() {
+            let tile = self.tile_cache.get_tile(&tile_id);
             visible_tile_info.push((tile_id, tile.extent() as f32));
         }
 
@@ -541,15 +690,14 @@ impl MapLayer {
         // that tile. For the selected feature we translate its stable id into each
         // tile's own local slot, so a feature spanning tiles lights up in all of them.
         let mut selected_object_ids = [NOT_SELECTED; MAX_TILES];
-        if let Some(selected) = app_state.selected_object() {
-            let feature_id = selected.object.feature_id;
+        if let Some(selected) = selection {
             for (i, (id, _)) in visible_tile_info.iter().enumerate() {
                 let slot = if *id == selected.tile_id {
                     // Same tile as the click: use the object's slot directly (also
                     // covers features without a stable id, which can't cross tiles).
-                    Some(selected.object.feature_slot)
-                } else if feature_id != 0 {
-                    app_state.tile_cache.get_tile(id).feature_slot(feature_id)
+                    Some(selected.feature_slot)
+                } else if selected.feature_id != 0 {
+                    self.tile_cache.get_tile(id).feature_slot(selected.feature_id)
                 } else {
                     None
                 };
@@ -559,12 +707,8 @@ impl MapLayer {
             }
         }
 
-        self.tile_transform_buffer = Self::create_tile_transform_buffer(
-            device,
-            &app_state.screen,
-            app_state.zoom,
-            visible_tile_info.into_iter(),
-        );
+        self.tile_transform_buffer =
+            Self::create_tile_transform_buffer(device, screen, zoom, visible_tile_info.into_iter());
 
         self.tile_selection_buffer =
             Self::create_tile_selection_buffer(device, &selected_object_ids);
@@ -583,27 +727,34 @@ impl Layer for MapLayer {
     fn update(&mut self, ctx: &mut LayerCtx) {
         self.reload_shader_if_changed(ctx.device);
 
-        self.feature_collection = span!(
+        self.frame_features = span!(
             ctx.spans,
             "cpu.fc_clone",
-            ctx.app_state.feature_collection().read().unwrap().clone()
+            self.feature_collection.read().unwrap().clone()
         );
 
         span!(ctx.spans, "cpu.gpu_upload", {
-            for tile_id in &mut ctx.app_state.visible_tiles {
-                let tile = ctx.app_state.tile_cache.try_get_tile_mut(tile_id).unwrap();
+            for tile_id in &self.visible_tiles {
+                let tile = self.tile_cache.try_get_tile_mut(tile_id).unwrap();
                 // Mesh is static after tessellation; only upload once. Selection
                 // and pan/zoom go through uniforms, not the vertex buffer.
                 if !tile.is_loaded_to_gpu() {
                     tile.load_to_gpu(ctx.device);
                 }
-                ctx.app_state.tile_cache.promote(tile_id);
+                self.tile_cache.promote(tile_id);
             }
         });
 
-        let feature_collection = self.feature_collection.clone();
+        let frame_features = self.frame_features.clone();
         span!(ctx.spans, "cpu.uniforms", {
-            self.update_uniforms(ctx.device, ctx.encoder, ctx.app_state, &feature_collection);
+            self.update_uniforms(
+                ctx.device,
+                ctx.encoder,
+                ctx.screen,
+                ctx.zoom,
+                ctx.selection,
+                &frame_features,
+            );
             self.bind_group = Self::create_blend_bind_group(
                 ctx.device,
                 &self.bind_group_layout,
@@ -622,15 +773,15 @@ impl Layer for MapLayer {
                 },
             );
 
-            let app_state = &mut *ctx.app_state;
-            for tile_id in &app_state.visible_tiles {
-                let tile = app_state.tile_cache.get_tile_mut(tile_id);
+            for tile_id in &self.visible_tiles {
+                let tile = self.tile_cache.get_tile_mut(tile_id);
                 tile.prepare_text(&mut self.font_system);
             }
-            let screen = &app_state.screen;
-            let zoom = app_state.zoom;
-            let text_areas = app_state.visible_tiles.iter().flat_map(|tile_id| {
-                let tile = app_state.tile_cache.get_tile(tile_id);
+            let screen = ctx.screen;
+            let zoom = ctx.zoom;
+            let tile_cache = &self.tile_cache;
+            let text_areas = self.visible_tiles.iter().flat_map(|tile_id| {
+                let tile = tile_cache.get_tile(tile_id);
                 tile.queue_text(screen, zoom)
             });
 
@@ -649,8 +800,6 @@ impl Layer for MapLayer {
     }
 
     fn paint(&self, frame: &mut FramePass) {
-        let app_state = frame.app_state;
-
         span!(frame.spans, "cpu.encode_polygons", {
             let poly_ts = if frame.record_gpu {
                 frame.gpu_timing.map(|g| g.writes(0, 1))
@@ -685,10 +834,10 @@ impl Layer for MapLayer {
             });
             render_pass.set_bind_group(0, &self.bind_group, &[]);
             let corner = Coord::<TileLocal>::new(0.0, 0.0);
-            let screen_dimensions = vec2(app_state.screen.width, app_state.screen.height) / 2.0;
+            let screen_dimensions = vec2(frame.screen.width, frame.screen.height) / 2.0;
 
-            for (i, tile_id) in app_state.visible_tiles().iter().enumerate() {
-                let matrix = app_state.screen.tile_to_screen(app_state.zoom, tile_id);
+            for (i, tile_id) in self.visible_tiles.iter().enumerate() {
+                let matrix = frame.screen.tile_to_screen(frame.zoom, tile_id);
                 let start = matrix.apply(corner).coords() + vec2(1.0, 1.0);
                 let s = vec2(
                     (start.x * screen_dimensions.x)
@@ -700,9 +849,9 @@ impl Layer for MapLayer {
                         .max(0.0)
                         .min(screen_dimensions.y * 2.0),
                 );
-                let matrix = app_state
+                let matrix = frame
                     .screen
-                    .tile_to_screen(app_state.zoom, &(*tile_id + TileId::new(tile_id.z, 1, 1)));
+                    .tile_to_screen(frame.zoom, &(*tile_id + TileId::new(tile_id.z, 1, 1)));
                 let end = matrix.apply(corner).coords() + vec2(1.0, 1.0);
                 let e = vec2(
                     (end.x * screen_dimensions.x)
@@ -721,13 +870,13 @@ impl Layer for MapLayer {
                     render_pass.set_scissor_rect(s.x as u32, s.y as u32, width, height);
                 }
 
-                let tile = app_state.tile_cache.try_get_tile(tile_id).unwrap();
+                let tile = self.tile_cache.try_get_tile(tile_id).unwrap();
                 let gpu_tile = tile.gpu_tile();
                 tile.paint(
                     &mut render_pass,
                     &self.blend_pipeline,
                     gpu_tile,
-                    &self.feature_collection,
+                    &self.frame_features,
                     i as u32,
                 );
             }

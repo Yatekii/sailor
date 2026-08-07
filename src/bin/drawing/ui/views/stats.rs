@@ -7,7 +7,7 @@ use crate::{app_state::AppState, drawing::ui::widgets::key_value_table::widget_k
 
 pub fn view_stats(ui: &mut Ui, app_state: &mut AppState) {
     Frame::default().outer_margin(5.0).show(ui, |ui| {
-        let tile_stats = app_state.tile_cache.get_stats(&app_state.visible_tiles);
+        let tile_stats = &app_state.tile_stats;
         let z = app_state.zoom;
         let p2w = app_state.screen.pixel_to_world(z);
         let p = p2w.apply(Coord::<Pixel>::new(

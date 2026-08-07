@@ -7,7 +7,7 @@ use wgpu::{
     QuerySetDescriptor, QueryType, Queue, RenderPassTimestampWrites, TextureView,
 };
 
-use crate::app_state::AppState;
+use osm::math::{Screen, TileId};
 
 pub mod map;
 pub mod temperature;
@@ -108,24 +108,39 @@ impl GpuTiming {
     }
 }
 
-/// Named CPU-timing spans a layer records during a frame; drained into stats by
-/// the painter (which holds `&mut AppState`).
+/// Named CPU-timing spans a layer records during a frame; drained into a
+/// `StatSink` by the painter at end of frame.
 pub type Spans = Vec<(&'static str, Duration)>;
+
+/// Where per-frame timing spans are recorded. Implemented by the app's stats
+/// store, so the render code stays free of any app type.
+pub trait StatSink {
+    fn record(&mut self, name: &'static str, dur: Duration);
+}
 
 /// Forecast time selector for time-varying layers. Empty until weather layers land;
 /// present now so the Layer contract doesn't churn later.
 #[derive(Clone, Copy, Default)]
 pub struct ForecastTime;
 
-/// Shared inputs a layer needs to prepare its GPU resources for the frame.
-///
-/// Carries `&mut AppState` and the frame encoder for now; both narrow at the
-/// crate split (render must not depend on the bin's `AppState`).
+/// The currently selected feature, for highlight. App-agnostic value the app
+/// hands to the map each frame.
+#[derive(Clone, Copy)]
+pub struct Selection {
+    pub tile_id: TileId,
+    pub feature_id: u64,
+    pub feature_slot: u32,
+}
+
+/// Shared, app-agnostic inputs a layer needs to prepare its GPU resources for
+/// the frame. No app or map-data types leak in here.
 pub struct LayerCtx<'a> {
     pub device: &'a Device,
     pub queue: &'a Queue,
     pub encoder: &'a mut CommandEncoder,
-    pub app_state: &'a mut AppState,
+    pub screen: &'a Screen,
+    pub zoom: f32,
+    pub selection: Option<Selection>,
     /// Physical render-target resolution (width, height).
     pub resolution: (u32, u32),
     pub spans: &'a mut Spans,
@@ -140,7 +155,8 @@ pub struct FramePass<'a> {
     /// Multisample color target, when MSAA is on.
     pub msaa: Option<&'a TextureView>,
     pub depth_stencil: &'a TextureView,
-    pub app_state: &'a AppState,
+    pub screen: &'a Screen,
+    pub zoom: f32,
     pub gpu_timing: Option<&'a GpuTiming>,
     pub record_gpu: bool,
     pub spans: &'a mut Spans,

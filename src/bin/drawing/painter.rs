@@ -6,11 +6,9 @@ use wgpu::*;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
-use super::layer::map::MapLayer;
-use super::layer::temperature::TemperatureLayer;
-use super::layer::wind::WindLayer;
-use super::layer::{FramePass, GpuTiming, LayerCtx, LayerStack, Spans};
-use crate::app_state::AppState;
+use osm::math::Screen;
+
+use super::layer::{FramePass, GpuTiming, Layer, LayerCtx, LayerStack, Selection, Spans, StatSink};
 use crate::config::CONFIG;
 
 pub struct Painter {
@@ -24,12 +22,11 @@ pub struct Painter {
     multisampled_framebuffer: TextureView,
     stencil: TextureView,
     gpu_timing: Option<GpuTiming>,
-    stack: LayerStack,
 }
 
 impl Painter {
     /// Initializes the entire draw machinery.
-    pub async fn init(window: Arc<Window>, size: PhysicalSize<u32>, app_state: &AppState) -> Self {
+    pub async fn init(window: Arc<Window>, size: PhysicalSize<u32>) -> Self {
         let factor = window.scale_factor();
 
         let instance =
@@ -107,11 +104,6 @@ impl Painter {
         let gpu_timing =
             timestamps_supported.then(|| GpuTiming::new(&device, queue.get_timestamp_period()));
 
-        let mut stack = LayerStack::new();
-        stack.push(Box::new(MapLayer::new(&device, &queue, app_state)));
-        stack.push(Box::new(WindLayer::default()));
-        stack.push(Box::new(TemperatureLayer::default()));
-
         Self {
             window,
             hidpi_factor: factor,
@@ -123,7 +115,6 @@ impl Painter {
             multisampled_framebuffer,
             stencil,
             gpu_timing,
-            stack,
         }
     }
 
@@ -191,41 +182,34 @@ impl Painter {
         self.stencil = Self::create_stencil(&self.device, &self.surface_config);
     }
 
-    /// Renders the layer stack into a fresh surface frame and hands it back so the
-    /// app can composite UI on top, then call `present`. Returns `None` when there
-    /// is nothing to draw yet or the surface is unavailable.
+    /// Renders the map plus overlay layers into a fresh surface frame and hands it
+    /// back so the app can composite UI on top, then call `present`. Returns `None`
+    /// when the surface is unavailable.
     ///
-    /// The map is UI-agnostic: the HUD is drawn by the app, not here.
-    pub fn paint(&mut self, app_state: &mut AppState) -> Option<Frame> {
+    /// UI-agnostic: no app or map-data types here — the app owns the layers and the
+    /// HUD, and passes only the camera, selection, and a stat sink.
+    pub fn paint(
+        &mut self,
+        map: &mut dyn Layer,
+        overlays: &mut LayerStack,
+        screen: &Screen,
+        zoom: f32,
+        selection: Option<Selection>,
+        stats: &mut dyn StatSink,
+    ) -> Option<Frame> {
         // Read back last frame's GPU pass timings (non-blocking) and record them.
         if let Some(gt) = self.gpu_timing.as_mut() {
             if let Some(raw) = gt.take(&self.device) {
                 let p = gt.period;
                 let poly = (raw[1].saturating_sub(raw[0])) as f32 * p;
                 let text = (raw[3].saturating_sub(raw[2])) as f32 * p;
-                app_state
-                    .stats
-                    .record("gpu.polygon_pass", Duration::from_nanos(poly as u64));
-                app_state
-                    .stats
-                    .record("gpu.text_pass", Duration::from_nanos(text as u64));
+                stats.record("gpu.polygon_pass", Duration::from_nanos(poly as u64));
+                stats.record("gpu.text_pass", Duration::from_nanos(text as u64));
             }
         }
         // Only instrument the GPU this frame if last frame's readback is done,
         // so we never copy into a still-mapped buffer.
         let record_gpu = self.gpu_timing.as_ref().is_some_and(|g| !g.pending);
-
-        // Nothing to draw until at least one tile's features have loaded; hold the
-        // frame (and the HUD) until then, matching the pre-layer behaviour.
-        let has_features = !app_state
-            .feature_collection()
-            .read()
-            .unwrap()
-            .features()
-            .is_empty();
-        if !has_features {
-            return None;
-        }
 
         let (wgpu::CurrentSurfaceTexture::Success(surface)
         | wgpu::CurrentSurfaceTexture::Suboptimal(surface)) =
@@ -246,12 +230,15 @@ impl Painter {
                 device: &self.device,
                 queue: &self.queue,
                 encoder: &mut encoder,
-                app_state: &mut *app_state,
+                screen,
+                zoom,
+                selection,
                 resolution: (self.surface_config.width, self.surface_config.height),
                 spans: &mut spans,
                 time: Default::default(),
             };
-            self.stack.update_all(&mut ctx);
+            map.update(&mut ctx);
+            overlays.update_all(&mut ctx);
         }
 
         {
@@ -265,12 +252,14 @@ impl Painter {
                 view: &view,
                 msaa,
                 depth_stencil: &self.stencil,
-                app_state: &*app_state,
+                screen,
+                zoom,
                 gpu_timing: self.gpu_timing.as_ref(),
                 record_gpu,
                 spans: &mut spans,
             };
-            self.stack.paint_all(&mut frame_pass);
+            map.paint(&mut frame_pass);
+            overlays.paint_all(&mut frame_pass);
         }
 
         Some(Frame {
@@ -283,7 +272,7 @@ impl Painter {
 
     /// Finishes a frame: resolves GPU timings, submits, presents, and records the
     /// remaining CPU spans. Call after the app has drawn its UI into the frame.
-    pub fn present(&mut self, mut frame: Frame, app_state: &mut AppState) {
+    pub fn present(&mut self, mut frame: Frame, stats: &mut dyn StatSink) {
         if frame.record_gpu {
             if let Some(gt) = self.gpu_timing.as_ref() {
                 gt.resolve(&mut frame.encoder);
@@ -302,7 +291,7 @@ impl Painter {
         frame.spans.push(("cpu.submit", submit.elapsed()));
 
         for (name, dur) in frame.spans {
-            app_state.stats.record(name, dur);
+            stats.record(name, dur);
         }
     }
 }

@@ -12,7 +12,7 @@ use crate::vector_tile::tile::{Tile, TileStats};
 
 const MAX_CACHE_ENTRIES: NonZeroUsize = NonZeroUsize::new(20).unwrap();
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[allow(dead_code)]
 pub struct CacheStats {
     pub cached_tiles: usize,
