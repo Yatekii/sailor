@@ -5,7 +5,7 @@ pub mod vector_tile;
 use core::ops::Range;
 use lyon::{
     math::*,
-    path::Path,
+    path::{Path, PathEvent},
     tessellation::{FillOptions, FillTessellator},
 };
 use varint::ZigZag;
@@ -163,6 +163,60 @@ pub fn paths_to_drawable(
             tesselate_line2(path, builder, extent);
         }
     }
+}
+
+/// Strokes the boundary of each polygon ring into a thin band, used as the
+/// outline geometry instead of inflating the whole fill. The band carries
+/// per-vertex normals like a line, so the shader offsets it by `border_width`
+/// at draw time (dynamic width). It is tagged `Polygon` so the shader's
+/// line-width path is skipped and only the outline offset applies.
+pub fn paths_to_outline(builder: &mut MeshBuilder, paths: &[Path], extent: f32) {
+    builder.set_current_vertex_type(VertexType::Polygon);
+    builder.set_current_extent(extent);
+
+    for path in paths {
+        for ring in rings_of(path) {
+            if ring.len() < 2 {
+                continue;
+            }
+
+            // Close the loop and carry one extra segment past the seam so the
+            // join at the ring's start/end is filled. Any self-overlap there is
+            // masked by the per-feature stencil, so transparent outlines stay
+            // single-blended.
+            let mut ring_path = Path::builder();
+            ring_path.begin(ring[0]);
+            for p in &ring[1..] {
+                ring_path.line_to(*p);
+            }
+            ring_path.line_to(ring[0]);
+            ring_path.line_to(ring[1]);
+            ring_path.end(false);
+
+            tesselate_line2(&ring_path.build(), builder, extent);
+        }
+    }
+}
+
+/// Splits a path into its rings (sub-paths) as point loops.
+fn rings_of(path: &Path) -> Vec<Vec<Point>> {
+    let mut rings = Vec::new();
+    let mut current: Vec<Point> = Vec::new();
+
+    for event in path.iter() {
+        match event {
+            PathEvent::Begin { at } => current = vec![at],
+            PathEvent::Line { to, .. } => current.push(to),
+            PathEvent::End { .. } => {
+                if current.len() >= 2 {
+                    rings.push(std::mem::take(&mut current));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    rings
 }
 
 // TODO: Very buggy!

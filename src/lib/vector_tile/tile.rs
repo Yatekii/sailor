@@ -28,7 +28,7 @@ use self::{
     object::Object,
 };
 
-use super::{geometry_commands_to_paths, paths_to_drawable};
+use super::{geometry_commands_to_paths, paths_to_drawable, paths_to_outline};
 
 #[derive(Clone, Copy, Debug)]
 pub struct TileStats {
@@ -82,7 +82,8 @@ pub struct Tile {
     mesh: VertexBuffers<Vertex, u32>,
     extent: u16,
     objects: Arc<RwLock<Vec<Object>>>,
-    features: Vec<(u32, Range<u32>)>,
+    // Per feature: (feature id, fill index range, outline band index range).
+    features: Vec<(u32, Range<u32>, Range<u32>)>,
     // Maps a stable feature id (OSM id) to its dense per-tile slot, so a selected
     // feature can be highlighted in every tile it spans.
     feature_slots: HashMap<u64, u32>,
@@ -141,7 +142,7 @@ impl Tile {
         // Add a background feature to the tile data.
         let (mut current_feature_id, object, range) =
             Self::create_background_feature(&mut builder, feature_collection.clone(), extent);
-        features.push((current_feature_id, range));
+        features.push((current_feature_id, range, 0..0));
         objects.push(object);
 
         // Dense per-feature slot written into the vertices for selection highlight,
@@ -248,23 +249,32 @@ impl Tile {
 
             // Transform all the features on a per selector basis.
             for (selector, feats) in map {
-                let index_start_before = builder.get_current_index();
-                for (kind, feature_slot, path) in feats {
+                let fill_start = builder.get_current_index();
+                for (kind, feature_slot, path) in &feats {
                     // Set the current feature id.
                     current_feature_id = {
                         // Scope the lock guard real tight to ensure it's released quickly.
                         let mut feature_collection = feature_collection.write().unwrap();
                         feature_collection.ensure_feature(&selector, layer_id)
                     };
-                    builder.set_current_feature_and_object_id(current_feature_id, feature_slot);
+                    builder.set_current_feature_and_object_id(current_feature_id, *feature_slot);
 
-                    paths_to_drawable(&mut builder, kind, &path, layer.extent as f32, tile_id);
+                    paths_to_drawable(&mut builder, *kind, path, layer.extent as f32, tile_id);
                 }
+                let fill_end = builder.get_current_index();
 
-                features.push((
-                    current_feature_id,
-                    index_start_before..builder.get_current_index(),
-                ));
+                // Second pass: stroke polygon boundaries into thin outline bands,
+                // sharing each feature's slot so the shader picks the right style
+                // and selection highlight.
+                for (kind, feature_slot, path) in &feats {
+                    if *kind == GeomType::POLYGON {
+                        builder.set_current_feature_and_object_id(current_feature_id, *feature_slot);
+                        paths_to_outline(&mut builder, path, layer.extent as f32);
+                    }
+                }
+                let outline_end = builder.get_current_index();
+
+                features.push((current_feature_id, fill_start..fill_end, fill_end..outline_end));
             }
         }
 
@@ -278,7 +288,7 @@ impl Tile {
                 .read()
                 .expect("Failed to read initial objects. This is a bug. Please report it.");
 
-            let feature_size = std::mem::size_of::<(u32, std::ops::Range<u32>)>();
+            let feature_size = std::mem::size_of::<(u32, std::ops::Range<u32>, std::ops::Range<u32>)>();
             let vertex_size = std::mem::size_of::<Vertex>();
             let index_size = std::mem::size_of::<u32>();
 
@@ -332,7 +342,7 @@ impl Tile {
         &self.mesh
     }
 
-    pub fn features(&self) -> &Vec<(u32, Range<u32>)> {
+    pub fn features(&self) -> &Vec<(u32, Range<u32>, Range<u32>)> {
         &self.features
     }
 
@@ -484,17 +494,17 @@ impl Tile {
 
             let mut i = 0;
             render_pass.set_pipeline(blend_pipeline);
-            for (id, range) in &features {
-                if !range.is_empty() && feature_collection.is_visible(*id) {
+            for (id, fill, outline) in &features {
+                if !fill.is_empty() && feature_collection.is_visible(*id) {
                     render_pass.set_stencil_reference(i as u32);
                     i += 1;
 
                     let range_start = (tile_id << 1) | 1;
-                    render_pass.draw_indexed(range.clone(), 0, range_start..1 + range_start);
+                    render_pass.draw_indexed(fill.clone(), 0, range_start..1 + range_start);
 
-                    if feature_collection.has_outline(*id) {
+                    if feature_collection.has_outline(*id) && !outline.is_empty() {
                         let range_start = tile_id << 1;
-                        render_pass.draw_indexed(range.clone(), 0, range_start..1 + range_start);
+                        render_pass.draw_indexed(outline.clone(), 0, range_start..1 + range_start);
                     }
                 }
             }

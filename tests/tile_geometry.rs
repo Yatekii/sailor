@@ -79,3 +79,41 @@ fn tile_geometry_snapshots() {
         insta::assert_debug_snapshot!(summarize(&objects));
     });
 }
+
+/// Every polygon feature must produce a non-empty outline band (the stroke
+/// geometry that replaced the inflated-fill outline). Guards against the band
+/// pass silently generating nothing.
+#[test]
+fn polygon_features_get_outline_bands() {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/tiles");
+    let mut fixtures = 0;
+    let mut outline_indices = 0usize;
+
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().and_then(|e| e.to_str()) != Some("pbf") {
+            continue;
+        }
+        fixtures += 1;
+        let stem = path.file_stem().unwrap().to_str().unwrap();
+        let tile_id = tile_id_from_stem(stem);
+        let data = std::fs::read(&path).unwrap();
+        let fc = Arc::new(RwLock::new(FeatureCollection::new()));
+        let tile = Tile::from_mbvt(&tile_id, &data, fc, vec![]);
+
+        for (_, fill, outline) in tile.features() {
+            // A band belongs to a real polygon feature: whenever there is an
+            // outline, there is a fill.
+            if !outline.is_empty() {
+                assert!(!fill.is_empty());
+            }
+            outline_indices += outline.len();
+        }
+    }
+
+    assert!(fixtures > 0, "no tile fixtures found");
+    assert!(
+        outline_indices > 0,
+        "expected some outline band geometry across {fixtures} fixtures, got none"
+    );
+}
