@@ -1,4 +1,5 @@
 pub mod helpers;
+pub mod layer;
 mod painter;
 pub mod ui;
 // The weather overlay still watches shader files with `notify`, which is
