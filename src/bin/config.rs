@@ -34,14 +34,6 @@ pub struct Renderer {
     pub tile_size: u32,
     pub msaa_samples: u32,
     pub selection_tags: Vec<String>,
-    pub temperature: Temperature,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct Temperature {
-    pub vertex_shader: String,
-    pub fragment_shader: String,
 }
 
 #[derive(Debug, Deserialize)]

@@ -10,6 +10,8 @@ use wgpu::{
 use crate::app_state::AppState;
 
 pub mod map;
+pub mod temperature;
+pub mod wind;
 
 // Two timestamps (begin/end) for each instrumented pass: polygon, then text.
 pub const GPU_TS_COUNT: u32 = 4;

@@ -19,9 +19,6 @@ renderer:
   tile-size: 384
   msaa-samples: 4
   selection-tags: []
-  temperature:
-    vertex-shader: "config/temperature/shader.vert"
-    fragment-shader: "config/temperature/shader.frag"
 
 map:
   initial:

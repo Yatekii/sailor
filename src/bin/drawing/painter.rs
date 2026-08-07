@@ -7,6 +7,8 @@ use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 use super::layer::map::MapLayer;
+use super::layer::temperature::TemperatureLayer;
+use super::layer::wind::WindLayer;
 use super::layer::{FramePass, GpuTiming, LayerCtx, LayerStack, Spans};
 use crate::app_state::AppState;
 use crate::config::CONFIG;
@@ -107,6 +109,8 @@ impl Painter {
 
         let mut stack = LayerStack::new();
         stack.push(Box::new(MapLayer::new(&device, &queue, app_state)));
+        stack.push(Box::new(WindLayer::default()));
+        stack.push(Box::new(TemperatureLayer::default()));
 
         Self {
             window,
