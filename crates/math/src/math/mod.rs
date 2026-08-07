@@ -13,6 +13,9 @@ pub use tile_id::*;
 
 pub type Vector2 = nalgebra::Vector2<f32>;
 pub type Point2 = nalgebra::Point2<f32>;
+// View center in world space. f64 because at high zoom one f32 step of the
+// center is several screen pixels, which snaps (jitters) the view.
+pub type PointF64 = nalgebra::Point2<f64>;
 pub type Rotation2 = nalgebra::Rotation2<f32>;
 
 pub trait EuclidVsNalgebra {

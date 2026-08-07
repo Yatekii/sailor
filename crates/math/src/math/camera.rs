@@ -3,7 +3,7 @@ use nalgebra_glm as glm;
 
 #[derive(Debug, Clone)]
 pub struct Camera {
-    pub center: Point,
+    pub center: PointF64,
     pub width: f32,
     pub height: f32,
     tile_size: f32,
@@ -12,7 +12,7 @@ pub struct Camera {
 impl Camera {
     pub fn new(center: Point, width: f32, height: f32, tile_size: f32, hidpi_factor: f32) -> Self {
         Self {
-            center,
+            center: PointF64::new(center.x as f64, center.y as f64),
             width,
             height,
             tile_size: tile_size * hidpi_factor,
@@ -31,10 +31,12 @@ impl Camera {
         let px_to_world = self.width / self.tile_size() / 2.0 / 2f32.powf(z) / scale as f32;
         let py_to_world = self.height / self.tile_size() / 2.0 / 2f32.powf(z) / scale as f32;
 
+        // Tile selection only needs integer tile ids, so f32 is plenty here.
+        let center = point(self.center.x as f32, self.center.y as f32);
         let top_left: TileId =
-            world_to_tile_space(&(self.center - vector(px_to_world, py_to_world)), z as u32).into();
+            world_to_tile_space(&(center - vector(px_to_world, py_to_world)), z as u32).into();
         let bottom_right: TileId =
-            world_to_tile_space(&(self.center + vector(px_to_world, py_to_world)), z as u32).into();
+            world_to_tile_space(&(center + vector(px_to_world, py_to_world)), z as u32).into();
         TileField::new(top_left, bottom_right + TileId::new(z as u32, 1, 0))
     }
 
@@ -45,8 +47,11 @@ impl Camera {
         // matrix instead (world_to_gpu * pos) makes the translation column
         // a difference of two large products that cancels in f32 and jitters
         // the tiles by ~1px as you zoom at high z.
-        let rel_x = coordinate.x as f32 * scale - self.center.x;
-        let rel_y = coordinate.y as f32 * scale - self.center.y;
+        // Subtract in f64 so the small result keeps its precision; casting the
+        // tiny `rel` to f32 afterwards is exact enough. An f32 subtraction here
+        // cancels catastrophically (both operands ~0.5) and jitters.
+        let rel_x = (coordinate.x as f64 * scale as f64 - self.center.x) as f32;
+        let rel_y = (coordinate.y as f64 * scale as f64 - self.center.y) as f32;
         let zoom_x = 2.0f32.powf(z) / (self.width / 2.0) * self.tile_size();
         let zoom_y = 2.0f32.powf(z) / (self.height / 2.0) * self.tile_size();
         Transform::from_mat(
@@ -61,7 +66,7 @@ impl Camera {
         let s = 2.0f32.powf(z) * self.tile_size();
         Transform::from_mat(
             glm::scaling(&glm::vec3(s, s, 1.0))
-                * glm::translation(&glm::vec3(-self.center.x, -self.center.y, 0.0)),
+                * glm::translation(&glm::vec3(-self.center.x as f32, -self.center.y as f32, 0.0)),
         )
     }
 
@@ -95,17 +100,29 @@ impl Camera {
     }
 
     /// Pan the view by a pixel-space drag from `from` to `to` at zoom `z`.
+    ///
+    /// The world delta is `(to - from) / s`; the `center` term of `pixel_to_world`
+    /// cancels analytically, so we compute it directly in f64 instead of
+    /// subtracting two absolute world positions (which cancel in f32).
     pub fn pan(&mut self, from: Coord<Pixel>, to: Coord<Pixel>, z: f32) {
-        let p2w = self.pixel_to_world(z);
-        let delta = p2w.apply(to).coords() - p2w.apply(from).coords();
-        self.center -= vector(delta.x, delta.y);
+        let s = 2f64.powf(z as f64) * self.tile_size() as f64;
+        self.center.x -= (to.x() as f64 - from.x() as f64) / s;
+        self.center.y -= (to.y() as f64 - from.y() as f64) / s;
     }
 
     /// Recenter so the world point under `cursor` stays fixed as zoom goes `from` -> `to`.
+    ///
+    /// `before - after` equals `(cursor - screen_center) * (1/s_from - 1/s_to)`;
+    /// the shared `center` cancels analytically, so we compute the tiny delta
+    /// directly in f64 and accumulate it into the f64 `center`. Doing it via two
+    /// absolute world positions cancels in f32 and, together with an f32 center,
+    /// snapped the view as you zoomed.
     pub fn zoom_to_cursor(&mut self, cursor: Coord<Pixel>, from: f32, to: f32) {
-        let before = self.pixel_to_world(from).apply(cursor);
-        let after = self.pixel_to_world(to).apply(cursor);
-        self.center += vector(before.x() - after.x(), before.y() - after.y());
+        let s_from = 2f64.powf(from as f64) * self.tile_size() as f64;
+        let s_to = 2f64.powf(to as f64) * self.tile_size() as f64;
+        let inv = 1.0 / s_from - 1.0 / s_to;
+        self.center.x += (cursor.x() as f64 - self.width as f64 / 2.0) * inv;
+        self.center.y += (cursor.y() as f64 - self.height as f64 / 2.0) * inv;
     }
 }
 
@@ -142,6 +159,36 @@ mod tests {
             ref_x,
             (ndc.x() as f64 - ref_x).abs()
         );
+    }
+
+    // Zooming to the cursor in many tiny steps must land on the same center as
+    // one big step (the deltas telescope). With an f32 center each step rounds
+    // to a ~pixel grid at high zoom and the two diverge — that was the jitter.
+    #[test]
+    fn zoom_to_cursor_accumulates_precisely() {
+        let cursor = Coord::<Pixel>::new(1700.0, 300.0); // well off-centre
+        let make = || Camera::new(point(0.5187345, 0.5093721), 2400.0, 1400.0, 384.0, 2.0);
+
+        // Many small scroll steps from z14 up to ~z18.
+        let mut stepwise = make();
+        let mut z = 14.0f32;
+        for _ in 0..2000 {
+            let to = z + 0.002;
+            stepwise.zoom_to_cursor(cursor, z, to);
+            z = to;
+        }
+
+        // One big step to the exact same end zoom.
+        let mut oneshot = make();
+        oneshot.zoom_to_cursor(cursor, 14.0, z);
+
+        // Difference in world space, expressed in pixels at the final zoom.
+        let s = 2f64.powf(z as f64) * oneshot.tile_size() as f64;
+        let err_px = ((oneshot.center.x - stepwise.center.x).powi(2)
+            + (oneshot.center.y - stepwise.center.y).powi(2))
+        .sqrt()
+            * s;
+        assert!(err_px < 0.5, "cursor-anchored zoom drifted {err_px} px");
     }
 
     fn approx(a: f32, b: f32) {

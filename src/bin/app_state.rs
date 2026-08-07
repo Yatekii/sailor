@@ -2,7 +2,7 @@ use lyon::math::Point;
 use nalgebra_glm::{Vec2, vec2};
 use osm::css::RulesCache;
 use osm::feature::collection::FeatureCollection;
-use osm::math::{Coord, Geo, Camera, TileId, deg2num, tile_to_world_space};
+use osm::math::{Camera, Coord, Geo, PointF64, TileId, deg2num, tile_to_world_space};
 use osm::cache::CacheStats;
 use osm::object::Object;
 use std::sync::{Arc, Mutex, RwLock};
@@ -116,17 +116,22 @@ impl AppState {
 
     pub fn set_center(&mut self, center: (f32, f32)) {
         let tile_coordinate = deg2num(Coord::<Geo>::new(center.1, center.0), self.zoom as u32);
-        self.screen.center = tile_to_world_space(&tile_coordinate);
+        let p = tile_to_world_space(&tile_coordinate);
+        self.screen.center = PointF64::new(p.x as f64, p.y as f64);
     }
 
     pub(crate) fn scale_factor_updated(&mut self, scale_factor: f32) {
+        // Rebuild the camera for the new scale factor but keep the f64 center as
+        // is — routing it back through the f32 `Camera::new` would drop precision.
+        let center = self.screen.center;
         self.screen = Camera::new(
-            self.screen.center,
+            Point::new(0.0, 0.0),
             self.screen.width,
             self.screen.height,
             self.screen.tile_size(),
             scale_factor,
-        )
+        );
+        self.screen.center = center;
     }
 
     pub fn set_cursor(&mut self, cursor: Vec2) {
