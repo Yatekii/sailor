@@ -1,6 +1,6 @@
 general:
   display-framerate: false
-  data-root: ""
+  data-root: "cache"
   log:
     level: "WARN"
 
