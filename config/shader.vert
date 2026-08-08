@@ -57,10 +57,12 @@ void main() {
     TileData tile_data = tile_datas[tile_id];
 
     bool is_line = feature_type == 1;
-    // Is the line we are currently handling (if it is a line) sized in world coordinates or pixels?
-    bool is_world_scale_line = (layer_data.line_width & 0x02) == 1;
+    // World-scale lines aren't implemented (see the commented block below), so
+    // always treat lines as pixel-scale.
+    bool is_world_scale_line = false;
 
-    float line_width = layer_data.line_width >> 2;
+    // line_width is encoded as (width_px << 1) | is_pixel_flag; recover the pixel width.
+    float line_width = layer_data.line_width >> 1;
 
     // Calculate the tile normal normal in [0.0, 1.0] coordinates.
     vec2 local_normal = normal / tile_data.extent;
@@ -94,8 +96,10 @@ void main() {
         outColor = layer_data.background_color;
     }
 
-    // Feather
-    gl_Position.xy += local_normal / canvas_size * 2;
+    // Feather. The fragment shader doesn't alpha-fade this, so it's solid extra
+    // width, not antialiasing (MSAA handles AA). Keep it small so a 1px line
+    // renders ~1px instead of being fattened by a fixed margin.
+    gl_Position.xy += local_normal / canvas_size * 0.5;
     gl_Position.y = -gl_Position.y;
 
     gl_Position.z = layer_data.z_index / 1000 + 0.001;
