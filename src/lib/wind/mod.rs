@@ -49,6 +49,12 @@ impl WindModel {
         }
     }
 
+    /// Whether this model is served by the local GRIB path (vs the Open-Meteo
+    /// point api). Only ECMWF for now.
+    pub fn uses_grib(self) -> bool {
+        matches!(self, Self::EcmwfIfs)
+    }
+
     /// The model's native grid spacing in degrees. Sampling finer than this just
     /// returns interpolated duplicates, so it's the floor for the arrow lattice.
     pub fn native_step_deg(self) -> f32 {

@@ -4,7 +4,9 @@ use std::time::Duration;
 use web_time::Instant;
 
 use crate::platform::{Task, spawn_task};
-use crate::wind::{WindField, WindModel};
+use crate::wind::ecmwf::fetch_ecmwf_wind;
+use crate::wind::grid::WindGrid;
+use crate::wind::{WindField, WindModel, WindSample};
 use sailor_platform::wind_fetch::fetch_wind_json;
 
 /// Geographic bounding box in degrees.
@@ -86,22 +88,32 @@ fn point_count(bbox: Bbox, step: f32) -> usize {
     cols * rows
 }
 
+/// The lattice points (lon, lat) for a snapped bbox at `step`, matching the
+/// Open-Meteo request grid so both backends sample the same points.
+fn lattice_points(bbox: Bbox, step: f32) -> Vec<(f32, f32)> {
+    let cols = ((bbox.width() / step).round() as i32).max(1);
+    let rows = ((bbox.height() / step).round() as i32).max(1);
+    let mut out = Vec::new();
+    for r in 0..=rows {
+        let lat = (bbox.min_lat + r as f32 * step).clamp(-85.0, 85.0);
+        for c in 0..=cols {
+            let lon = (bbox.min_lon + c as f32 * step).clamp(-180.0, 180.0);
+            out.push((lon, lat));
+        }
+    }
+    out
+}
+
 /// Build the Open-Meteo request for wind on a fixed global lattice of `step`
 /// degrees covering `bbox` (assumed already snapped + clamped), plus a stable
 /// disk-cache key. Points sit at multiples of `step`, so they stay pinned to
 /// the same spots as you pan. Requests the current step, wind in knots.
 pub fn open_meteo_url(model: &str, bbox: Bbox, step: f32) -> (String, String) {
-    let cols = ((bbox.width() / step).round() as i32).max(1);
-    let rows = ((bbox.height() / step).round() as i32).max(1);
     let mut lats = Vec::new();
     let mut lons = Vec::new();
-    for r in 0..=rows {
-        let lat = (bbox.min_lat + r as f32 * step).clamp(-85.0, 85.0);
-        for c in 0..=cols {
-            let lon = (bbox.min_lon + c as f32 * step).clamp(-180.0, 180.0);
-            lats.push(format!("{lat:.4}"));
-            lons.push(format!("{lon:.4}"));
-        }
+    for (lon, lat) in lattice_points(bbox, step) {
+        lats.push(format!("{lat:.4}"));
+        lons.push(format!("{lon:.4}"));
     }
     let url = format!(
         "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}\
@@ -146,6 +158,10 @@ pub struct WindCache {
     /// Current model + density; changing either invalidates and refetches.
     model: WindModel,
     density: f32,
+    /// Cached GRIB grid for ECMWF; loaded once per session (or until evicted).
+    grid: Option<WindGrid>,
+    /// In-flight task loading the GRIB grid.
+    grid_loader: Option<Task<Option<WindGrid>>>,
 }
 
 impl WindCache {
@@ -159,6 +175,8 @@ impl WindCache {
             retry_after: None,
             model: WindModel::EcmwfIfs,
             density: 10.0,
+            grid: None,
+            grid_loader: None,
         }
     }
 
@@ -177,6 +195,11 @@ impl WindCache {
             self.loaded_bbox = None;
             self.pending = None;
             self.retry_after = None;
+        }
+
+        if model.uses_grib() {
+            self.request_grib(bbox, density);
+            return;
         }
 
         if let Some((b, task)) = &mut self.loader {
@@ -227,6 +250,52 @@ impl WindCache {
         });
         self.loader = Some((snapped, task));
         self.pending = None;
+    }
+
+    /// Load the ECMWF grid once (async, disk-cached) and sample the viewport
+    /// lattice from it locally — no per-point network cost, so it runs every
+    /// frame. Keeps the last field on a load failure and backs off.
+    fn request_grib(&mut self, bbox: Bbox, density: f32) {
+        let now = Instant::now();
+
+        if let Some(task) = &mut self.grid_loader {
+            if let Some(result) = task.try_take() {
+                self.grid_loader = None;
+                match result {
+                    Some(g) => {
+                        self.grid = Some(g);
+                        self.retry_after = None;
+                    }
+                    None => self.retry_after = Some(now + BACKOFF),
+                }
+            }
+        }
+
+        let cooling = self.retry_after.is_some_and(|t| now < t);
+        if self.grid.is_none() && self.grid_loader.is_none() && !cooling {
+            let cache_location = self.cache_location.clone();
+            let now_unix = web_time::SystemTime::now()
+                .duration_since(web_time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            self.grid_loader = Some(spawn_task(async move {
+                fetch_ecmwf_wind(&cache_location, now_unix)
+                    .await
+                    .and_then(|(u, v)| WindGrid::from_ecmwf_messages(&u, &v))
+            }));
+        }
+
+        if let Some(grid) = &self.grid {
+            let (snapped, step) = plan_lattice(bbox, density, 0.25);
+            let samples = lattice_points(snapped, step)
+                .into_iter()
+                .map(|(lon, lat)| {
+                    let (u, v) = grid.sample(lon, lat);
+                    WindSample { lon, lat, u, v }
+                })
+                .collect();
+            self.field = Some(WindField { samples });
+        }
     }
 
     /// The most recently loaded field, if any.
