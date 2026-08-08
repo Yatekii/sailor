@@ -58,8 +58,8 @@ VertexBuffers {
                 1,
             ],
             normal: [
-                -4095,
-                4095,
+                -4096,
+                4096,
             ],
             feature_id: 65536,
             object_id: 0,
@@ -70,8 +70,8 @@ VertexBuffers {
                 1,
             ],
             normal: [
-                4095,
-                -4095,
+                4096,
+                -4096,
             ],
             feature_id: 65536,
             object_id: 0,
