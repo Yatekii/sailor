@@ -137,6 +137,8 @@ pub struct Application {
     mouse_down: bool,
     drag_moved: bool,
     last_position: Coord<Pixel>,
+    /// Cursor position when the left button went down, to tell a click from a drag.
+    press_position: Coord<Pixel>,
     args: Args,
 }
 
@@ -204,6 +206,7 @@ impl Application {
             mouse_down: false,
             drag_moved: false,
             last_position: Coord::<Pixel>::new(0.0, 0.0),
+            press_position: Coord::<Pixel>::new(0.0, 0.0),
             args,
         }
     }
@@ -256,6 +259,7 @@ impl Application {
                         ElementState::Pressed => {
                             self.mouse_down = true;
                             self.drag_moved = false;
+                            self.press_position = self.last_position;
                         }
                         ElementState::Released => {
                             self.mouse_down = false;
@@ -292,8 +296,17 @@ impl Application {
 
                 if !ui_event {
                     if self.mouse_down {
-                        self.drag_moved = true;
-                        self.app_state.screen.pan(from, to);
+                        // Only a real drag past a small threshold pans and blocks the
+                        // release-selection; sub-pixel jitter during a click must not.
+                        const DRAG_THRESHOLD_PX: f32 = 6.0;
+                        let dx = to.x() - self.press_position.x();
+                        let dy = to.y() - self.press_position.y();
+                        if (dx * dx + dy * dy).sqrt() > DRAG_THRESHOLD_PX {
+                            self.drag_moved = true;
+                        }
+                        if self.drag_moved {
+                            self.app_state.screen.pan(from, to);
+                        }
                     }
 
                     self.map.update_hovered_objects(
