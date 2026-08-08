@@ -14,9 +14,29 @@ pub struct Bbox {
 }
 
 impl Bbox {
-    /// Expand outward to the nearest `step`-degree grid lines, so the fetched
-    /// region only changes when you pan across a grid line (bounds refetch spam,
-    /// makes the disk cache key stable).
+    pub fn width(&self) -> f32 {
+        (self.max_lon - self.min_lon).abs()
+    }
+
+    pub fn height(&self) -> f32 {
+        (self.max_lat - self.min_lat).abs()
+    }
+
+    /// Clamp to the valid web-mercator range. At low zoom the viewport spills
+    /// past the world; without this the fetch asks for out-of-range lat/lon,
+    /// open-meteo rejects it, and a stale patch is left frozen on screen.
+    pub fn clamp_valid(&self) -> Bbox {
+        Bbox {
+            min_lon: self.min_lon.clamp(-180.0, 180.0),
+            min_lat: self.min_lat.clamp(-85.0, 85.0),
+            max_lon: self.max_lon.clamp(-180.0, 180.0),
+            max_lat: self.max_lat.clamp(-85.0, 85.0),
+        }
+    }
+
+    /// Expand outward to the nearest `step`-degree lattice lines, so sample
+    /// points stay pinned to a fixed global grid (multiples of `step`) instead
+    /// of sliding as you pan, and the fetch only changes when you cross a line.
     pub fn snap(&self, step: f32) -> Bbox {
         Bbox {
             min_lon: (self.min_lon / step).floor() * step,
@@ -27,17 +47,47 @@ impl Bbox {
     }
 }
 
-/// Build the Open-Meteo request URL for a `cols`x`rows` grid over `bbox`, plus a
-/// stable disk-cache key. Requests the current step, wind in knots.
-pub fn open_meteo_url(model: &str, bbox: Bbox, cols: u32, rows: u32) -> (String, String) {
+/// Roughly how many arrows to show across the larger viewport dimension.
+const TARGET_ARROWS: f32 = 16.0;
+/// Safety cap on lattice points per request; bounds the url length and the
+/// instance count. The step is doubled until the lattice fits.
+const MAX_POINTS: usize = 300;
+const MODEL: &str = "ecmwf_ifs025";
+
+/// Pick a "nice" lattice step (degrees) for a viewport `span` degrees wide, so
+/// the overlay keeps a roughly constant on-screen arrow density: coarse when
+/// zoomed out, fine when zoomed in.
+pub fn nice_step(span: f32) -> f32 {
+    const STEPS: [f32; 10] = [0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 30.0];
+    let ideal = span / TARGET_ARROWS;
+    for s in STEPS {
+        if s >= ideal {
+            return s;
+        }
+    }
+    30.0
+}
+
+/// Lattice point count for a snapped bbox at `step`.
+fn point_count(bbox: Bbox, step: f32) -> usize {
+    let cols = (bbox.width() / step).round() as usize + 1;
+    let rows = (bbox.height() / step).round() as usize + 1;
+    cols * rows
+}
+
+/// Build the Open-Meteo request for wind on a fixed global lattice of `step`
+/// degrees covering `bbox` (assumed already snapped + clamped), plus a stable
+/// disk-cache key. Points sit at multiples of `step`, so they stay pinned to
+/// the same spots as you pan. Requests the current step, wind in knots.
+pub fn open_meteo_url(model: &str, bbox: Bbox, step: f32) -> (String, String) {
+    let cols = ((bbox.width() / step).round() as i32).max(1);
+    let rows = ((bbox.height() / step).round() as i32).max(1);
     let mut lats = Vec::new();
     let mut lons = Vec::new();
-    for r in 0..rows {
-        let ty = r as f32 / (rows.max(2) - 1) as f32;
-        let lat = bbox.min_lat + ty * (bbox.max_lat - bbox.min_lat);
-        for c in 0..cols {
-            let tx = c as f32 / (cols.max(2) - 1) as f32;
-            let lon = bbox.min_lon + tx * (bbox.max_lon - bbox.min_lon);
+    for r in 0..=rows {
+        let lat = (bbox.min_lat + r as f32 * step).clamp(-85.0, 85.0);
+        for c in 0..=cols {
+            let lon = (bbox.min_lon + c as f32 * step).clamp(-180.0, 180.0);
             lats.push(format!("{lat:.4}"));
             lons.push(format!("{lon:.4}"));
         }
@@ -49,17 +99,24 @@ pub fn open_meteo_url(model: &str, bbox: Bbox, cols: u32, rows: u32) -> (String,
         lons.join(",")
     );
     let key = format!(
-        "{model}_{:.2}_{:.2}_{:.2}_{:.2}_{cols}x{rows}",
+        "{model}_{step}_{:.2}_{:.2}_{:.2}_{:.2}",
         bbox.min_lon, bbox.min_lat, bbox.max_lon, bbox.max_lat
     );
     (url, key)
 }
 
-/// Grid resolution and snap step for the fixed-model overlay.
-const GRID_COLS: u32 = 12;
-const GRID_ROWS: u32 = 8;
-const SNAP_STEP: f32 = 0.25;
-const MODEL: &str = "ecmwf_ifs025";
+/// Choose the lattice step and snapped bbox for a viewport, coarsening the step
+/// until the lattice fits under `MAX_POINTS`.
+fn plan_lattice(bbox: Bbox) -> (Bbox, f32) {
+    let clamped = bbox.clamp_valid();
+    let mut step = nice_step(clamped.width().max(clamped.height()));
+    let mut snapped = clamped.snap(step);
+    while point_count(snapped, step) > MAX_POINTS {
+        step *= 2.0;
+        snapped = clamped.snap(step);
+    }
+    (snapped, step)
+}
 
 /// Holds the current wind field and refetches when the snapped viewport changes.
 /// Mirrors `TileCache`: an async loader task feeds a held value.
@@ -80,8 +137,8 @@ impl WindCache {
         }
     }
 
-    /// Ask for wind over `bbox`. Snaps it; if that differs from what we have (or
-    /// are loading), kick an async fetch. Finalizes any completed fetch first.
+    /// Ask for wind over `bbox`. Plans a lattice; if that differs from what we
+    /// have (or are loading), kick an async fetch. Finalizes a completed fetch first.
     pub fn request(&mut self, bbox: Bbox) {
         if let Some((b, task)) = &mut self.loader {
             if let Some(result) = task.try_take() {
@@ -96,14 +153,14 @@ impl WindCache {
             }
         }
 
-        let snapped = bbox.snap(SNAP_STEP);
+        let (snapped, step) = plan_lattice(bbox);
         let already = self.loaded_bbox == Some(snapped);
         let loading = self.loader.as_ref().map(|(b, _)| *b) == Some(snapped);
         if already || loading {
             return;
         }
 
-        let (url, key) = open_meteo_url(MODEL, snapped, GRID_COLS, GRID_ROWS);
+        let (url, key) = open_meteo_url(MODEL, snapped, step);
         let cache_location = self.cache_location.clone();
         let task = spawn_task(async move {
             fetch_wind_json(Path::new(&cache_location), &key, &url)
@@ -138,25 +195,61 @@ mod tests {
         assert!((s.max_lat - 48.0).abs() < 1e-4);
     }
 
-    // Same snapped bbox + model must produce a stable cache key (so disk cache hits).
+    // Zooming out (wider span) must pick a coarser lattice; zooming in, a finer
+    // one, floored at the smallest step.
+    #[test]
+    fn nice_step_tracks_zoom() {
+        assert!(nice_step(360.0) > nice_step(10.0));
+        assert!(nice_step(10.0) > nice_step(0.5));
+        assert_eq!(nice_step(0.01), 0.1); // floored
+    }
+
+    // A viewport spilling past the world clamps to valid lat/lon so the fetch
+    // never asks for out-of-range coordinates.
+    #[test]
+    fn clamp_keeps_coords_valid() {
+        let b = Bbox { min_lon: -520.0, min_lat: -140.0, max_lon: 430.0, max_lat: 140.0 };
+        let c = b.clamp_valid();
+        assert!(c.min_lon >= -180.0 && c.max_lon <= 180.0);
+        assert!(c.min_lat >= -85.0 && c.max_lat <= 85.0);
+    }
+
+    // Even a world-spanning viewport stays under the point cap (bounded url).
+    #[test]
+    fn lattice_stays_under_cap() {
+        let world = Bbox { min_lon: -180.0, min_lat: -85.0, max_lon: 180.0, max_lat: 85.0 };
+        let (snapped, step) = plan_lattice(world);
+        assert!(point_count(snapped, step) <= MAX_POINTS);
+    }
+
+    // Same snapped bbox + step must produce a stable cache key (so disk cache hits).
     #[test]
     fn url_key_is_stable() {
         let b = Bbox { min_lon: 8.0, min_lat: 47.0, max_lon: 9.0, max_lat: 48.0 };
-        let (_, k1) = open_meteo_url("ecmwf_ifs025", b, 4, 4);
-        let (_, k2) = open_meteo_url("ecmwf_ifs025", b, 4, 4);
+        let (_, k1) = open_meteo_url("ecmwf_ifs025", b, 0.5);
+        let (_, k2) = open_meteo_url("ecmwf_ifs025", b, 0.5);
         assert_eq!(k1, k2);
         assert!(k1.contains("ecmwf_ifs025"));
+    }
+
+    // Points sit on the global lattice (multiples of step), pinned regardless of
+    // pan: a step-1 grid over [0,2] must include the whole-degree lines.
+    #[test]
+    fn lattice_points_are_pinned() {
+        let b = Bbox { min_lon: 0.0, min_lat: 0.0, max_lon: 2.0, max_lat: 2.0 };
+        let (url, _) = open_meteo_url("ecmwf_ifs025", b, 1.0);
+        assert!(url.contains("0.0000"));
+        assert!(url.contains("1.0000"));
+        assert!(url.contains("2.0000"));
     }
 
     // The url must request u/v-able fields in knots and the current step.
     #[test]
     fn url_requests_current_wind_in_knots() {
         let b = Bbox { min_lon: 8.0, min_lat: 47.0, max_lon: 9.0, max_lat: 48.0 };
-        let (url, _) = open_meteo_url("ecmwf_ifs025", b, 2, 2);
+        let (url, _) = open_meteo_url("ecmwf_ifs025", b, 0.5);
         assert!(url.contains("current=wind_speed_10m,wind_direction_10m"));
         assert!(url.contains("wind_speed_unit=kn"));
         assert!(url.contains("models=ecmwf_ifs025"));
-        // 2x2 grid -> 4 comma-joined latitudes.
-        assert!(url.matches("47").count() + url.matches("48").count() >= 4);
     }
 }
