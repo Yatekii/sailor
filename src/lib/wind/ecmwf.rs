@@ -68,6 +68,43 @@ pub fn ecmwf_run_candidates(now_unix: i64) -> Vec<(String, u32)> {
         .collect()
 }
 
+use std::path::Path;
+
+use sailor_platform::{http, platform};
+
+const ECMWF_BASE: &str = "https://data.ecmwf.int/forecasts";
+
+/// Fetch ECMWF open-data 10u/10v for the latest published run, cache-as-you-go.
+/// Tries run candidates newest-first: GET the index, locate 10u/10v, range-GET
+/// each message. Returns the two raw GRIB2 messages, or None if no run resolves.
+pub async fn fetch_ecmwf_wind(cache_location: &str, now_unix: i64) -> Option<(Vec<u8>, Vec<u8>)> {
+    for (date, hh) in ecmwf_run_candidates(now_unix) {
+        let stem = format!("{ECMWF_BASE}/{date}/{hh:02}z/ifs/0p25/oper/{date}{hh:02}0000-0h-oper-fc");
+        let cache_u = Path::new(cache_location).join(format!("wind/ecmwf_{date}_{hh:02}_10u.grib2"));
+        let cache_v = Path::new(cache_location).join(format!("wind/ecmwf_{date}_{hh:02}_10v.grib2"));
+        let (cu, cv) = (cache_u.to_string_lossy(), cache_v.to_string_lossy());
+
+        // serve a cached run without touching the network.
+        if let (Some(u), Some(v)) = (platform::read_bytes(&cu), platform::read_bytes(&cv)) {
+            return Some((u, v));
+        }
+
+        let Some(index) = http::get(&format!("{stem}.index")).await else {
+            continue; // run not published yet; try the previous one
+        };
+        let Some((ur, vr)) = find_wind_ranges(&String::from_utf8_lossy(&index)) else {
+            continue;
+        };
+        let grib = format!("{stem}.grib2");
+        let u = http::get_range(&grib, ur.offset, ur.length).await?;
+        let v = http::get_range(&grib, vr.offset, vr.length).await?;
+        platform::write_bytes(&cu, &u);
+        platform::write_bytes(&cv, &v);
+        return Some((u, v));
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
