@@ -5,6 +5,7 @@ pub mod feature;
 pub mod interaction;
 pub mod object;
 pub mod vector_tile;
+pub mod wind;
 
 // math + geometry now live in the sailor-math crate; platform + fetch in
 // sailor-platform. Re-exported here so existing `osm::*` paths keep resolving
