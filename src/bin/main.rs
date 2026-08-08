@@ -59,9 +59,9 @@ fn parse_args() -> Args {
 fn window_attributes() -> WindowAttributes {
     let attributes = WindowAttributes::default().with_title("Sailor");
     let attributes = match CONFIG.window.size {
-        config::WindowSize::Windowed { width, height } => {
-            attributes.with_inner_size(LogicalSize { width, height })
-        }
+        config::WindowSize::Windowed { width, height } => attributes
+            .with_inner_size(LogicalSize { width, height })
+            .with_maximized(true),
         config::WindowSize::Fullscreen => attributes
             .with_fullscreen(Some(winit::window::Fullscreen::Borderless(None)))
             .with_decorations(false),
