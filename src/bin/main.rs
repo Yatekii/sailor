@@ -194,7 +194,7 @@ impl Application {
             feature_collection,
         );
         let mut overlays = drawing::layer::LayerStack::new();
-        overlays.push(Box::new(drawing::layer::wind::WindLayer::default()));
+        overlays.push(Box::new(drawing::layer::wind::WindLayer::new(&painter.device)));
         overlays.push(Box::new(drawing::layer::temperature::TemperatureLayer::default()));
         overlays.push(Box::new(drawing::layer::hover::HoverLayer::new(
             &painter.device,
