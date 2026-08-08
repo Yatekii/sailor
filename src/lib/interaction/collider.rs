@@ -41,6 +41,17 @@ impl Collider {
             let global_point = inv.apply(screen_point);
             let tile_point = Vec2::new(global_point.x(), global_point.y()) * *extent;
 
+            // Pick radius in tile-local units: map a fixed pixel tolerance through
+            // the same inverse transform so points/lines stay clickable at any zoom.
+            const PICK_TOLERANCE_PX: f32 = 6.0;
+            let offset_point = Coord::<Gpu>::new(
+                (point.0 + PICK_TOLERANCE_PX) / (camera.width / 2f32) - 1.0,
+                point.1 / (camera.height / 2f32) - 1.0,
+            );
+            let offset_global = inv.apply(offset_point);
+            let offset_tile = Vec2::new(offset_global.x(), offset_global.y()) * *extent;
+            let radius = (offset_tile - tile_point).length();
+
             if tile_point.x >= 0.0
                 && tile_point.x <= *extent
                 && tile_point.y >= 0.0
@@ -49,7 +60,7 @@ impl Collider {
                 if let Ok(collider) = collider.try_read()
                     && let Ok(objects) = objects.try_read()
                 {
-                    collider.get_hovered_objects(&tile_point, &mut object_ids);
+                    collider.get_hovered_objects(&tile_point, radius, &mut object_ids);
 
                     for object_id in &object_ids {
                         // The collider is loaded asynchronously, so it can briefly disagree

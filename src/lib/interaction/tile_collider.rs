@@ -1,5 +1,5 @@
 use parry2d::{
-    bounding_volume::Aabb,
+    bounding_volume::{Aabb, BoundingVolume},
     math::Vec2,
     partitioning::{Bvh, BvhBuildStrategy},
 };
@@ -9,11 +9,30 @@ use crate::geometry::{Geometry, Polygon};
 use crate::object::Object;
 use crate::platform::spawn;
 
-/// One collidable object: the index of the source object plus the polygon we
-/// hit-test against. Non-polygon objects don't produce a collision object.
+/// The shape a collision object is hit-tested against. Polygons test containment;
+/// points and lines have no area, so they test within a pick radius instead.
+enum Shape {
+    Polygon(Polygon),
+    Point(Vec2),
+    Line(Vec<Vec2>),
+}
+
+/// One collidable object: the index of the source object plus its shape.
 struct CollisionObject {
     object_id: usize,
-    polygon: Polygon,
+    shape: Shape,
+}
+
+/// Distance from `p` to segment `a`-`b`.
+fn segment_distance(p: Vec2, a: Vec2, b: Vec2) -> f32 {
+    let ab = b - a;
+    let len2 = ab.length_squared();
+    let t = if len2 > 0.0 {
+        ((p - a).dot(ab) / len2).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (p - (a + ab * t)).length()
 }
 
 pub struct TileCollider {
@@ -41,14 +60,30 @@ impl TileCollider {
         self.len() == 0
     }
 
-    pub fn get_hovered_objects(&self, cursor_point: &Vec2, hovered_objects: &mut Vec<usize>) {
-        // Broad phase against the object aabbs, narrow phase against the polygon itself.
-        for leaf in self
-            .bvh
-            .leaves(|node| node.aabb().contains_local_point(*cursor_point))
-        {
+    /// `radius` (tile-local units) is the pick tolerance for area-less points and
+    /// lines; polygons ignore it and test true containment.
+    pub fn get_hovered_objects(
+        &self,
+        cursor_point: &Vec2,
+        radius: f32,
+        hovered_objects: &mut Vec<usize>,
+    ) {
+        let cursor = *cursor_point;
+        // Broad phase: any leaf whose aabb comes within the pick radius of the cursor.
+        let query = Aabb::from_points([
+            cursor - Vec2::new(radius, radius),
+            cursor + Vec2::new(radius, radius),
+        ]);
+        for leaf in self.bvh.leaves(|node| node.aabb().intersects(&query)) {
             let object = &self.objects[leaf as usize];
-            if object.polygon.contains(*cursor_point) {
+            let hit = match &object.shape {
+                Shape::Polygon(polygon) => polygon.contains(cursor),
+                Shape::Point(p) => (*p - cursor).length() <= radius,
+                Shape::Line(points) => points
+                    .windows(2)
+                    .any(|w| segment_distance(cursor, w[0], w[1]) <= radius),
+            };
+            if hit {
                 hovered_objects.push(object.object_id);
             }
         }
@@ -58,6 +93,25 @@ impl TileCollider {
 impl Default for TileCollider {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Vec2, segment_distance};
+
+    #[test]
+    fn segment_distance_cases() {
+        let a = Vec2::new(0.0, 0.0);
+        let b = Vec2::new(10.0, 0.0);
+        // On the segment.
+        assert_eq!(segment_distance(Vec2::new(5.0, 0.0), a, b), 0.0);
+        // Perpendicular off the middle.
+        assert_eq!(segment_distance(Vec2::new(5.0, 3.0), a, b), 3.0);
+        // Past an endpoint clamps to the endpoint distance, not the infinite line.
+        assert_eq!(segment_distance(Vec2::new(-4.0, 0.0), a, b), 4.0);
+        // Degenerate segment (a == b) is the distance to the point.
+        assert_eq!(segment_distance(Vec2::new(3.0, 4.0), a, a), 5.0);
     }
 }
 
@@ -73,21 +127,26 @@ impl TileColliderLoader for Arc<RwLock<TileCollider>> {
                 let mut collision_objects: Vec<CollisionObject> = Vec::new();
                 let mut aabbs: Vec<Aabb> = Vec::new();
                 for (object_id, object) in objects.iter().enumerate() {
-                    // Only polygons enclose an area. Points (e.g. multipoint housenumber
-                    // features) and lines would otherwise be treated as fake polygons.
-                    let Geometry::Polygon(polygon) = object.geometry() else {
-                        continue;
+                    let (aabb, shape) = match object.geometry() {
+                        Geometry::Polygon(polygon) => {
+                            if polygon.is_empty() {
+                                continue;
+                            }
+                            (polygon.aabb(), Shape::Polygon(polygon.clone()))
+                        }
+                        Geometry::Point(p) => (Aabb::from_points([*p]), Shape::Point(*p)),
+                        Geometry::Line(points) => {
+                            if points.len() < 2 {
+                                continue;
+                            }
+                            (
+                                Aabb::from_points(points.iter().copied()),
+                                Shape::Line(points.clone()),
+                            )
+                        }
                     };
-
-                    if polygon.is_empty() {
-                        continue;
-                    }
-
-                    aabbs.push(polygon.aabb());
-                    collision_objects.push(CollisionObject {
-                        object_id,
-                        polygon: polygon.clone(),
-                    });
+                    aabbs.push(aabb);
+                    collision_objects.push(CollisionObject { object_id, shape });
                 }
                 // Build the tree in one shot; incremental `insert` leaves the tree unbalanced
                 // and `leaves` then yields internal node indices instead of leaf data.
