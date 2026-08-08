@@ -48,14 +48,18 @@ struct VsOut {
 @vertex
 fn vs_main(in: VsIn) -> VsOut {
     let speed = length(in.wind);
-    // Screen direction: north is -y in clip space, so flip v.
-    let dir = normalize(vec2<f32>(in.wind.x, -in.wind.y) + vec2<f32>(1e-6, 0.0));
+    // The basemap flips clip-space y (shader.vert ends with gl_Position.y = -y),
+    // so the final screen is +y up / north up. Point the arrow straight along the
+    // wind vector (u east, v north) in that space.
+    let dir = normalize(in.wind + vec2<f32>(1e-6, 0.0));
     // Constant on-screen arrow length in pixels, growing a little with speed.
     let px = 14.0 + min(speed, 40.0) * 0.6;
     let rot = mat2x2<f32>(dir.x, dir.y, -dir.y, dir.x);
     let offset_px = rot * (in.corner * px);
-    // Anchor in clip space, then add the pixel offset converted to clip units.
+    // Anchor in clip space, then match the basemap's y-flip so positions and pan
+    // track the map. Pixel offset is added in that same +y-up space.
     var anchor = u.world_to_clip * vec4<f32>(in.world, 0.0, 1.0);
+    anchor.y = -anchor.y;
     let ndc_off = offset_px / (u.viewport * 0.5);
     var out: VsOut;
     out.pos = vec4<f32>(anchor.xy + ndc_off, 0.0, 1.0);
