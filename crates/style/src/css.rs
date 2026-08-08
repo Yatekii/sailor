@@ -19,8 +19,23 @@ const DEFAULT_STYLE: &str = include_str!("../../../config/style.css");
 
 /// Tries to parse an entire stylesheet.
 pub fn try_parse_styles(style: &str) -> Option<Vec<Rule>> {
+    let style: &str = &strip_comments(style);
     match rules::<VerboseError<&str>>(style) {
-        Ok((_, s)) => Some(s),
+        Ok((remaining, s)) => {
+            // many0 stops at the first byte it can't parse and silently keeps the rest.
+            // Surface that instead of rendering nothing.
+            if !remaining.trim().is_empty() {
+                let at = style.len() - remaining.len();
+                let line = style[..at].bytes().filter(|&b| b == b'\n').count() + 1;
+                let snippet: String = remaining.trim_start().chars().take(60).collect();
+                log::warn!(
+                    "stylesheet: stopped parsing at line {line}, {} rule(s) loaded. \
+                     unparsed: {snippet:?}",
+                    s.len()
+                );
+            }
+            Some(s)
+        }
         Err(Err::Error(e)) | Err(Err::Failure(e)) => {
             log::info!("Failed to load stylesheet.");
             log::info!("Trace: {}", convert_error(style, e));
@@ -255,6 +270,24 @@ enum SelectorPart {
     Class(String),
     Id(String),
     Any(String, String),
+}
+
+/// Replace `/* ... */` comments with spaces, keeping newlines so line numbers
+/// in parse warnings still point at the right place. CSS comments don't nest.
+fn strip_comments(style: &str) -> String {
+    let mut out = String::with_capacity(style.len());
+    let mut rest = style;
+    while let Some(start) = rest.find("/*") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 2..];
+        let end = after.find("*/").map(|e| e + 2).unwrap_or(after.len());
+        for c in after[..end].chars() {
+            out.push(if c == '\n' { '\n' } else { ' ' });
+        }
+        rest = &after[end..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Parses an entire set of rules.
@@ -589,4 +622,12 @@ where
 fn selector_size() {
     let selector = Selector::default();
     assert_eq!(selector.size(), 96);
+}
+
+#[test]
+fn comments_are_stripped_and_parse() {
+    // leading + inline comment; newlines inside comment preserve line numbers.
+    let css = "/* header\nspanning */\nbackground { background-color: red; } /* trailing */";
+    assert_eq!(strip_comments(css).lines().count(), css.lines().count());
+    assert_eq!(try_parse_styles(css).unwrap().len(), 1);
 }
