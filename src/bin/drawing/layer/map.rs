@@ -217,12 +217,16 @@ impl MapLayer {
     /// that scrolled out. Restyles features via the app-owned stylesheet cache.
     pub fn load_visible(&mut self, camera: &Camera, css_cache: &mut RulesCache) {
         let zoom = camera.zoom;
-        let tile_field = camera.get_tile_boundaries_for_zoom_level(zoom, 1);
+        // Fetch one level deeper than the display zoom. Our map panel is smaller
+        // than a full browser window, so at floor(zoom) we'd pull tiles too coarse
+        // to carry buildings/POIs (z13/z14 content). Overzoom restores that detail.
+        let overzoom = 1;
+        let tile_field = camera.get_tile_boundaries_for_zoom_level(zoom, 1, overzoom);
 
         // Remove old bigger tiles which are not in the FOV anymore.
-        let old_tile_field = camera.get_tile_boundaries_for_zoom_level(zoom - 1.0, 2);
+        let old_tile_field = camera.get_tile_boundaries_for_zoom_level(zoom - 1.0, 2, overzoom);
         for tile_id in &self.visible_tiles.clone() {
-            if tile_id.z == (zoom - 1.0) as u32 {
+            if tile_id.z == (zoom - 1.0) as u32 + overzoom {
                 if !old_tile_field.contains(tile_id) {
                     self.remove_visible_tile(tile_id);
                 }

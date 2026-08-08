@@ -34,7 +34,7 @@ impl Camera {
 
     /// Tile field covering the view at zoom level `z` (a level query, so it keeps
     /// an explicit `z`: callers ask for `zoom` and `zoom - 1` to manage the pyramid).
-    pub fn get_tile_boundaries_for_zoom_level(&self, z: f32, scale: u32) -> TileField {
+    pub fn get_tile_boundaries_for_zoom_level(&self, z: f32, scale: u32, overzoom: u32) -> TileField {
         let z = z.min(14.0);
         // Use the same fractional zoom as `global_to_screen` so the visible extent
         // matches what is actually rendered; using the integer floor here would
@@ -42,13 +42,18 @@ impl Camera {
         let px_to_world = self.width / self.tile_size() / 2.0 / 2f32.powf(z) / scale as f32;
         let py_to_world = self.height / self.tile_size() / 2.0 / 2f32.powf(z) / scale as f32;
 
+        // The extent comes from the fractional display zoom above, but the tile
+        // *level* can be pushed deeper (overzoom) so a small viewport still fetches
+        // the detail OMT only ships at higher zooms. Capped at the source max (14).
+        let level = ((z as u32) + overzoom).min(14);
+
         // Tile selection only needs integer tile ids, so f32 is plenty here.
         let center = point(self.center.x as f32, self.center.y as f32);
         let top_left: TileId =
-            world_to_tile_space(&(center - vector(px_to_world, py_to_world)), z as u32).into();
+            world_to_tile_space(&(center - vector(px_to_world, py_to_world)), level).into();
         let bottom_right: TileId =
-            world_to_tile_space(&(center + vector(px_to_world, py_to_world)), z as u32).into();
-        TileField::new(top_left, bottom_right + TileId::new(z as u32, 1, 0))
+            world_to_tile_space(&(center + vector(px_to_world, py_to_world)), level).into();
+        TileField::new(top_left, bottom_right + TileId::new(level, 1, 0))
     }
 
     pub fn tile_to_screen(&self, coordinate: &TileId) -> Transform<TileLocal, Gpu> {
