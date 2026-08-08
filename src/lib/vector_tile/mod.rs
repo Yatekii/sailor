@@ -13,7 +13,7 @@ use vector_tile::mod_Tile::*;
 
 use crate::{
     drawing::{
-        line_tesselator::tesselate_line2,
+        line_tesselator::{tesselate_line2, tesselate_points},
         mesh::MeshBuilder,
         vertex::{Vertex, VertexType},
     },
@@ -161,6 +161,13 @@ pub fn paths_to_drawable(
             builder.set_current_vertex_type(VertexType::Line);
             builder.set_current_extent(extent);
             tesselate_line2(path, builder, extent);
+        }
+
+        if geometry_type == GeomType::POINT {
+            // Dots reuse the line vertex type so `line-width` sizes them in pixels.
+            builder.set_current_vertex_type(VertexType::Line);
+            builder.set_current_extent(extent);
+            tesselate_points(path, builder, extent);
         }
     }
 }

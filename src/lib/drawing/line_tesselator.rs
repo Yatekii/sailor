@@ -6,7 +6,7 @@ use lyon::{
 };
 use nalgebra::Vector1;
 
-use crate::math::{EuclidVsNalgebra, Point2, Rotation2};
+use crate::math::{EuclidVsNalgebra, Point2, Rotation2, Vector2};
 
 use super::mesh::MeshBuilder;
 
@@ -124,6 +124,25 @@ pub fn tesselate_line2(path: &Path, builder: &mut MeshBuilder, extent: f32) {
     builder.end_geometry();
 }
 
+/// Emit a small screen-space square (a dot) at each point of the path. The corners
+/// carry diagonal normals and are drawn as line-type vertices, so the shader
+/// extrudes them by `line-width` pixels — a fixed-size dot that doesn't scale with
+/// zoom. `line-width` is the dot's full pixel size.
+pub fn tesselate_points(path: &Path, builder: &mut MeshBuilder, extent: f32) {
+    builder.begin_geometry();
+    let e = extent;
+    for p in path.points() {
+        let c: Point2 = p.convert();
+        let tl = builder.add_vertex(c, Vector2::new(-e, -e));
+        let tr = builder.add_vertex(c, Vector2::new(e, -e));
+        let br = builder.add_vertex(c, Vector2::new(e, e));
+        let bl = builder.add_vertex(c, Vector2::new(-e, e));
+        <dyn FillGeometryBuilder>::add_triangle(builder, tl, tr, br);
+        <dyn FillGeometryBuilder>::add_triangle(builder, tl, br, bl);
+    }
+    builder.end_geometry();
+}
+
 #[cfg(test)]
 mod tests {
     use lyon::{math::Point, path::Path, tessellation::VertexBuffers};
@@ -136,7 +155,40 @@ mod tests {
         math::TileId,
     };
 
-    use super::tesselate_line2;
+    use super::{tesselate_line2, tesselate_points};
+
+    #[test]
+    fn tesselate_points_emits_a_quad_per_point() {
+        let extent = 4096.0;
+        let mut builder = Path::builder();
+        builder.begin(Point::new(10.0, 20.0));
+        builder.end(false);
+        builder.begin(Point::new(30.0, 40.0));
+        builder.end(false);
+        let path = builder.build();
+
+        let mut buffers = VertexBuffers::new();
+        let mut mesh = MeshBuilder::new(
+            &mut buffers,
+            LayerVertexCtor {
+                tile_id: TileId::new(0, 0, 0),
+                feature_id: 0,
+                extent,
+                vertex_type: VertexType::Line,
+                object_id: 0,
+            },
+        );
+        tesselate_points(&path, &mut mesh, extent);
+
+        // Two points -> two quads: 4 verts + 6 indices each.
+        assert_eq!(mesh.buffers.vertices.len(), 8);
+        assert_eq!(mesh.buffers.indices.len(), 12);
+        for v in &mesh.buffers.vertices {
+            let normal = v.normal; // packed struct: copy out before use
+            assert_eq!(normal[0].unsigned_abs() as f32, extent);
+            assert_eq!(normal[1].unsigned_abs() as f32, extent);
+        }
+    }
 
     #[test]
     fn tesselate_straight_line() {
