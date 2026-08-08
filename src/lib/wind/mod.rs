@@ -35,13 +35,15 @@ impl WindModel {
         }
     }
 
+    /// Display name including the native grid resolution (kept in sync with
+    /// `native_step_deg`; ~111 km per degree).
     pub fn label(self) -> &'static str {
         match self {
-            Self::EcmwfIfs => "ECMWF IFS · global",
-            Self::Icon => "ICON · global (DWD)",
-            Self::AromeFrance => "AROME · France",
-            Self::IconCh1 => "ICON-CH1 · Alps (MeteoSwiss)",
-            Self::Gfs => "GFS · global (US)",
+            Self::EcmwfIfs => "ECMWF IFS · global · 0.25° (~28 km)",
+            Self::Icon => "ICON · global (DWD) · 0.1° (~11 km)",
+            Self::AromeFrance => "AROME · France · 0.025° (~2.8 km)",
+            Self::IconCh1 => "ICON-CH1 · Alps (MeteoSwiss) · 0.01° (~1 km)",
+            Self::Gfs => "GFS · global (US) · 0.25° (~28 km)",
         }
     }
 
