@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+pub mod cache;
+
 /// One wind sample on the lat/lon grid. u is eastward, v is northward, in knots.
 #[derive(Clone, Copy, Debug)]
 pub struct WindSample {
