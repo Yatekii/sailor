@@ -1,43 +1,48 @@
+use std::f64::consts::{FRAC_PI_4, PI};
+
 use crate::config::CONFIG;
 use osm::drawing::as_byte_slice;
-use osm::math::{deg2num, num2deg, Camera, Coord, Geo, Pixel, TileCoordinate};
+use osm::math::{num2deg, Camera, Coord, Geo, Pixel, TileCoordinate};
 use osm::wind::cache::{Bbox, WindCache};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
 
 use super::{FramePass, Layer, LayerCtx};
 
-/// One arrow instance: world-space anchor (mercator [0,1]) and wind vector (kn).
+/// Max arrows drawn in a frame; the lattice fetch is capped well below this.
+const MAX_INSTANCES: usize = 512;
+
+/// One arrow instance: position relative to the camera centre (mercator units)
+/// and the wind vector (u east, v north, knots). The offset is kept relative
+/// and subtracted in f64 on the cpu so it doesn't cancel in f32 at high zoom.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 struct Instance {
-    world_x: f32,
-    world_y: f32,
+    rel_x: f32,
+    rel_y: f32,
     u: f32,
     v: f32,
 }
 
-/// Camera uniform: world->clip matrix (mat4) + viewport size in pixels.
+/// Camera uniform: mercator->clip scale (x, y) + viewport size in pixels.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 struct Uniforms {
-    world_to_clip: [f32; 16],
+    scale: [f32; 2],
     viewport: [f32; 2],
-    _pad: [f32; 2],
 }
 
 const WGSL: &str = r#"
 struct Uniforms {
-    world_to_clip: mat4x4<f32>,
+    scale: vec2<f32>,
     viewport: vec2<f32>,
-    _pad: vec2<f32>,
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
 struct VsIn {
     @location(0) corner: vec2<f32>,   // unit arrow vertex, x along shaft
-    @location(1) world: vec2<f32>,
-    @location(2) wind: vec2<f32>,       // u (east), v (north) in knots
+    @location(1) rel: vec2<f32>,      // position relative to camera centre
+    @location(2) wind: vec2<f32>,     // u (east), v (north) in knots
 };
 
 struct VsOut {
@@ -52,17 +57,18 @@ fn vs_main(in: VsIn) -> VsOut {
     // so the final screen is +y up / north up. Point the arrow straight along the
     // wind vector (u east, v north) in that space.
     let dir = normalize(in.wind + vec2<f32>(1e-6, 0.0));
-    // Constant on-screen arrow length in pixels, growing a little with speed.
-    let px = 14.0 + min(speed, 40.0) * 0.6;
+    // On-screen arrow length in pixels, growing a little with speed.
+    let px = 70.0 + min(speed, 40.0) * 3.0;
     let rot = mat2x2<f32>(dir.x, dir.y, -dir.y, dir.x);
     let offset_px = rot * (in.corner * px);
-    // Anchor in clip space, then match the basemap's y-flip so positions and pan
-    // track the map. Pixel offset is added in that same +y-up space.
-    var anchor = u.world_to_clip * vec4<f32>(in.world, 0.0, 1.0);
+    // Only the scale is applied here; the centre offset was already subtracted in
+    // f64 on the cpu, so there is no large-number cancellation at high zoom. Then
+    // match the basemap's y-flip so positions and pan track the map.
+    var anchor = in.rel * u.scale;
     anchor.y = -anchor.y;
     let ndc_off = offset_px / (u.viewport * 0.5);
     var out: VsOut;
-    out.pos = vec4<f32>(anchor.xy + ndc_off, 0.0, 1.0);
+    out.pos = vec4<f32>(anchor + ndc_off, 0.0, 1.0);
     out.speed = speed;
     return out;
 }
@@ -91,11 +97,9 @@ pub struct WindLayer {
     bind_group: Option<BindGroup>,
     template: Buffer,
     uniform: Buffer,
-    instances: Option<Buffer>,
+    instances: Buffer,
     instance_count: u32,
     cache: WindCache,
-    /// snapped region the current instance buffer was built for
-    built_bbox: Option<Bbox>,
     visible: bool,
 }
 
@@ -205,16 +209,22 @@ impl WindLayer {
             mapped_at_creation: false,
         });
 
+        let instances = device.create_buffer(&BufferDescriptor {
+            label: Some("wind instances"),
+            size: (MAX_INSTANCES * std::mem::size_of::<Instance>()) as u64,
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         Self {
             pipeline,
             bind_group_layout,
             bind_group: None,
             template,
             uniform,
-            instances: None,
+            instances,
             instance_count: 0,
             cache: WindCache::new(CONFIG.general.data_root.clone()),
-            built_bbox: None,
             visible: true,
         }
     }
@@ -248,41 +258,47 @@ impl Layer for WindLayer {
     }
 
     fn update(&mut self, ctx: &mut LayerCtx) {
-        let bbox = Self::viewport_bbox(ctx.screen);
-        self.cache.request(bbox);
+        let cam = ctx.screen;
+        self.cache.request(Self::viewport_bbox(cam));
 
-        // Rebuild the instance buffer only when the loaded field region changes,
-        // not every pan frame — the field only changes when we cross a grid line.
-        let field_bbox = self.cache.loaded_bbox();
-        if field_bbox != self.built_bbox {
-            if let Some(field) = self.cache.field() {
-                let instances: Vec<Instance> = field
+        // Rebuild instances each frame: position is relative to the camera centre,
+        // which moves on every pan/zoom. Subtract the centre in f64 (and project
+        // lat/lon in f64) so a small offset doesn't vanish in f32 at high zoom.
+        let center = cam.center;
+        let instances: Vec<Instance> = self
+            .cache
+            .field()
+            .map(|field| {
+                field
                     .samples
                     .iter()
+                    .take(MAX_INSTANCES)
                     .map(|s| {
-                        // world space is the z=0 tile coordinate (mercator [0,1]).
-                        let t = deg2num(Coord::<Geo>::new(s.lon, s.lat), 0);
-                        Instance { world_x: t.x, world_y: t.y, u: s.u, v: s.v }
+                        let lon = s.lon as f64;
+                        let lat = (s.lat as f64).to_radians();
+                        let wx = (lon + 180.0) / 360.0;
+                        let wy = (1.0 - (FRAC_PI_4 + lat / 2.0).tan().ln() / PI) / 2.0;
+                        Instance {
+                            rel_x: (wx - center.x) as f32,
+                            rel_y: (wy - center.y) as f32,
+                            u: s.u,
+                            v: s.v,
+                        }
                     })
-                    .collect();
-                self.instance_count = instances.len() as u32;
-                self.instances = Some(ctx.device.create_buffer_init(&BufferInitDescriptor {
-                    label: Some("wind instances"),
-                    contents: as_byte_slice(&instances),
-                    usage: BufferUsages::VERTEX,
-                }));
-                self.built_bbox = field_bbox;
-            }
+                    .collect()
+            })
+            .unwrap_or_default();
+        self.instance_count = instances.len() as u32;
+        if !instances.is_empty() {
+            ctx.queue
+                .write_buffer(&self.instances, 0, as_byte_slice(&instances));
         }
 
-        // Upload the camera uniform every frame (world->clip changes on pan/zoom).
-        let m = ctx.screen.world_to_gpu();
-        let mut world_to_clip = [0.0f32; 16];
-        world_to_clip.copy_from_slice(m.matrix().as_slice());
+        // Mercator->clip scale (same as world_to_gpu without the centre term).
+        let s = 2f32.powf(cam.zoom) * cam.tile_size();
         let uniforms = Uniforms {
-            world_to_clip,
-            viewport: [ctx.screen.width, ctx.screen.height],
-            _pad: [0.0, 0.0],
+            scale: [s / (cam.width / 2.0), s / (cam.height / 2.0)],
+            viewport: [cam.width, cam.height],
         };
         ctx.queue.write_buffer(&self.uniform, 0, as_byte_slice(&[uniforms]));
 
@@ -298,7 +314,6 @@ impl Layer for WindLayer {
     }
 
     fn paint(&self, frame: &mut FramePass) {
-        let Some(instances) = &self.instances else { return };
         let Some(bind_group) = &self.bind_group else { return };
         if self.instance_count == 0 {
             return;
@@ -323,7 +338,7 @@ impl Layer for WindLayer {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, bind_group, &[]);
         pass.set_vertex_buffer(0, self.template.slice(..));
-        pass.set_vertex_buffer(1, instances.slice(..));
+        pass.set_vertex_buffer(1, self.instances.slice(..));
         pass.draw(0..ARROW.len() as u32, 0..self.instance_count);
     }
 }
