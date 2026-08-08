@@ -44,6 +44,17 @@ impl WindModel {
             Self::Gfs => "GFS · global (US)",
         }
     }
+
+    /// The model's native grid spacing in degrees. Sampling finer than this just
+    /// returns interpolated duplicates, so it's the floor for the arrow lattice.
+    pub fn native_step_deg(self) -> f32 {
+        match self {
+            Self::EcmwfIfs | Self::Gfs => 0.25,
+            Self::Icon => 0.1,
+            Self::AromeFrance => 0.025,
+            Self::IconCh1 => 0.01,
+        }
+    }
 }
 
 /// One wind sample on the lat/lon grid. u is eastward, v is northward, in knots.

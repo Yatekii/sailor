@@ -53,7 +53,7 @@ impl Bbox {
 /// Safety cap on lattice points per request; bounds the url length, the instance
 /// count, and the open-meteo quota cost (billed per location). The step is
 /// doubled until the lattice fits.
-const MAX_POINTS: usize = 150;
+const MAX_POINTS: usize = 350;
 /// Let the view settle this long before fetching, so panning across many
 /// lattice cells fires one request instead of a burst.
 const DEBOUNCE: Duration = Duration::from_millis(400);
@@ -64,10 +64,13 @@ const BACKOFF: Duration = Duration::from_secs(15);
 
 /// Pick a "nice" lattice step (degrees) for a viewport `span` degrees wide, so
 /// the overlay keeps a roughly constant on-screen arrow density: `target` arrows
-/// across the span. Coarse when zoomed out, fine when zoomed in.
-pub fn nice_step(span: f32, target: f32) -> f32 {
-    const STEPS: [f32; 10] = [0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 30.0];
-    let ideal = span / target.max(1.0);
+/// across the span. Never finer than `min_step` (the model's native grid —
+/// finer only returns interpolated duplicates). Coarse when zoomed out, fine in.
+pub fn nice_step(span: f32, target: f32, min_step: f32) -> f32 {
+    const STEPS: [f32; 13] = [
+        0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 30.0,
+    ];
+    let ideal = (span / target.max(1.0)).max(min_step);
     for s in STEPS {
         if s >= ideal {
             return s;
@@ -114,10 +117,11 @@ pub fn open_meteo_url(model: &str, bbox: Bbox, step: f32) -> (String, String) {
 }
 
 /// Choose the lattice step and snapped bbox for a viewport at `density` arrows
-/// across, coarsening the step until the lattice fits under `MAX_POINTS`.
-fn plan_lattice(bbox: Bbox, density: f32) -> (Bbox, f32) {
+/// across, never finer than the model's `min_step`, coarsening until the lattice
+/// fits under `MAX_POINTS`.
+fn plan_lattice(bbox: Bbox, density: f32, min_step: f32) -> (Bbox, f32) {
     let clamped = bbox.clamp_valid();
-    let mut step = nice_step(clamped.width().max(clamped.height()), density);
+    let mut step = nice_step(clamped.width().max(clamped.height()), density, min_step);
     let mut snapped = clamped.snap(step);
     while point_count(snapped, step) > MAX_POINTS {
         step *= 2.0;
@@ -192,7 +196,7 @@ impl WindCache {
             }
         }
 
-        let (snapped, step) = plan_lattice(bbox, self.density);
+        let (snapped, step) = plan_lattice(bbox, self.density, self.model.native_step_deg());
 
         if self.loaded_bbox == Some(snapped) {
             self.pending = None;
@@ -254,9 +258,18 @@ mod tests {
     // one, floored at the smallest step.
     #[test]
     fn nice_step_tracks_zoom() {
-        assert!(nice_step(360.0, 10.0) > nice_step(10.0, 10.0));
-        assert!(nice_step(10.0, 10.0) > nice_step(0.5, 10.0));
-        assert_eq!(nice_step(0.01, 10.0), 0.1); // floored
+        assert!(nice_step(360.0, 10.0, 0.1) > nice_step(10.0, 10.0, 0.1));
+        assert!(nice_step(10.0, 10.0, 0.1) > nice_step(0.5, 10.0, 0.1));
+        assert_eq!(nice_step(0.01, 10.0, 0.1), 0.1); // floored at min_step
+    }
+
+    // A high-res model (small min_step) can sample finer than the old 0.1 floor.
+    #[test]
+    fn finer_min_step_allows_denser() {
+        // 2 deg span, 100 arrows across -> 0.02 ideal, allowed by a 0.01 floor.
+        assert!(nice_step(2.0, 100.0, 0.01) < 0.1);
+        // but the same request on a 0.25 model can't go below its native grid.
+        assert_eq!(nice_step(2.0, 100.0, 0.25), 0.25);
     }
 
     // A viewport spilling past the world clamps to valid lat/lon so the fetch
@@ -273,7 +286,7 @@ mod tests {
     #[test]
     fn lattice_stays_under_cap() {
         let world = Bbox { min_lon: -180.0, min_lat: -85.0, max_lon: 180.0, max_lat: 85.0 };
-        let (snapped, step) = plan_lattice(world, 10.0);
+        let (snapped, step) = plan_lattice(world, 10.0, 0.25);
         assert!(point_count(snapped, step) <= MAX_POINTS);
     }
 
