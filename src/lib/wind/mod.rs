@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 pub mod cache;
+pub mod ecmwf;
 pub mod grid;
 
 /// A selectable weather model, mapped to its Open-Meteo id. Non-US models first;
