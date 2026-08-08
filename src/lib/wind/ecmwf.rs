@@ -1,3 +1,6 @@
+use std::path::Path;
+
+use sailor_platform::{http, platform};
 use serde::Deserialize;
 
 /// A field's byte range within an ECMWF open-data `.grib2` file.
@@ -67,10 +70,6 @@ pub fn ecmwf_run_candidates(now_unix: i64) -> Vec<(String, u32)> {
         })
         .collect()
 }
-
-use std::path::Path;
-
-use sailor_platform::{http, platform};
 
 const ECMWF_BASE: &str = "https://data.ecmwf.int/forecasts";
 
