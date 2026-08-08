@@ -3871,6 +3871,7 @@ dependencies = [
  "sailor-platform",
  "sailor-style",
  "serde",
+ "serde_json",
  "tokio",
  "varint",
  "wasm-bindgen-futures",

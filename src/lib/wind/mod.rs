@@ -1,3 +1,5 @@
+use serde::Deserialize;
+
 /// One wind sample on the lat/lon grid. u is eastward, v is northward, in knots.
 #[derive(Clone, Copy, Debug)]
 pub struct WindSample {
@@ -20,6 +22,35 @@ pub struct WindField {
 pub fn uv_from_speed_dir(speed: f32, dir_deg: f32) -> (f32, f32) {
     let r = dir_deg.to_radians();
     (-speed * r.sin(), -speed * r.cos())
+}
+
+impl WindField {
+    /// Parse Open-Meteo's multi-location `current` response into a field.
+    /// Returns None if the body is not the expected JSON shape.
+    pub fn from_open_meteo_json(bytes: &[u8]) -> Option<WindField> {
+        #[derive(Deserialize)]
+        struct Current {
+            wind_speed_10m: f32,
+            wind_direction_10m: f32,
+        }
+
+        #[derive(Deserialize)]
+        struct Loc {
+            latitude: f32,
+            longitude: f32,
+            current: Current,
+        }
+
+        let locs: Vec<Loc> = serde_json::from_slice(bytes).ok()?;
+        let samples = locs
+            .into_iter()
+            .map(|l| {
+                let (u, v) = uv_from_speed_dir(l.current.wind_speed_10m, l.current.wind_direction_10m);
+                WindSample { lon: l.longitude, lat: l.latitude, u, v }
+            })
+            .collect();
+        Some(WindField { samples })
+    }
 }
 
 #[cfg(test)]
@@ -45,5 +76,24 @@ mod tests {
         let (u, v) = uv_from_speed_dir(10.0, 270.0);
         approx(u, 10.0);
         approx(v, 0.0);
+    }
+
+    // Open-Meteo returns a JSON array (one object per requested location), each
+    // with a `current` block. We map each into one WindSample.
+    #[test]
+    fn parses_open_meteo_array() {
+        let json = br#"[
+          {"latitude":47.0,"longitude":8.0,
+           "current":{"wind_speed_10m":10.0,"wind_direction_10m":270.0}},
+          {"latitude":47.5,"longitude":8.5,
+           "current":{"wind_speed_10m":0.0,"wind_direction_10m":0.0}}
+        ]"#;
+        let field = WindField::from_open_meteo_json(json).unwrap();
+        assert_eq!(field.samples.len(), 2);
+        let s = field.samples[0];
+        assert!((s.lon - 8.0).abs() < 1e-3);
+        assert!((s.lat - 47.0).abs() < 1e-3);
+        assert!((s.u - 10.0).abs() < 1e-3); // westerly -> eastward
+        assert!(s.v.abs() < 1e-3);
     }
 }
