@@ -1,6 +1,14 @@
 use std::path::Path;
+use std::sync::OnceLock;
 
 use crate::platform;
+
+/// One shared client for all wind fetches — mirrors fetch.rs. `reqwest::get`
+/// builds a fresh Client per call (no keep-alive); reusing one pools connections.
+fn client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(reqwest::Client::new)
+}
 
 /// Fetch raw Open-Meteo JSON for a grid request, cache-as-you-go on disk.
 ///
@@ -14,7 +22,7 @@ pub async fn fetch_wind_json(cache_location: &Path, cache_key: &str, url: &str) 
         return Some(cached);
     }
 
-    let data = match reqwest::get(url).await {
+    let data = match client().get(url).send().await {
         Ok(r) if r.status().is_success() => r.bytes().await.ok()?.to_vec(),
         Ok(r) => {
             log::warn!("wind fetch failed: {}", r.status());

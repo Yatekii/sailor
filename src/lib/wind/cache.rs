@@ -89,8 +89,10 @@ impl WindCache {
                 self.loader = None;
                 if let Some(field) = result {
                     self.field = Some(field);
-                    self.loaded_bbox = Some(b);
                 }
+                // mark the bbox even on failure so we don't immediately re-fetch
+                // the same region and spam the api at ~60 req/sec
+                self.loaded_bbox = Some(b);
             }
         }
 
@@ -114,6 +116,11 @@ impl WindCache {
     /// The most recently loaded field, if any.
     pub fn field(&self) -> Option<&WindField> {
         self.field.as_ref()
+    }
+
+    /// The snapped bbox the current field was fetched for, if any.
+    pub fn loaded_bbox(&self) -> Option<Bbox> {
+        self.loaded_bbox
     }
 }
 

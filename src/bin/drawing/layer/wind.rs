@@ -90,7 +90,8 @@ pub struct WindLayer {
     instances: Option<Buffer>,
     instance_count: u32,
     cache: WindCache,
-    last_bbox: Option<Bbox>,
+    /// snapped region the current instance buffer was built for
+    built_bbox: Option<Bbox>,
     visible: bool,
 }
 
@@ -176,8 +177,10 @@ impl WindLayer {
                 conservative: false,
             },
             depth_stencil: None,
+            // single-sampled: rendered directly onto frame.view like hover, so
+            // we don't re-resolve the msaa buffer and clobber other overlays
             multisample: MultisampleState {
-                count: CONFIG.renderer.msaa_samples,
+                count: 1,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
@@ -207,7 +210,7 @@ impl WindLayer {
             instances: None,
             instance_count: 0,
             cache: WindCache::new(CONFIG.general.data_root.clone()),
-            last_bbox: None,
+            built_bbox: None,
             visible: true,
         }
     }
@@ -244,10 +247,11 @@ impl Layer for WindLayer {
         let bbox = Self::viewport_bbox(ctx.screen);
         self.cache.request(bbox);
 
-        // Rebuild the instance buffer when the field or the view changed.
-        let moved = self.last_bbox != Some(bbox);
-        if let Some(field) = self.cache.field() {
-            if moved || self.instances.is_none() {
+        // Rebuild the instance buffer only when the loaded field region changes,
+        // not every pan frame — the field only changes when we cross a grid line.
+        let field_bbox = self.cache.loaded_bbox();
+        if field_bbox != self.built_bbox {
+            if let Some(field) = self.cache.field() {
                 let instances: Vec<Instance> = field
                     .samples
                     .iter()
@@ -263,9 +267,9 @@ impl Layer for WindLayer {
                     contents: as_byte_slice(&instances),
                     usage: BufferUsages::VERTEX,
                 }));
+                self.built_bbox = field_bbox;
             }
         }
-        self.last_bbox = Some(bbox);
 
         // Upload the camera uniform every frame (world->clip changes on pan/zoom).
         let m = ctx.screen.world_to_gpu();
@@ -300,8 +304,8 @@ impl Layer for WindLayer {
             label: Some("wind arrows"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 depth_slice: None,
-                view: frame.msaa.unwrap_or(frame.view),
-                resolve_target: frame.msaa.map(|_| frame.view),
+                view: frame.view,
+                resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Load,
                     store: StoreOp::Store,
