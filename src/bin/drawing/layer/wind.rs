@@ -259,7 +259,9 @@ impl Layer for WindLayer {
 
     fn update(&mut self, ctx: &mut LayerCtx) {
         let cam = ctx.screen;
-        self.cache.request(Self::viewport_bbox(cam));
+        self.visible = ctx.wind.visible;
+        self.cache
+            .request(Self::viewport_bbox(cam), ctx.wind.model, ctx.wind.density);
 
         // Rebuild instances each frame: position is relative to the camera centre,
         // which moves on every pan/zoom. Subtract the centre in f64 (and project

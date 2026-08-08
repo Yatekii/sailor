@@ -380,6 +380,7 @@ impl Application {
                         &self.app_state.screen,
                         selection,
                         hover,
+                        self.app_state.ui.wind,
                         &mut self.app_state.stats,
                     )
                 });

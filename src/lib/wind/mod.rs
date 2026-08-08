@@ -2,6 +2,50 @@ use serde::Deserialize;
 
 pub mod cache;
 
+/// A selectable weather model, mapped to its Open-Meteo id. Non-US models first;
+/// GFS is the US one we prefer to avoid but keep available.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindModel {
+    EcmwfIfs,
+    Icon,
+    AromeFrance,
+    IconCh1,
+    Gfs,
+}
+
+impl WindModel {
+    pub const ALL: [WindModel; 5] = [
+        Self::EcmwfIfs,
+        Self::Icon,
+        Self::AromeFrance,
+        Self::IconCh1,
+        Self::Gfs,
+    ];
+
+    /// The Open-Meteo `models=` id.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::EcmwfIfs => "ecmwf_ifs025",
+            Self::Icon => "icon_seamless",
+            Self::AromeFrance => "meteofrance_arome_france",
+            // meteoswiss ids are newer; verify against open-meteo's model list if
+            // this one returns nothing.
+            Self::IconCh1 => "meteoswiss_icon_ch1",
+            Self::Gfs => "gfs_seamless",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::EcmwfIfs => "ECMWF IFS · global",
+            Self::Icon => "ICON · global (DWD)",
+            Self::AromeFrance => "AROME · France",
+            Self::IconCh1 => "ICON-CH1 · Alps (MeteoSwiss)",
+            Self::Gfs => "GFS · global (US)",
+        }
+    }
+}
+
 /// One wind sample on the lat/lon grid. u is eastward, v is northward, in knots.
 #[derive(Clone, Copy, Debug)]
 pub struct WindSample {

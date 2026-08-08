@@ -195,6 +195,7 @@ impl Painter {
         camera: &Camera,
         selection: Option<Selection>,
         hover: Option<super::layer::hover::HoverInfo>,
+        wind: super::layer::WindControls,
         stats: &mut dyn StatSink,
     ) -> Option<Frame> {
         // Read back last frame's GPU pass timings (non-blocking) and record them.
@@ -236,6 +237,7 @@ impl Painter {
                 resolution: (self.surface_config.width, self.surface_config.height),
                 spans: &mut spans,
                 time: Default::default(),
+                wind,
             };
             map.update(&mut ctx);
             overlays.update_all(&mut ctx);

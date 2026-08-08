@@ -13,7 +13,7 @@ use crate::platform::spawn;
 /// points and lines have no area, so they test within a pick radius instead.
 enum Shape {
     Polygon(Polygon),
-    Point(Vec2),
+    Point(Vec<Vec2>),
     Line(Vec<Vec2>),
 }
 
@@ -78,7 +78,9 @@ impl TileCollider {
             let object = &self.objects[leaf as usize];
             let hit = match &object.shape {
                 Shape::Polygon(polygon) => polygon.contains(cursor),
-                Shape::Point(p) => (*p - cursor).length() <= radius,
+                Shape::Point(points) => {
+                    points.iter().any(|p| (*p - cursor).length() <= radius)
+                }
                 Shape::Line(points) => points
                     .windows(2)
                     .any(|w| segment_distance(cursor, w[0], w[1]) <= radius),
@@ -134,7 +136,15 @@ impl TileColliderLoader for Arc<RwLock<TileCollider>> {
                             }
                             (polygon.aabb(), Shape::Polygon(polygon.clone()))
                         }
-                        Geometry::Point(p) => (Aabb::from_points([*p]), Shape::Point(*p)),
+                        Geometry::Point(points) => {
+                            if points.is_empty() {
+                                continue;
+                            }
+                            (
+                                Aabb::from_points(points.iter().copied()),
+                                Shape::Point(points.clone()),
+                            )
+                        }
                         Geometry::Line(points) => {
                             if points.len() < 2 {
                                 continue;

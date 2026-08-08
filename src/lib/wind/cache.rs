@@ -4,7 +4,7 @@ use std::time::Duration;
 use web_time::Instant;
 
 use crate::platform::{Task, spawn_task};
-use crate::wind::WindField;
+use crate::wind::{WindField, WindModel};
 use sailor_platform::wind_fetch::fetch_wind_json;
 
 /// Geographic bounding box in degrees.
@@ -50,8 +50,6 @@ impl Bbox {
     }
 }
 
-/// Roughly how many arrows to show across the larger viewport dimension.
-const TARGET_ARROWS: f32 = 10.0;
 /// Safety cap on lattice points per request; bounds the url length, the instance
 /// count, and the open-meteo quota cost (billed per location). The step is
 /// doubled until the lattice fits.
@@ -63,14 +61,13 @@ const DEBOUNCE: Duration = Duration::from_millis(400);
 /// (a 429, a dropped connection) self-heals instead of freezing the field —
 /// without hammering the api at frame rate.
 const BACKOFF: Duration = Duration::from_secs(15);
-const MODEL: &str = "ecmwf_ifs025";
 
 /// Pick a "nice" lattice step (degrees) for a viewport `span` degrees wide, so
-/// the overlay keeps a roughly constant on-screen arrow density: coarse when
-/// zoomed out, fine when zoomed in.
-pub fn nice_step(span: f32) -> f32 {
+/// the overlay keeps a roughly constant on-screen arrow density: `target` arrows
+/// across the span. Coarse when zoomed out, fine when zoomed in.
+pub fn nice_step(span: f32, target: f32) -> f32 {
     const STEPS: [f32; 10] = [0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 30.0];
-    let ideal = span / TARGET_ARROWS;
+    let ideal = span / target.max(1.0);
     for s in STEPS {
         if s >= ideal {
             return s;
@@ -116,11 +113,11 @@ pub fn open_meteo_url(model: &str, bbox: Bbox, step: f32) -> (String, String) {
     (url, key)
 }
 
-/// Choose the lattice step and snapped bbox for a viewport, coarsening the step
-/// until the lattice fits under `MAX_POINTS`.
-fn plan_lattice(bbox: Bbox) -> (Bbox, f32) {
+/// Choose the lattice step and snapped bbox for a viewport at `density` arrows
+/// across, coarsening the step until the lattice fits under `MAX_POINTS`.
+fn plan_lattice(bbox: Bbox, density: f32) -> (Bbox, f32) {
     let clamped = bbox.clamp_valid();
-    let mut step = nice_step(clamped.width().max(clamped.height()));
+    let mut step = nice_step(clamped.width().max(clamped.height()), density);
     let mut snapped = clamped.snap(step);
     while point_count(snapped, step) > MAX_POINTS {
         step *= 2.0;
@@ -142,6 +139,9 @@ pub struct WindCache {
     pending: Option<(Bbox, f32, Instant)>,
     /// Don't fetch again until this time, set after a failed fetch.
     retry_after: Option<Instant>,
+    /// Current model + density; changing either invalidates and refetches.
+    model: WindModel,
+    density: f32,
 }
 
 impl WindCache {
@@ -153,14 +153,27 @@ impl WindCache {
             loader: None,
             pending: None,
             retry_after: None,
+            model: WindModel::EcmwfIfs,
+            density: 10.0,
         }
     }
 
-    /// Ask for wind over `bbox`. Plans a lattice; once the wanted region has
-    /// settled (and we're not loading or backing off), kick an async fetch.
-    /// Finalizes a completed fetch first, keeping the old field on failure.
-    pub fn request(&mut self, bbox: Bbox) {
+    /// Ask for wind over `bbox` for `model` at `density` arrows across. Changing
+    /// model or density invalidates and refetches. Plans a lattice; once the
+    /// wanted region has settled (and we're not loading or backing off), kick an
+    /// async fetch. Finalizes a completed fetch first, keeping the old field on
+    /// failure.
+    pub fn request(&mut self, bbox: Bbox, model: WindModel, density: f32) {
         let now = Instant::now();
+
+        if model != self.model || density != self.density {
+            self.model = model;
+            self.density = density;
+            self.loader = None;
+            self.loaded_bbox = None;
+            self.pending = None;
+            self.retry_after = None;
+        }
 
         if let Some((b, task)) = &mut self.loader {
             if let Some(result) = task.try_take() {
@@ -179,7 +192,7 @@ impl WindCache {
             }
         }
 
-        let (snapped, step) = plan_lattice(bbox);
+        let (snapped, step) = plan_lattice(bbox, self.density);
 
         if self.loaded_bbox == Some(snapped) {
             self.pending = None;
@@ -201,7 +214,7 @@ impl WindCache {
             }
         }
 
-        let (url, key) = open_meteo_url(MODEL, snapped, step);
+        let (url, key) = open_meteo_url(self.model.id(), snapped, step);
         let cache_location = self.cache_location.clone();
         let task = spawn_task(async move {
             fetch_wind_json(Path::new(&cache_location), &key, &url)
@@ -241,9 +254,9 @@ mod tests {
     // one, floored at the smallest step.
     #[test]
     fn nice_step_tracks_zoom() {
-        assert!(nice_step(360.0) > nice_step(10.0));
-        assert!(nice_step(10.0) > nice_step(0.5));
-        assert_eq!(nice_step(0.01), 0.1); // floored
+        assert!(nice_step(360.0, 10.0) > nice_step(10.0, 10.0));
+        assert!(nice_step(10.0, 10.0) > nice_step(0.5, 10.0));
+        assert_eq!(nice_step(0.01, 10.0), 0.1); // floored
     }
 
     // A viewport spilling past the world clamps to valid lat/lon so the fetch
@@ -260,7 +273,7 @@ mod tests {
     #[test]
     fn lattice_stays_under_cap() {
         let world = Bbox { min_lon: -180.0, min_lat: -85.0, max_lon: 180.0, max_lat: 85.0 };
-        let (snapped, step) = plan_lattice(world);
+        let (snapped, step) = plan_lattice(world, 10.0);
         assert!(point_count(snapped, step) <= MAX_POINTS);
     }
 

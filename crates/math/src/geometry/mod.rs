@@ -13,7 +13,8 @@ use parry2d::math::Vec2;
 pub enum Geometry {
     Polygon(Polygon),
     Line(Vec<Vec2>),
-    Point(Vec2),
+    /// All points of a (multi)point feature. Every one is drawn and hit-tested.
+    Point(Vec<Vec2>),
 }
 
 impl Geometry {
@@ -26,7 +27,7 @@ impl Geometry {
     }
 
     pub fn point(path: &Path) -> Self {
-        Geometry::Point(path_points(path).first().copied().unwrap_or(Vec2::new(0.0, 0.0)))
+        Geometry::Point(path_points(path))
     }
 
     /// A short, stable kind name (used by tests / debug output).
@@ -43,7 +44,7 @@ impl Geometry {
         match self {
             Geometry::Polygon(p) => p.point_count(),
             Geometry::Line(points) => points.len(),
-            Geometry::Point(_) => 1,
+            Geometry::Point(points) => points.len(),
         }
     }
 }

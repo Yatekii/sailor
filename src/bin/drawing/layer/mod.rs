@@ -8,6 +8,7 @@ use wgpu::{
 };
 
 use osm::math::{Camera, TileId};
+use osm::wind::WindModel;
 
 pub mod hover;
 pub mod map;
@@ -124,6 +125,26 @@ pub trait StatSink {
 #[derive(Clone, Copy, Default)]
 pub struct ForecastTime;
 
+/// Wind-overlay controls the app hands the wind layer each frame (from the UI).
+/// App-agnostic value; no egui type leaks into the layer.
+#[derive(Clone, Copy)]
+pub struct WindControls {
+    pub visible: bool,
+    pub model: WindModel,
+    /// Target arrows across the viewport (lattice density).
+    pub density: f32,
+}
+
+impl Default for WindControls {
+    fn default() -> Self {
+        Self {
+            visible: true,
+            model: WindModel::EcmwfIfs,
+            density: 10.0,
+        }
+    }
+}
+
 /// The currently selected feature, for highlight. App-agnostic value the app
 /// hands to the map each frame.
 #[derive(Clone, Copy)]
@@ -147,6 +168,7 @@ pub struct LayerCtx<'a> {
     pub resolution: (u32, u32),
     pub spans: &'a mut Spans,
     pub time: ForecastTime,
+    pub wind: WindControls,
 }
 
 /// The in-flight frame a layer records draw commands into.
