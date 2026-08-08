@@ -212,7 +212,15 @@ impl Application {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, event: WindowEvent) {
-        self.app_state.css_cache.update();
+        if self.app_state.css_cache.update() {
+            // Restyle already-loaded features against the new sheet; without this
+            // only tiles loaded after the edit would pick up the change.
+            let zoom = self.app_state.screen.zoom;
+            let fc = self.app_state.feature_collection();
+            fc.write()
+                .unwrap()
+                .load_styles(zoom, &mut self.app_state.css_cache);
+        }
         let ui_event = self.hud.interact(&self.painter.window, &event);
         match &event {
             WindowEvent::Destroyed => event_loop.exit(),

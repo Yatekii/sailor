@@ -75,14 +75,14 @@ impl Watcher for FileWatcher {
     }
 
     fn changed(&self) -> bool {
-        use notify::{EventKind, event::ModifyKind};
-        matches!(
-            self.rx.try_recv(),
-            Ok(Ok(notify::Event {
-                kind: EventKind::Modify(ModifyKind::Data(_)),
-                ..
-            }))
-        )
+        // Drain everything queued; any event on the watched path counts. Filtering
+        // by ModifyKind::Data misses macOS FSEvents and editors that save via a
+        // temp-file + atomic rename (which emit Create/Rename, not Modify(Data)).
+        let mut changed = false;
+        while let Ok(res) = self.rx.try_recv() {
+            changed |= res.is_ok();
+        }
+        changed
     }
 }
 
