@@ -336,7 +336,11 @@ impl MapLayer {
         let camera = camera.clone();
         let mut visible_tiles = Vec::with_capacity(MAX_TILES);
         for tile_id in self.visible_tiles.iter() {
-            let tile = self.tile_cache.try_get_tile(tile_id).unwrap();
+            // Skip any tile the cache has since evicted: this runs inside winit's
+            // mouse-moved callback, where a panic aborts hard instead of unwinding.
+            let Some(tile) = self.tile_cache.try_get_tile(tile_id) else {
+                continue;
+            };
             visible_tiles.push(VisibleTile {
                 tile_id: *tile_id,
                 extent: tile.extent() as f32,

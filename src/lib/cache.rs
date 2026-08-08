@@ -4,13 +4,18 @@ use std::sync::{Arc, RwLock};
 
 use lru::LruCache;
 
+use crate::config::MAX_TILES;
 use crate::feature::collection::FeatureCollection;
 use crate::fetch::fetch_tile_data;
 use crate::math::TileId;
 use crate::platform::{Task, spawn_task};
 use crate::vector_tile::tile::{Tile, TileStats};
 
-const MAX_CACHE_ENTRIES: NonZeroUsize = NonZeroUsize::new(20).unwrap();
+// The map layer assumes every visible tile is cached (it unwraps on lookup), so
+// the cache must hold at least the full visible set (MAX_TILES) plus headroom
+// for panning, which briefly holds old + new tiles. 20 < MAX_TILES evicted
+// still-visible tiles at low zoom and panicked hover/paint.
+const MAX_CACHE_ENTRIES: NonZeroUsize = NonZeroUsize::new(MAX_TILES * 2).unwrap();
 
 #[derive(Debug, Clone, Default)]
 #[allow(dead_code)]
