@@ -1,4 +1,7 @@
 use std::path::Path;
+use std::time::Duration;
+
+use web_time::Instant;
 
 use crate::platform::{Task, spawn_task};
 use crate::wind::WindField;
@@ -48,10 +51,18 @@ impl Bbox {
 }
 
 /// Roughly how many arrows to show across the larger viewport dimension.
-const TARGET_ARROWS: f32 = 16.0;
-/// Safety cap on lattice points per request; bounds the url length and the
-/// instance count. The step is doubled until the lattice fits.
-const MAX_POINTS: usize = 300;
+const TARGET_ARROWS: f32 = 10.0;
+/// Safety cap on lattice points per request; bounds the url length, the instance
+/// count, and the open-meteo quota cost (billed per location). The step is
+/// doubled until the lattice fits.
+const MAX_POINTS: usize = 150;
+/// Let the view settle this long before fetching, so panning across many
+/// lattice cells fires one request instead of a burst.
+const DEBOUNCE: Duration = Duration::from_millis(400);
+/// After a failed fetch, wait this long before retrying, so a transient error
+/// (a 429, a dropped connection) self-heals instead of freezing the field —
+/// without hammering the api at frame rate.
+const BACKOFF: Duration = Duration::from_secs(15);
 const MODEL: &str = "ecmwf_ifs025";
 
 /// Pick a "nice" lattice step (degrees) for a viewport `span` degrees wide, so
@@ -119,12 +130,18 @@ fn plan_lattice(bbox: Bbox) -> (Bbox, f32) {
 }
 
 /// Holds the current wind field and refetches when the snapped viewport changes.
-/// Mirrors `TileCache`: an async loader task feeds a held value.
+/// Mirrors `TileCache`: an async loader task feeds a held value. Refetches are
+/// debounced while the view moves and backed off after a failure.
 pub struct WindCache {
     cache_location: String,
     field: Option<WindField>,
     loaded_bbox: Option<Bbox>,
     loader: Option<(Bbox, Task<Option<WindField>>)>,
+    /// The region we want but haven't fetched yet, and since when it's been the
+    /// wanted region (for the settle debounce).
+    pending: Option<(Bbox, f32, Instant)>,
+    /// Don't fetch again until this time, set after a failed fetch.
+    retry_after: Option<Instant>,
 }
 
 impl WindCache {
@@ -134,30 +151,54 @@ impl WindCache {
             field: None,
             loaded_bbox: None,
             loader: None,
+            pending: None,
+            retry_after: None,
         }
     }
 
-    /// Ask for wind over `bbox`. Plans a lattice; if that differs from what we
-    /// have (or are loading), kick an async fetch. Finalizes a completed fetch first.
+    /// Ask for wind over `bbox`. Plans a lattice; once the wanted region has
+    /// settled (and we're not loading or backing off), kick an async fetch.
+    /// Finalizes a completed fetch first, keeping the old field on failure.
     pub fn request(&mut self, bbox: Bbox) {
+        let now = Instant::now();
+
         if let Some((b, task)) = &mut self.loader {
             if let Some(result) = task.try_take() {
                 let b = *b;
                 self.loader = None;
-                if let Some(field) = result {
-                    self.field = Some(field);
+                match result {
+                    Some(field) => {
+                        self.field = Some(field);
+                        self.loaded_bbox = Some(b);
+                        self.retry_after = None;
+                    }
+                    // Keep the last good field on screen and retry after a delay,
+                    // rather than freezing on the failed region or spamming it.
+                    None => self.retry_after = Some(now + BACKOFF),
                 }
-                // mark the bbox even on failure so we don't immediately re-fetch
-                // the same region and spam the api at ~60 req/sec
-                self.loaded_bbox = Some(b);
             }
         }
 
         let (snapped, step) = plan_lattice(bbox);
-        let already = self.loaded_bbox == Some(snapped);
-        let loading = self.loader.as_ref().map(|(b, _)| *b) == Some(snapped);
-        if already || loading {
+
+        if self.loaded_bbox == Some(snapped) {
+            self.pending = None;
             return;
+        }
+        // One fetch in flight at a time; still backing off; not settled yet.
+        if self.loader.is_some() || self.retry_after.is_some_and(|t| now < t) {
+            return;
+        }
+        match self.pending {
+            Some((b, _, since)) if b == snapped => {
+                if now.duration_since(since) < DEBOUNCE {
+                    return;
+                }
+            }
+            _ => {
+                self.pending = Some((snapped, step, now));
+                return;
+            }
         }
 
         let (url, key) = open_meteo_url(MODEL, snapped, step);
@@ -168,6 +209,7 @@ impl WindCache {
                 .and_then(|bytes| WindField::from_open_meteo_json(&bytes))
         });
         self.loader = Some((snapped, task));
+        self.pending = None;
     }
 
     /// The most recently loaded field, if any.
