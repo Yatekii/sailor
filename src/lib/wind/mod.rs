@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 pub mod cache;
+pub mod grid;
 
 /// A selectable weather model, mapped to its Open-Meteo id. Non-US models first;
 /// GFS is the US one we prefer to avoid but keep available.
