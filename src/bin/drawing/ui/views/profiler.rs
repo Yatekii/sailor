@@ -1,4 +1,4 @@
-use egui::{Color32, Rect, Sense, Ui, pos2, vec2};
+use egui::{Align2, Color32, FontId, Rect, Sense, Ui, pos2, vec2};
 
 use crate::app_state::AppState;
 
@@ -48,6 +48,31 @@ pub fn view_profiler(ui: &mut Ui, app_state: &mut AppState) {
                     Color32::from_rgb(120, 180, 255),
                 );
             }
+
+            // Axis ticks: y is frame count (0..peak), x is duration (0..max ms).
+            let font = FontId::proportional(9.0);
+            let ink = Color32::from_gray(150);
+            painter.text(
+                rect.left_top() + vec2(2.0, 0.0),
+                Align2::LEFT_TOP,
+                format!("{peak:.0} frames"),
+                font.clone(),
+                ink,
+            );
+            painter.text(
+                rect.left_bottom() + vec2(2.0, -1.0),
+                Align2::LEFT_BOTTOM,
+                "0",
+                font.clone(),
+                ink,
+            );
+            painter.text(
+                rect.right_bottom() + vec2(-2.0, -1.0),
+                Align2::RIGHT_BOTTOM,
+                format!("{max:.2}ms"),
+                font,
+                ink,
+            );
         }
     });
 }
