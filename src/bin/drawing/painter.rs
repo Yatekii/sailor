@@ -194,6 +194,7 @@ impl Painter {
         overlays: &mut LayerStack,
         camera: &Camera,
         selection: Option<Selection>,
+        hover: Option<super::layer::hover::HoverInfo>,
         stats: &mut dyn StatSink,
     ) -> Option<Frame> {
         // Read back last frame's GPU pass timings (non-blocking) and record them.
@@ -231,6 +232,7 @@ impl Painter {
                 encoder: &mut encoder,
                 screen: camera,
                 selection,
+                hover,
                 resolution: (self.surface_config.width, self.surface_config.height),
                 spans: &mut spans,
                 time: Default::default(),

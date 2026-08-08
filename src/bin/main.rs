@@ -1,6 +1,7 @@
 mod app_state;
 mod config;
 mod drawing;
+mod hover;
 mod stats;
 
 use std::sync::Arc;
@@ -195,6 +196,10 @@ impl Application {
         let mut overlays = drawing::layer::LayerStack::new();
         overlays.push(Box::new(drawing::layer::wind::WindLayer::default()));
         overlays.push(Box::new(drawing::layer::temperature::TemperatureLayer::default()));
+        overlays.push(Box::new(drawing::layer::hover::HoverLayer::new(
+            &painter.device,
+            painter.surface_config.format,
+        )));
 
         Self {
             hud,
@@ -354,13 +359,33 @@ impl Application {
                     }
                 });
 
-                if let Some(mut frame) = self.painter.paint(
-                    &mut self.map,
-                    &mut self.overlays,
-                    &self.app_state.screen,
-                    selection,
-                    &mut self.app_state.stats,
-                ) {
+                let cursor = {
+                    let c = self.app_state.cursor();
+                    (c.x, c.y)
+                };
+                let pixels_per_point = self.painter.window.scale_factor() as f32;
+                let hovered = self.app_state.hovered_objects.clone();
+                let hovered = hovered.lock().unwrap();
+                let zoom = self.app_state.screen.zoom;
+                let painted = hover::with_hover_info(
+                    &hovered,
+                    &self.app_state.css_cache,
+                    zoom,
+                    cursor,
+                    pixels_per_point,
+                    |hover| {
+                    self.painter.paint(
+                        &mut self.map,
+                        &mut self.overlays,
+                        &self.app_state.screen,
+                        selection,
+                        hover,
+                        &mut self.app_state.stats,
+                    )
+                });
+                drop(hovered);
+
+                if let Some(mut frame) = painted {
                     let hud_start = web_time::Instant::now();
                     self.hud.paint(
                         &mut self.app_state,

@@ -56,6 +56,9 @@ pub struct MapLayer {
     viewport: Viewport,
     atlas: TextAtlas,
     text_renderer: TextRenderer,
+    /// Draw on-map name labels. Off by default — the hover overlay shows names
+    /// instead, keeping the map uncluttered like the planetiler demo.
+    labels: bool,
 
     /// The map owns its data: the tile cache, the shared feature/style collection
     /// (a handle the app's UI also holds), and the current visible tile set.
@@ -200,6 +203,7 @@ impl MapLayer {
             viewport,
             atlas,
             text_renderer,
+            labels: false,
             tile_cache: TileCache::new(CONFIG.general.data_root.clone()),
             feature_collection,
             visible_tiles: Vec::new(),
@@ -765,6 +769,7 @@ impl Layer for MapLayer {
             );
         });
 
+        if self.labels {
         span!(ctx.spans, "cpu.text_prep", {
             self.viewport.update(
                 ctx.queue,
@@ -797,6 +802,7 @@ impl Layer for MapLayer {
                 )
                 .unwrap();
         });
+        }
     }
 
     fn paint(&self, frame: &mut FramePass) {
@@ -882,6 +888,7 @@ impl Layer for MapLayer {
             }
         });
 
+        if self.labels {
         span!(frame.spans, "cpu.text", {
             let text_ts = if frame.record_gpu {
                 frame.gpu_timing.map(|g| g.writes(2, 3))
@@ -909,5 +916,6 @@ impl Layer for MapLayer {
                 .render(&self.atlas, &self.viewport, &mut pass)
                 .unwrap();
         });
+        }
     }
 }

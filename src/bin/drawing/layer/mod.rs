@@ -9,6 +9,7 @@ use wgpu::{
 
 use osm::math::{Camera, TileId};
 
+pub mod hover;
 pub mod map;
 pub mod temperature;
 pub mod wind;
@@ -140,6 +141,8 @@ pub struct LayerCtx<'a> {
     pub encoder: &'a mut CommandEncoder,
     pub screen: &'a Camera,
     pub selection: Option<Selection>,
+    /// What the cursor is over this frame, for overlay layers (e.g. hover tooltip).
+    pub hover: Option<hover::HoverInfo<'a>>,
     /// Physical render-target resolution (width, height).
     pub resolution: (u32, u32),
     pub spans: &'a mut Spans,
