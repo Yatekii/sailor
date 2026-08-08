@@ -14,7 +14,7 @@
           inherit system;
           overlays = [ rust-overlay.overlays.default ];
         };
-        rust = pkgs.rust-bin.stable."1.96.0".default.override {
+        rust = pkgs.rust-bin.stable."1.97.1".default.override {
           extensions = [ "rust-src" "clippy" "rustfmt" ];
           targets = [ "wasm32-unknown-unknown" ];
         };
