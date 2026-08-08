@@ -35,7 +35,7 @@ struct Uniforms {
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
 struct VsIn {
-    @location(0) template: vec2<f32>,   // unit arrow vertex, x along shaft
+    @location(0) corner: vec2<f32>,   // unit arrow vertex, x along shaft
     @location(1) world: vec2<f32>,
     @location(2) wind: vec2<f32>,       // u (east), v (north) in knots
 };
@@ -53,7 +53,7 @@ fn vs_main(in: VsIn) -> VsOut {
     // Constant on-screen arrow length in pixels, growing a little with speed.
     let px = 14.0 + min(speed, 40.0) * 0.6;
     let rot = mat2x2<f32>(dir.x, dir.y, -dir.y, dir.x);
-    let offset_px = rot * (in.template * px);
+    let offset_px = rot * (in.corner * px);
     // Anchor in clip space, then add the pixel offset converted to clip units.
     var anchor = u.world_to_clip * vec4<f32>(in.world, 0.0, 1.0);
     let ndc_off = offset_px / (u.viewport * 0.5);
