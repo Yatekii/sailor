@@ -55,6 +55,7 @@ pollster = "1"
 quick-protobuf = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+gribberish = "1"
 varint = "0.9"
 wgpu = { version = "30", features = ["glsl"] }
 glyphon = "0.12"

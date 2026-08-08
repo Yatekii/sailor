@@ -1,3 +1,5 @@
+use gribberish::message::read_messages;
+
 /// A decoded regular lat/lon wind field for one forecast step. Degrees for
 /// angles, knots for u/v. The lat axis descends from `lat0` by `lat_step`; the
 /// lon axis ascends from `lon0` by `lon_step` and wraps the globe, so longitude
@@ -24,6 +26,43 @@ impl WindGrid {
         let col = raw.rem_euclid(self.nlon as isize) as usize;
         let idx = row * self.nlon + col;
         (self.u[idx], self.v[idx])
+    }
+}
+
+/// Metres/second to knots.
+const MS_TO_KN: f32 = 1.943_844_5;
+
+impl WindGrid {
+    /// Build a grid from ECMWF open-data 10u and 10v GRIB2 messages. Returns
+    /// None if either message is missing, not a regular lat/lon grid, or the
+    /// field lengths disagree. Values are converted m/s -> knots.
+    pub fn from_ecmwf_messages(u_bytes: &[u8], v_bytes: &[u8]) -> Option<WindGrid> {
+        let um = read_messages(u_bytes).next()?;
+        let vm = read_messages(v_bytes).next()?;
+        let (nlat, nlon) = um.grid_dimensions().ok()?;
+        let proj = um.latlng_projector().ok()?;
+        if !proj.is_regular_latlng_grid() {
+            return None;
+        }
+        let (lats, lons) = proj.lat_lng();
+        if lats.len() < 2 || lons.len() < 2 {
+            return None;
+        }
+        let ud = um.data().ok()?;
+        let vd = vm.data().ok()?;
+        if ud.len() != nlat * nlon || vd.len() != nlat * nlon {
+            return None;
+        }
+        Some(WindGrid {
+            nlat,
+            nlon,
+            lat0: lats[0] as f32,
+            lat_step: (lats[1] - lats[0]) as f32,
+            lon0: lons[0] as f32,
+            lon_step: (lons[1] - lons[0]) as f32,
+            u: ud.iter().map(|x| *x as f32 * MS_TO_KN).collect(),
+            v: vd.iter().map(|x| *x as f32 * MS_TO_KN).collect(),
+        })
     }
 }
 
@@ -60,5 +99,22 @@ mod tests {
         let g = grid();
         // far south clamps to last row
         assert_eq!(g.sample(0.0, -200.0), (4.0, -4.0));
+    }
+
+    #[test]
+    fn decodes_ecmwf_fixture() {
+        let u = std::fs::read("tests/fixtures/wind/ecmwf_10u.grib2").unwrap();
+        let v = std::fs::read("tests/fixtures/wind/ecmwf_10v.grib2").unwrap();
+        let g = WindGrid::from_ecmwf_messages(&u, &v).expect("decode");
+        assert_eq!((g.nlat, g.nlon), (721, 1440));
+        assert!((g.lat0 - 90.0).abs() < 1e-3);
+        assert!((g.lat_step - -0.25).abs() < 1e-3);
+        assert!((g.lon0 - 180.0).abs() < 1e-3);
+        assert!((g.lon_step - 0.25).abs() < 1e-3);
+        assert_eq!(g.u.len(), 721 * 1440);
+        assert_eq!(g.v.len(), 721 * 1440);
+        // wind should be a sane magnitude in knots everywhere.
+        let (u0, v0) = g.sample(8.5, 47.4); // zurich
+        assert!(u0.hypot(v0) < 200.0);
     }
 }

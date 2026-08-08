@@ -1,0 +1,2 @@
+{"domain": "g", "date": "20260808", "time": "0000", "expver": "0001", "class": "od", "type": "fc", "stream": "oper", "step": "0", "levtype": "sfc", "param": "10u", "_offset": 20118299, "_length": 868687}
+{"domain": "g", "date": "20260808", "time": "0000", "expver": "0001", "class": "od", "type": "fc", "stream": "oper", "step": "0", "levtype": "sfc", "param": "10v", "_offset": 24199492, "_length": 864428}
