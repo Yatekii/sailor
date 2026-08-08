@@ -27,7 +27,11 @@ async fn fetch_tile_from_server(tile_id: &TileId) -> Option<Vec<u8>> {
     // server proxies to the CDN, so the browser does not block them with CORS.
     let request_url = match platform::origin() {
         Some(origin) => format!("{origin}/planet/{tile_id}.mvt"),
-        None => format!("https://d17gef4m69t9r4.cloudfront.net/planet/{tile_id}.mvt"),
+        // OSM US public OpenMapTiles endpoint (unpadded z/x/y, same OMT schema).
+        None => format!(
+            "https://tiles.openstreetmap.us/vector/openmaptiles/{}/{}/{}.mvt",
+            tile_id.z, tile_id.x, tile_id.y
+        ),
     };
 
     match reqwest::get(&request_url).await {
