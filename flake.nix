@@ -20,7 +20,7 @@
         };
       in {
         devShells.default = pkgs.mkShell {
-          buildInputs = [ rust pkgs.cargo-deny pkgs.trunk pkgs.binaryen ]
+          buildInputs = [ rust pkgs.cargo-deny pkgs.cargo-insta pkgs.trunk pkgs.binaryen ]
             ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ]
             ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
               pkgs.vulkan-loader pkgs.libxkbcommon pkgs.wayland
