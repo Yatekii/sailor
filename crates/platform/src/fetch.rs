@@ -1,7 +1,16 @@
 use std::path::Path;
+use std::sync::OnceLock;
 
 use crate::platform;
 use sailor_math::math::TileId;
+
+/// One shared client for all tile fetches. `reqwest::get` builds a fresh Client
+/// per call (new TCP + TLS handshake, no keep-alive, no HTTP/2 multiplexing) —
+/// reusing one pools connections and is dramatically faster when panning.
+fn client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(reqwest::Client::new)
+}
 
 /// Fetch the raw vector-tile bytes for a tile.
 ///
@@ -34,7 +43,7 @@ async fn fetch_tile_from_server(tile_id: &TileId) -> Option<Vec<u8>> {
         ),
     };
 
-    match reqwest::get(&request_url).await {
+    match client().get(&request_url).send().await {
         Ok(response) if response.status().is_success() => match response.bytes().await {
             Ok(bytes) => Some(bytes.to_vec()),
             Err(e) => {
