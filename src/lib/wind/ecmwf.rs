@@ -32,7 +32,10 @@ pub fn find_wind_ranges(index_text: &str) -> Option<(GribRange, GribRange)> {
         let Ok(e) = serde_json::from_str::<Entry>(line) else {
             continue;
         };
-        let range = GribRange { offset: e.offset, length: e.length };
+        let range = GribRange {
+            offset: e.offset,
+            length: e.length,
+        };
         match e.param.as_str() {
             "10u" => u = Some(range),
             "10v" => v = Some(range),
@@ -78,9 +81,12 @@ const ECMWF_BASE: &str = "https://data.ecmwf.int/forecasts";
 /// each message. Returns the two raw GRIB2 messages, or None if no run resolves.
 pub async fn fetch_ecmwf_wind(cache_location: &str, now_unix: i64) -> Option<(Vec<u8>, Vec<u8>)> {
     for (date, hh) in ecmwf_run_candidates(now_unix) {
-        let stem = format!("{ECMWF_BASE}/{date}/{hh:02}z/ifs/0p25/oper/{date}{hh:02}0000-0h-oper-fc");
-        let cache_u = Path::new(cache_location).join(format!("wind/ecmwf_{date}_{hh:02}_10u.grib2"));
-        let cache_v = Path::new(cache_location).join(format!("wind/ecmwf_{date}_{hh:02}_10v.grib2"));
+        let stem =
+            format!("{ECMWF_BASE}/{date}/{hh:02}z/ifs/0p25/oper/{date}{hh:02}0000-0h-oper-fc");
+        let cache_u =
+            Path::new(cache_location).join(format!("wind/ecmwf_{date}_{hh:02}_10u.grib2"));
+        let cache_v =
+            Path::new(cache_location).join(format!("wind/ecmwf_{date}_{hh:02}_10v.grib2"));
         let (cu, cv) = (cache_u.to_string_lossy(), cache_v.to_string_lossy());
 
         // serve a cached run without touching the network.
@@ -114,8 +120,20 @@ mod tests {
 {\"param\": \"10u\", \"_offset\": 20118299, \"_length\": 868687}
 {\"param\": \"10v\", \"_offset\": 24199492, \"_length\": 864428}";
         let (u, v) = find_wind_ranges(idx).unwrap();
-        assert_eq!(u, GribRange { offset: 20118299, length: 868687 });
-        assert_eq!(v, GribRange { offset: 24199492, length: 864428 });
+        assert_eq!(
+            u,
+            GribRange {
+                offset: 20118299,
+                length: 868687
+            }
+        );
+        assert_eq!(
+            v,
+            GribRange {
+                offset: 24199492,
+                length: 864428
+            }
+        );
     }
 
     #[test]

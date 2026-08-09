@@ -112,8 +112,14 @@ impl WindField {
         let samples = locs
             .into_iter()
             .map(|l| {
-                let (u, v) = uv_from_speed_dir(l.current.wind_speed_10m, l.current.wind_direction_10m);
-                WindSample { lon: l.longitude, lat: l.latitude, u, v }
+                let (u, v) =
+                    uv_from_speed_dir(l.current.wind_speed_10m, l.current.wind_direction_10m);
+                WindSample {
+                    lon: l.longitude,
+                    lat: l.latitude,
+                    u,
+                    v,
+                }
             })
             .collect();
         Some(WindField { samples })

@@ -1,9 +1,9 @@
 use lyon::math::Point;
 use nalgebra_glm::{Vec2, vec2};
+use osm::cache::CacheStats;
 use osm::css::RulesCache;
 use osm::feature::collection::FeatureCollection;
 use osm::math::{Camera, Coord, Geo, PointF64, TileId, deg2num, tile_to_world_space};
-use osm::cache::CacheStats;
 use osm::object::Object;
 use std::sync::{Arc, Mutex, RwLock};
 use winit::dpi::PhysicalSize;
@@ -114,7 +114,10 @@ impl AppState {
     }
 
     pub fn set_center(&mut self, center: (f32, f32)) {
-        let tile_coordinate = deg2num(Coord::<Geo>::new(center.1, center.0), self.screen.zoom as u32);
+        let tile_coordinate = deg2num(
+            Coord::<Geo>::new(center.1, center.0),
+            self.screen.zoom as u32,
+        );
         let p = tile_to_world_space(&tile_coordinate);
         self.screen.center = PointF64::new(p.x as f64, p.y as f64);
     }

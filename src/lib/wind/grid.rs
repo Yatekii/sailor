@@ -99,7 +99,16 @@ mod tests {
     fn grid() -> WindGrid {
         let u: Vec<f32> = (0..8).map(|i| i as f32).collect();
         let v: Vec<f32> = (0..8).map(|i| -(i as f32)).collect();
-        WindGrid { nlat: 2, nlon: 4, lat0: 90.0, lat_step: -1.0, lon0: 0.0, lon_step: 90.0, u, v }
+        WindGrid {
+            nlat: 2,
+            nlon: 4,
+            lat0: 90.0,
+            lat_step: -1.0,
+            lon0: 0.0,
+            lon_step: 90.0,
+            u,
+            v,
+        }
     }
 
     #[test]
@@ -156,7 +165,16 @@ mod tests {
                 v[r * nlon + c] = 90.0 - r as f32; // latitude
             }
         }
-        let g = WindGrid { nlat, nlon, lat0: 90.0, lat_step: -1.0, lon0: 0.0, lon_step: 1.0, u, v };
+        let g = WindGrid {
+            nlat,
+            nlon,
+            lat0: 90.0,
+            lat_step: -1.0,
+            lon0: 0.0,
+            lon_step: 1.0,
+            u,
+            v,
+        };
         let w = 64;
         let h = 64;
         let out = g.resample_mercator(w, h);

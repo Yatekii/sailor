@@ -12,7 +12,10 @@ pub fn view_profiler(ui: &mut Ui, app_state: &mut AppState) {
         for series in app_state.stats.series() {
             let avg = series.average().as_secs_f32() * 1000.0;
             let max = series.max().as_secs_f32() * 1000.0;
-            ui.label(format!("{}  avg {:.2}ms  max {:.2}ms", series.name, avg, max));
+            ui.label(format!(
+                "{}  avg {:.2}ms  max {:.2}ms",
+                series.name, avg, max
+            ));
 
             let (rect, _) =
                 ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
@@ -26,7 +29,10 @@ pub fn view_profiler(ui: &mut Ui, app_state: &mut AppState) {
             // Robust x-axis scale: the 98th percentile, so a rare spike doesn't
             // crush the whole distribution into the first bucket. Values above it
             // land in the last (overflow) bucket.
-            let mut ms: Vec<f32> = series.durations().map(|d| d.as_secs_f32() * 1000.0).collect();
+            let mut ms: Vec<f32> = series
+                .durations()
+                .map(|d| d.as_secs_f32() * 1000.0)
+                .collect();
             let idx = (((ms.len() as f32) * 0.98) as usize).min(ms.len() - 1);
             let scale = *ms.select_nth_unstable_by(idx, |a, b| a.total_cmp(b)).1;
             let scale = scale.max(1e-4);

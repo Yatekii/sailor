@@ -50,11 +50,20 @@ impl Polygon {
 
     /// Even-odd containment across all rings.
     pub fn contains(&self, point: Vec2) -> bool {
-        self.rings.iter().filter(|ring| ring.contains(point)).count() % 2 == 1
+        self.rings
+            .iter()
+            .filter(|ring| ring.contains(point))
+            .count()
+            % 2
+            == 1
     }
 
     pub fn aabb(&self) -> Aabb {
-        Aabb::from_points(self.rings.iter().flat_map(|ring| ring.points().iter().copied()))
+        Aabb::from_points(
+            self.rings
+                .iter()
+                .flat_map(|ring| ring.points().iter().copied()),
+        )
     }
 
     pub fn rings(&self) -> &[Ring] {
@@ -117,7 +126,10 @@ mod tests {
         };
         assert!(poly.contains(Vec2::new(0.5, 0.5)), "inside first part");
         assert!(poly.contains(Vec2::new(10.5, 0.5)), "inside second part");
-        assert!(!poly.contains(Vec2::new(5.0, 0.5)), "in the gap between parts");
+        assert!(
+            !poly.contains(Vec2::new(5.0, 0.5)),
+            "in the gap between parts"
+        );
     }
 
     #[test]

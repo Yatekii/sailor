@@ -194,8 +194,12 @@ impl Application {
             feature_collection,
         );
         let mut overlays = drawing::layer::LayerStack::new();
-        overlays.push(Box::new(drawing::layer::wind::WindLayer::new(&painter.device)));
-        overlays.push(Box::new(drawing::layer::temperature::TemperatureLayer::default()));
+        overlays.push(Box::new(drawing::layer::wind::WindLayer::new(
+            &painter.device,
+        )));
+        overlays.push(Box::new(
+            drawing::layer::temperature::TemperatureLayer::default(),
+        ));
         overlays.push(Box::new(drawing::layer::hover::HoverLayer::new(
             &painter.device,
             painter.surface_config.format,
@@ -351,13 +355,14 @@ impl Application {
 
                 self.app_state.tile_stats = self.map.tile_stats();
 
-                let selection = self.app_state.selected_object().map(|s| {
-                    drawing::layer::Selection {
-                        tile_id: s.tile_id,
-                        feature_id: s.object.feature_id,
-                        feature_slot: s.object.feature_slot,
-                    }
-                });
+                let selection =
+                    self.app_state
+                        .selected_object()
+                        .map(|s| drawing::layer::Selection {
+                            tile_id: s.tile_id,
+                            feature_id: s.object.feature_id,
+                            feature_slot: s.object.feature_slot,
+                        });
 
                 let cursor = {
                     let c = self.app_state.cursor();
@@ -374,16 +379,17 @@ impl Application {
                     cursor,
                     pixels_per_point,
                     |hover| {
-                    self.painter.paint(
-                        &mut self.map,
-                        &mut self.overlays,
-                        &self.app_state.screen,
-                        selection,
-                        hover,
-                        self.app_state.ui.wind,
-                        &mut self.app_state.stats,
-                    )
-                });
+                        self.painter.paint(
+                            &mut self.map,
+                            &mut self.overlays,
+                            &self.app_state.screen,
+                            selection,
+                            hover,
+                            self.app_state.ui.wind,
+                            &mut self.app_state.stats,
+                        )
+                    },
+                );
                 drop(hovered);
 
                 if let Some(mut frame) = painted {

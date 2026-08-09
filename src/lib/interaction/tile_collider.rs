@@ -78,9 +78,7 @@ impl TileCollider {
             let object = &self.objects[leaf as usize];
             let hit = match &object.shape {
                 Shape::Polygon(polygon) => polygon.contains(cursor),
-                Shape::Point(points) => {
-                    points.iter().any(|p| (*p - cursor).length() <= radius)
-                }
+                Shape::Point(points) => points.iter().any(|p| (*p - cursor).length() <= radius),
                 Shape::Line(points) => points
                     .windows(2)
                     .any(|w| segment_distance(cursor, w[0], w[1]) <= radius),
@@ -95,25 +93,6 @@ impl TileCollider {
 impl Default for TileCollider {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Vec2, segment_distance};
-
-    #[test]
-    fn segment_distance_cases() {
-        let a = Vec2::new(0.0, 0.0);
-        let b = Vec2::new(10.0, 0.0);
-        // On the segment.
-        assert_eq!(segment_distance(Vec2::new(5.0, 0.0), a, b), 0.0);
-        // Perpendicular off the middle.
-        assert_eq!(segment_distance(Vec2::new(5.0, 3.0), a, b), 3.0);
-        // Past an endpoint clamps to the endpoint distance, not the infinite line.
-        assert_eq!(segment_distance(Vec2::new(-4.0, 0.0), a, b), 4.0);
-        // Degenerate segment (a == b) is the distance to the point.
-        assert_eq!(segment_distance(Vec2::new(3.0, 4.0), a, a), 5.0);
     }
 }
 
@@ -172,5 +151,24 @@ impl TileColliderLoader for Arc<RwLock<TileCollider>> {
                 }
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Vec2, segment_distance};
+
+    #[test]
+    fn segment_distance_cases() {
+        let a = Vec2::new(0.0, 0.0);
+        let b = Vec2::new(10.0, 0.0);
+        // On the segment.
+        assert_eq!(segment_distance(Vec2::new(5.0, 0.0), a, b), 0.0);
+        // Perpendicular off the middle.
+        assert_eq!(segment_distance(Vec2::new(5.0, 3.0), a, b), 3.0);
+        // Past an endpoint clamps to the endpoint distance, not the infinite line.
+        assert_eq!(segment_distance(Vec2::new(-4.0, 0.0), a, b), 4.0);
+        // Degenerate segment (a == b) is the distance to the point.
+        assert_eq!(segment_distance(Vec2::new(3.0, 4.0), a, a), 5.0);
     }
 }

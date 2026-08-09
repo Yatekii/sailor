@@ -81,7 +81,14 @@ impl<'a> Iterator for TileIterator<'a> {
 #[test]
 fn get_tile_boundaries_for_8_zoom() {
     use super::*;
-    let bb = Camera::new(point(47.607_372, 6.114297), 800f32, 800f32, 256f32, 1.0, 8.0);
+    let bb = Camera::new(
+        point(47.607_372, 6.114297),
+        800f32,
+        800f32,
+        256f32,
+        1.0,
+        8.0,
+    );
     let tile_field = bb.get_tile_boundaries_for_zoom_level(8.0, 1, 0);
 
     assert_eq!(tile_field.iter().count(), 20);

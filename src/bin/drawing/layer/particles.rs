@@ -187,7 +187,11 @@ impl ParticleSystem {
     pub fn new(device: &Device) -> Self {
         let wind_tex = device.create_texture(&TextureDescriptor {
             label: Some("wind uv texture"),
-            size: Extent3d { width: TEX_W, height: TEX_H, depth_or_array_layers: 1 },
+            size: Extent3d {
+                width: TEX_W,
+                height: TEX_H,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,
@@ -459,7 +463,11 @@ impl ParticleSystem {
                 conservative: false,
             },
             depth_stencil: None,
-            multisample: MultisampleState { count: 1, mask: !0, alpha_to_coverage_enabled: false },
+            multisample: MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
             multiview_mask: None,
             cache: None,
         });
@@ -505,7 +513,11 @@ impl ParticleSystem {
                 conservative: false,
             },
             depth_stencil: None,
-            multisample: MultisampleState { count: 1, mask: !0, alpha_to_coverage_enabled: false },
+            multisample: MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
             multiview_mask: None,
             cache: None,
         });
@@ -557,7 +569,11 @@ impl ParticleSystem {
                 bytes_per_row: Some(TEX_W * 8), // rg32float = 8 bytes/texel
                 rows_per_image: Some(TEX_H),
             },
-            Extent3d { width: TEX_W, height: TEX_H, depth_or_array_layers: 1 },
+            Extent3d {
+                width: TEX_W,
+                height: TEX_H,
+                depth_or_array_layers: 1,
+            },
         );
     }
 
@@ -595,7 +611,7 @@ impl ParticleSystem {
         let cy = camera.center.y as f32;
         let cu = [
             1.0f32,
-            0.0015,
+            0.0004,
             camera.zoom,
             self.frame,
             cx - hx,
@@ -609,13 +625,22 @@ impl ParticleSystem {
             label: Some("advect bg"),
             layout: &self.advect_bgl,
             entries: &[
-                BindGroupEntry { binding: 0, resource: self.particles.as_entire_binding() },
+                BindGroupEntry {
+                    binding: 0,
+                    resource: self.particles.as_entire_binding(),
+                },
                 BindGroupEntry {
                     binding: 1,
                     resource: BindingResource::TextureView(&self.wind_view),
                 },
-                BindGroupEntry { binding: 2, resource: BindingResource::Sampler(&self.sampler) },
-                BindGroupEntry { binding: 3, resource: self.cu.as_entire_binding() },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: BindingResource::Sampler(&self.sampler),
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: self.cu.as_entire_binding(),
+                },
             ],
         });
         {
@@ -658,7 +683,10 @@ impl ParticleSystem {
                     depth_slice: None,
                     view: &self.trails_views[dst],
                     resolve_target: None,
-                    ops: Operations { load: LoadOp::Clear(Color::TRANSPARENT), store: StoreOp::Store },
+                    ops: Operations {
+                        load: LoadOp::Clear(Color::TRANSPARENT),
+                        store: StoreOp::Store,
+                    },
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
@@ -689,8 +717,14 @@ impl ParticleSystem {
             label: Some("draw bg"),
             layout: &self.draw_bgl,
             entries: &[
-                BindGroupEntry { binding: 0, resource: self.particles.as_entire_binding() },
-                BindGroupEntry { binding: 1, resource: self.du.as_entire_binding() },
+                BindGroupEntry {
+                    binding: 0,
+                    resource: self.particles.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: self.du.as_entire_binding(),
+                },
             ],
         }));
 
@@ -703,7 +737,10 @@ impl ParticleSystem {
                     depth_slice: None,
                     view: &self.trails_views[dst],
                     resolve_target: None,
-                    ops: Operations { load: LoadOp::Load, store: StoreOp::Store },
+                    ops: Operations {
+                        load: LoadOp::Load,
+                        store: StoreOp::Store,
+                    },
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
@@ -751,7 +788,11 @@ fn make_trails(device: &Device, w: u32, h: u32) -> ([Texture; 2], [TextureView; 
     let make = |label: &'static str| {
         device.create_texture(&TextureDescriptor {
             label: Some(label),
-            size: Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            size: Extent3d {
+                width: w,
+                height: h,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: TextureDimension::D2,

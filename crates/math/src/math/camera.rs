@@ -34,7 +34,12 @@ impl Camera {
 
     /// Tile field covering the view at zoom level `z` (a level query, so it keeps
     /// an explicit `z`: callers ask for `zoom` and `zoom - 1` to manage the pyramid).
-    pub fn get_tile_boundaries_for_zoom_level(&self, z: f32, scale: u32, overzoom: u32) -> TileField {
+    pub fn get_tile_boundaries_for_zoom_level(
+        &self,
+        z: f32,
+        scale: u32,
+        overzoom: u32,
+    ) -> TileField {
         let z = z.min(14.0);
         // Use the same fractional zoom as `global_to_screen` so the visible extent
         // matches what is actually rendered; using the integer floor here would
@@ -82,7 +87,11 @@ impl Camera {
         let s = 2.0f32.powf(self.zoom) * self.tile_size();
         Transform::from_mat(
             glm::scaling(&glm::vec3(s, s, 1.0))
-                * glm::translation(&glm::vec3(-self.center.x as f32, -self.center.y as f32, 0.0)),
+                * glm::translation(&glm::vec3(
+                    -self.center.x as f32,
+                    -self.center.y as f32,
+                    0.0,
+                )),
         )
     }
 
@@ -185,7 +194,16 @@ mod tests {
     #[test]
     fn zoom_to_cursor_accumulates_precisely() {
         let cursor = Coord::<Pixel>::new(1700.0, 300.0); // well off-centre
-        let make = || Camera::new(point(0.5187345, 0.5093721), 2400.0, 1400.0, 384.0, 2.0, 14.0);
+        let make = || {
+            Camera::new(
+                point(0.5187345, 0.5093721),
+                2400.0,
+                1400.0,
+                384.0,
+                2.0,
+                14.0,
+            )
+        };
 
         // Many small scroll steps from z14 up to ~z18.
         let mut stepwise = make();

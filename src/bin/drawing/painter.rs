@@ -188,6 +188,7 @@ impl Painter {
     ///
     /// UI-agnostic: no app or map-data types here — the app owns the layers and the
     /// HUD, and passes only the camera, selection, and a stat sink.
+    #[allow(clippy::too_many_arguments)]
     pub fn paint(
         &mut self,
         map: &mut dyn Layer,
@@ -199,22 +200,21 @@ impl Painter {
         stats: &mut dyn StatSink,
     ) -> Option<Frame> {
         // Read back last frame's GPU pass timings (non-blocking) and record them.
-        if let Some(gt) = self.gpu_timing.as_mut() {
-            if let Some(raw) = gt.take(&self.device) {
-                let p = gt.period;
-                let poly = (raw[1].saturating_sub(raw[0])) as f32 * p;
-                let text = (raw[3].saturating_sub(raw[2])) as f32 * p;
-                stats.record("gpu.polygon_pass", Duration::from_nanos(poly as u64));
-                stats.record("gpu.text_pass", Duration::from_nanos(text as u64));
-            }
+        if let Some(gt) = self.gpu_timing.as_mut()
+            && let Some(raw) = gt.take(&self.device)
+        {
+            let p = gt.period;
+            let poly = (raw[1].saturating_sub(raw[0])) as f32 * p;
+            let text = (raw[3].saturating_sub(raw[2])) as f32 * p;
+            stats.record("gpu.polygon_pass", Duration::from_nanos(poly as u64));
+            stats.record("gpu.text_pass", Duration::from_nanos(text as u64));
         }
         // Only instrument the GPU this frame if last frame's readback is done,
         // so we never copy into a still-mapped buffer.
         let record_gpu = self.gpu_timing.as_ref().is_some_and(|g| !g.pending);
 
         let (wgpu::CurrentSurfaceTexture::Success(surface)
-        | wgpu::CurrentSurfaceTexture::Suboptimal(surface)) =
-            self.surface.get_current_texture()
+        | wgpu::CurrentSurfaceTexture::Suboptimal(surface)) = self.surface.get_current_texture()
         else {
             return None;
         };
@@ -274,20 +274,20 @@ impl Painter {
     /// Finishes a frame: resolves GPU timings, submits, presents, and records the
     /// remaining CPU spans. Call after the app has drawn its UI into the frame.
     pub fn present(&mut self, mut frame: Frame, stats: &mut dyn StatSink) {
-        if frame.record_gpu {
-            if let Some(gt) = self.gpu_timing.as_ref() {
-                gt.resolve(&mut frame.encoder);
-            }
+        if frame.record_gpu
+            && let Some(gt) = self.gpu_timing.as_ref()
+        {
+            gt.resolve(&mut frame.encoder);
         }
 
         let submit = web_time::Instant::now();
         self.staging_belt.finish();
         self.queue.submit([frame.encoder.finish()]);
         self.queue.present(frame.surface);
-        if frame.record_gpu {
-            if let Some(gt) = self.gpu_timing.as_mut() {
-                gt.map();
-            }
+        if frame.record_gpu
+            && let Some(gt) = self.gpu_timing.as_mut()
+        {
+            gt.map();
         }
         frame.spans.push(("cpu.submit", submit.elapsed()));
 

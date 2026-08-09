@@ -205,20 +205,20 @@ impl WindCache {
             return;
         }
 
-        if let Some((b, task)) = &mut self.loader {
-            if let Some(result) = task.try_take() {
-                let b = *b;
-                self.loader = None;
-                match result {
-                    Some(field) => {
-                        self.field = Some(field);
-                        self.loaded_bbox = Some(b);
-                        self.retry_after = None;
-                    }
-                    // Keep the last good field on screen and retry after a delay,
-                    // rather than freezing on the failed region or spamming it.
-                    None => self.retry_after = Some(now + BACKOFF),
+        if let Some((b, task)) = &mut self.loader
+            && let Some(result) = task.try_take()
+        {
+            let b = *b;
+            self.loader = None;
+            match result {
+                Some(field) => {
+                    self.field = Some(field);
+                    self.loaded_bbox = Some(b);
+                    self.retry_after = None;
                 }
+                // Keep the last good field on screen and retry after a delay,
+                // rather than freezing on the failed region or spamming it.
+                None => self.retry_after = Some(now + BACKOFF),
             }
         }
 
@@ -261,17 +261,17 @@ impl WindCache {
     fn request_grib(&mut self, bbox: Bbox, density: f32) {
         let now = Instant::now();
 
-        if let Some(task) = &mut self.grid_loader {
-            if let Some(result) = task.try_take() {
-                self.grid_loader = None;
-                match result {
-                    Some(g) => {
-                        self.grid = Some(g);
-                        self.grid_generation += 1;
-                        self.retry_after = None;
-                    }
-                    None => self.retry_after = Some(now + BACKOFF),
+        if let Some(task) = &mut self.grid_loader
+            && let Some(result) = task.try_take()
+        {
+            self.grid_loader = None;
+            match result {
+                Some(g) => {
+                    self.grid = Some(g);
+                    self.grid_generation += 1;
+                    self.retry_after = None;
                 }
+                None => self.retry_after = Some(now + BACKOFF),
             }
         }
 
@@ -330,7 +330,12 @@ mod tests {
 
     #[test]
     fn snap_expands_to_step_grid() {
-        let b = Bbox { min_lon: 8.1, min_lat: 47.2, max_lon: 8.9, max_lat: 47.7 };
+        let b = Bbox {
+            min_lon: 8.1,
+            min_lat: 47.2,
+            max_lon: 8.9,
+            max_lat: 47.7,
+        };
         let s = b.snap(0.5);
         assert!((s.min_lon - 8.0).abs() < 1e-4);
         assert!((s.min_lat - 47.0).abs() < 1e-4);
@@ -360,7 +365,12 @@ mod tests {
     // never asks for out-of-range coordinates.
     #[test]
     fn clamp_keeps_coords_valid() {
-        let b = Bbox { min_lon: -520.0, min_lat: -140.0, max_lon: 430.0, max_lat: 140.0 };
+        let b = Bbox {
+            min_lon: -520.0,
+            min_lat: -140.0,
+            max_lon: 430.0,
+            max_lat: 140.0,
+        };
         let c = b.clamp_valid();
         assert!(c.min_lon >= -180.0 && c.max_lon <= 180.0);
         assert!(c.min_lat >= -85.0 && c.max_lat <= 85.0);
@@ -369,7 +379,12 @@ mod tests {
     // Even a world-spanning viewport stays under the point cap (bounded url).
     #[test]
     fn lattice_stays_under_cap() {
-        let world = Bbox { min_lon: -180.0, min_lat: -85.0, max_lon: 180.0, max_lat: 85.0 };
+        let world = Bbox {
+            min_lon: -180.0,
+            min_lat: -85.0,
+            max_lon: 180.0,
+            max_lat: 85.0,
+        };
         let (snapped, step) = plan_lattice(world, 10.0, 0.25);
         assert!(point_count(snapped, step) <= MAX_POINTS);
     }
@@ -377,7 +392,12 @@ mod tests {
     // Same snapped bbox + step must produce a stable cache key (so disk cache hits).
     #[test]
     fn url_key_is_stable() {
-        let b = Bbox { min_lon: 8.0, min_lat: 47.0, max_lon: 9.0, max_lat: 48.0 };
+        let b = Bbox {
+            min_lon: 8.0,
+            min_lat: 47.0,
+            max_lon: 9.0,
+            max_lat: 48.0,
+        };
         let (_, k1) = open_meteo_url("ecmwf_ifs025", b, 0.5);
         let (_, k2) = open_meteo_url("ecmwf_ifs025", b, 0.5);
         assert_eq!(k1, k2);
@@ -388,7 +408,12 @@ mod tests {
     // pan: a step-1 grid over [0,2] must include the whole-degree lines.
     #[test]
     fn lattice_points_are_pinned() {
-        let b = Bbox { min_lon: 0.0, min_lat: 0.0, max_lon: 2.0, max_lat: 2.0 };
+        let b = Bbox {
+            min_lon: 0.0,
+            min_lat: 0.0,
+            max_lon: 2.0,
+            max_lat: 2.0,
+        };
         let (url, _) = open_meteo_url("ecmwf_ifs025", b, 1.0);
         assert!(url.contains("0.0000"));
         assert!(url.contains("1.0000"));
@@ -398,7 +423,12 @@ mod tests {
     // The url must request u/v-able fields in knots and the current step.
     #[test]
     fn url_requests_current_wind_in_knots() {
-        let b = Bbox { min_lon: 8.0, min_lat: 47.0, max_lon: 9.0, max_lat: 48.0 };
+        let b = Bbox {
+            min_lon: 8.0,
+            min_lat: 47.0,
+            max_lon: 9.0,
+            max_lat: 48.0,
+        };
         let (url, _) = open_meteo_url("ecmwf_ifs025", b, 0.5);
         assert!(url.contains("current=wind_speed_10m,wind_direction_10m"));
         assert!(url.contains("wind_speed_unit=kn"));

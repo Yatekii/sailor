@@ -17,7 +17,12 @@ pub async fn get(url: &str) -> Option<Vec<u8>> {
 pub async fn get_range(url: &str, offset: u64, length: u64) -> Option<Vec<u8>> {
     let end = offset + length - 1;
     let client = reqwest::Client::new();
-    match client.get(url).header("Range", format!("bytes={offset}-{end}")).send().await {
+    match client
+        .get(url)
+        .header("Range", format!("bytes={offset}-{end}"))
+        .send()
+        .await
+    {
         Ok(r) if r.status() == reqwest::StatusCode::PARTIAL_CONTENT => {
             r.bytes().await.ok().map(|b| b.to_vec())
         }

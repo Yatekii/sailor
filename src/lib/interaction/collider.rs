@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    math::{Coord, Gpu, Camera, TileId},
+    math::{Camera, Coord, Gpu, TileId},
     object::Object,
 };
 

@@ -77,11 +77,9 @@ impl GpuTiming {
 
     pub fn map(&mut self) {
         let ready = self.ready.clone();
-        self.readback
-            .slice(..)
-            .map_async(MapMode::Read, move |_| {
-                ready.store(true, Ordering::Release);
-            });
+        self.readback.slice(..).map_async(MapMode::Read, move |_| {
+            ready.store(true, Ordering::Release);
+        });
         self.pending = true;
     }
 
@@ -177,6 +175,8 @@ pub struct LayerCtx<'a> {
     /// Physical render-target resolution (width, height).
     pub resolution: (u32, u32),
     pub spans: &'a mut Spans,
+    /// Present for the Layer contract; not read until forecast-time scrubbing lands.
+    #[allow(dead_code)]
     pub time: ForecastTime,
     pub wind: WindControls,
 }
@@ -197,6 +197,8 @@ pub struct FramePass<'a> {
 
 /// One composable map layer. The basemap is just one of these.
 pub trait Layer {
+    /// Used by `names_in_paint_order` (debug/tests); no live caller in the app yet.
+    #[allow(dead_code)]
     fn name(&self) -> &str;
     fn visible(&self) -> bool;
     fn update(&mut self, ctx: &mut LayerCtx);
@@ -232,6 +234,7 @@ impl LayerStack {
         }
     }
 
+    #[allow(dead_code)]
     pub fn names_in_paint_order(&self) -> Vec<&str> {
         self.layers
             .iter()

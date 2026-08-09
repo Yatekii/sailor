@@ -181,11 +181,17 @@ impl Layer for HoverLayer {
         self.jobs = self.ctx.tessellate(full.shapes, full.pixels_per_point);
         for (id, deltas) in &full.textures_delta.set {
             for delta in deltas {
-                self.renderer.update_texture(ctx.device, ctx.queue, *id, delta);
+                self.renderer
+                    .update_texture(ctx.device, ctx.queue, *id, delta);
             }
         }
-        self.renderer
-            .update_buffers(ctx.device, ctx.queue, ctx.encoder, &self.jobs, &self.descriptor);
+        self.renderer.update_buffers(
+            ctx.device,
+            ctx.queue,
+            ctx.encoder,
+            &self.jobs,
+            &self.descriptor,
+        );
         self.free = full.textures_delta.free.iter().copied().collect();
     }
 
@@ -212,6 +218,7 @@ impl Layer for HoverLayer {
                 multiview_mask: None,
             })
             .forget_lifetime();
-        self.renderer.render(&mut pass, &self.jobs, &self.descriptor);
+        self.renderer
+            .render(&mut pass, &self.jobs, &self.descriptor);
     }
 }

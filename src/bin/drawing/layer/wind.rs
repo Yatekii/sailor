@@ -2,12 +2,12 @@ use std::f64::consts::{FRAC_PI_4, PI};
 
 use crate::config::CONFIG;
 use osm::drawing::as_byte_slice;
-use osm::math::{num2deg, Camera, Coord, Geo, Pixel, TileCoordinate};
+use osm::math::{Camera, Coord, Geo, Pixel, TileCoordinate, num2deg};
 use osm::wind::cache::{Bbox, WindCache};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
 
-use super::{particles::ParticleSystem, FramePass, Layer, LayerCtx, RenderMode};
+use super::{FramePass, Layer, LayerCtx, RenderMode, particles::ParticleSystem};
 
 /// Max arrows drawn in a frame; the lattice fetch is capped well below this.
 const MAX_INSTANCES: usize = 512;
@@ -85,10 +85,16 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 // x runs 0..1 along the wind direction; y is the across-shaft axis.
 const ARROW: &[[f32; 2]] = &[
     // shaft quad
-    [0.0, -0.06], [0.7, -0.06], [0.7, 0.06],
-    [0.0, -0.06], [0.7, 0.06], [0.0, 0.06],
+    [0.0, -0.06],
+    [0.7, -0.06],
+    [0.7, 0.06],
+    [0.0, -0.06],
+    [0.7, 0.06],
+    [0.0, 0.06],
     // head triangle
-    [0.6, -0.18], [1.0, 0.0], [0.6, 0.18],
+    [0.6, -0.18],
+    [1.0, 0.0],
+    [0.6, 0.18],
 ];
 
 pub struct WindLayer {
@@ -332,7 +338,8 @@ impl Layer for WindLayer {
             scale: [s / (cam.width / 2.0), s / (cam.height / 2.0)],
             viewport: [cam.width, cam.height],
         };
-        ctx.queue.write_buffer(&self.uniform, 0, as_byte_slice(&[uniforms]));
+        ctx.queue
+            .write_buffer(&self.uniform, 0, as_byte_slice(&[uniforms]));
 
         // FramePass carries no device, so build the bind group here, not in paint.
         self.bind_group = Some(ctx.device.create_bind_group(&BindGroupDescriptor {
@@ -353,7 +360,10 @@ impl Layer for WindLayer {
                     depth_slice: None,
                     view: frame.view,
                     resolve_target: None,
-                    ops: Operations { load: LoadOp::Load, store: StoreOp::Store },
+                    ops: Operations {
+                        load: LoadOp::Load,
+                        store: StoreOp::Store,
+                    },
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
@@ -364,7 +374,9 @@ impl Layer for WindLayer {
             return;
         }
 
-        let Some(bind_group) = &self.bind_group else { return };
+        let Some(bind_group) = &self.bind_group else {
+            return;
+        };
         if self.instance_count == 0 {
             return;
         }

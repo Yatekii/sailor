@@ -10,7 +10,7 @@ use osm::drawing::as_byte_slice;
 use osm::drawing::vertex::Vertex;
 use osm::feature::collection::FeatureCollection;
 use osm::interaction::collider::{Collider, VisibleTile};
-use osm::math::{Coord, Camera, TileId, TileLocal};
+use osm::math::{Camera, Coord, TileId, TileLocal};
 use osm::object::Object;
 use osm::platform::{FileWatcher, Watcher};
 use wgpu::naga::ShaderStage;
@@ -187,7 +187,8 @@ impl MapLayer {
         let cache = Cache::new(device);
         let viewport = Viewport::new(device, &cache);
         let mut atlas = TextAtlas::new(device, queue, &cache, TextureFormat::Bgra8Unorm);
-        let text_renderer = TextRenderer::new(&mut atlas, device, MultisampleState::default(), None);
+        let text_renderer =
+            TextRenderer::new(&mut atlas, device, MultisampleState::default(), None);
 
         Self {
             blend_pipeline,
@@ -529,7 +530,9 @@ impl MapLayer {
 
         for (i, (tile_id, extent)) in visible_tiles.enumerate() {
             let matrix = camera.tile_to_screen(&tile_id);
-            data[i].transform.copy_from_slice(matrix.matrix().as_slice());
+            data[i]
+                .transform
+                .copy_from_slice(matrix.matrix().as_slice());
             data[i].extent = extent;
         }
         (
@@ -707,7 +710,9 @@ impl MapLayer {
                     // covers features without a stable id, which can't cross tiles).
                     Some(selected.feature_slot)
                 } else if selected.feature_id != 0 {
-                    self.tile_cache.get_tile(id).feature_slot(selected.feature_id)
+                    self.tile_cache
+                        .get_tile(id)
+                        .feature_slot(selected.feature_id)
                 } else {
                     None
                 };
@@ -774,38 +779,38 @@ impl Layer for MapLayer {
         });
 
         if self.labels {
-        span!(ctx.spans, "cpu.text_prep", {
-            self.viewport.update(
-                ctx.queue,
-                Resolution {
-                    width: ctx.resolution.0,
-                    height: ctx.resolution.1,
-                },
-            );
-
-            for tile_id in &self.visible_tiles {
-                let tile = self.tile_cache.get_tile_mut(tile_id);
-                tile.prepare_text(&mut self.font_system);
-            }
-            let camera = ctx.screen;
-            let tile_cache = &self.tile_cache;
-            let text_areas = self.visible_tiles.iter().flat_map(|tile_id| {
-                let tile = tile_cache.get_tile(tile_id);
-                tile.queue_text(camera)
-            });
-
-            self.text_renderer
-                .prepare(
-                    ctx.device,
+            span!(ctx.spans, "cpu.text_prep", {
+                self.viewport.update(
                     ctx.queue,
-                    &mut self.font_system,
-                    &mut self.atlas,
-                    &self.viewport,
-                    text_areas,
-                    &mut self.swash_cache,
-                )
-                .unwrap();
-        });
+                    Resolution {
+                        width: ctx.resolution.0,
+                        height: ctx.resolution.1,
+                    },
+                );
+
+                for tile_id in &self.visible_tiles {
+                    let tile = self.tile_cache.get_tile_mut(tile_id);
+                    tile.prepare_text(&mut self.font_system);
+                }
+                let camera = ctx.screen;
+                let tile_cache = &self.tile_cache;
+                let text_areas = self.visible_tiles.iter().flat_map(|tile_id| {
+                    let tile = tile_cache.get_tile(tile_id);
+                    tile.queue_text(camera)
+                });
+
+                self.text_renderer
+                    .prepare(
+                        ctx.device,
+                        ctx.queue,
+                        &mut self.font_system,
+                        &mut self.atlas,
+                        &self.viewport,
+                        text_areas,
+                        &mut self.swash_cache,
+                    )
+                    .unwrap();
+            });
         }
     }
 
@@ -893,33 +898,33 @@ impl Layer for MapLayer {
         });
 
         if self.labels {
-        span!(frame.spans, "cpu.text", {
-            let text_ts = if frame.record_gpu {
-                frame.gpu_timing.map(|g| g.writes(2, 3))
-            } else {
-                None
-            };
-            let mut pass = frame.encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("tile text pass"),
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: frame.view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Load,
-                        store: StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: text_ts,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
+            span!(frame.spans, "cpu.text", {
+                let text_ts = if frame.record_gpu {
+                    frame.gpu_timing.map(|g| g.writes(2, 3))
+                } else {
+                    None
+                };
+                let mut pass = frame.encoder.begin_render_pass(&RenderPassDescriptor {
+                    label: Some("tile text pass"),
+                    color_attachments: &[Some(RenderPassColorAttachment {
+                        view: frame.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: Operations {
+                            load: LoadOp::Load,
+                            store: StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: text_ts,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
 
-            self.text_renderer
-                .render(&self.atlas, &self.viewport, &mut pass)
-                .unwrap();
-        });
+                self.text_renderer
+                    .render(&self.atlas, &self.viewport, &mut pass)
+                    .unwrap();
+            });
         }
     }
 }

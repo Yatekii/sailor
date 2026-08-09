@@ -501,10 +501,7 @@ impl Tile {
         }
     }
 
-    pub fn queue_text<'a>(
-        &'a self,
-        camera: &'a Camera,
-    ) -> impl Iterator<Item = TextArea<'a>> {
+    pub fn queue_text<'a>(&'a self, camera: &'a Camera) -> impl Iterator<Item = TextArea<'a>> {
         let matrix = camera.tile_to_screen(&self.tile_id());
         self.text
             .iter()
@@ -570,12 +567,12 @@ impl<'a> Display for Value<'a> {
             self.bool_value,
         ) {
             (Some(v), None, None, None, None, None, None) => f.write_str(v),
-            (None, Some(v), None, None, None, None, None) => f.write_fmt(format_args!("{}", &v)),
-            (None, None, Some(v), None, None, None, None) => f.write_fmt(format_args!("{}", &v)),
-            (None, None, None, Some(v), None, None, None) => f.write_fmt(format_args!("{}", &v)),
-            (None, None, None, None, Some(v), None, None) => f.write_fmt(format_args!("{}", &v)),
-            (None, None, None, None, None, Some(v), None) => f.write_fmt(format_args!("{}", &v)),
-            (None, None, None, None, None, None, Some(v)) => f.write_fmt(format_args!("{}", &v)),
+            (None, Some(v), None, None, None, None, None) => f.write_fmt(format_args!("{}", v)),
+            (None, None, Some(v), None, None, None, None) => f.write_fmt(format_args!("{}", v)),
+            (None, None, None, Some(v), None, None, None) => f.write_fmt(format_args!("{}", v)),
+            (None, None, None, None, Some(v), None, None) => f.write_fmt(format_args!("{}", v)),
+            (None, None, None, None, None, Some(v), None) => f.write_fmt(format_args!("{}", v)),
+            (None, None, None, None, None, None, Some(v)) => f.write_fmt(format_args!("{}", v)),
             _ => Ok(()),
         }
     }
