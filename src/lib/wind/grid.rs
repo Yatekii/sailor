@@ -1,4 +1,5 @@
 use gribberish::message::read_messages;
+use std::f32::consts::PI;
 
 /// A decoded regular lat/lon wind field for one forecast step. Degrees for
 /// angles, knots for u/v. The lat axis descends from `lat0` by `lat_step`; the
@@ -66,6 +67,30 @@ impl WindGrid {
     }
 }
 
+impl WindGrid {
+    /// Resample into a `w`x`h` mercator-space u/v field (interleaved u,v),
+    /// row 0 = north. World y in [0,1] maps to latitude by the inverse mercator
+    /// (clamped to ±85°), longitude spans the globe. Sampling the result with
+    /// `(fract(world.x), world.y)` then needs no projection math on the gpu.
+    pub fn resample_mercator(&self, w: usize, h: usize) -> Vec<f32> {
+        let mut out = vec![0.0f32; w * h * 2];
+        for j in 0..h {
+            let world_y = (j as f32 + 0.5) / h as f32;
+            // inverse mercator: lat from normalized y (0=north, 1=south).
+            let lat_rad = 2.0 * ((PI * (1.0 - 2.0 * world_y)).exp().atan() - PI / 4.0);
+            let lat = lat_rad.to_degrees().clamp(-85.0, 85.0);
+            for i in 0..w {
+                let lon = (i as f32 + 0.5) / w as f32 * 360.0 - 180.0;
+                let (u, v) = self.sample(lon, lat);
+                let idx = (j * w + i) * 2;
+                out[idx] = u;
+                out[idx + 1] = v;
+            }
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,5 +141,30 @@ mod tests {
         // wind should be a sane magnitude in knots everywhere.
         let (u0, v0) = g.sample(8.5, 47.4); // zurich
         assert!(u0.hypot(v0) < 200.0);
+    }
+
+    #[test]
+    fn resample_matches_grid_at_texel() {
+        // small synthetic global grid: u = lon, v = lat, so we can predict samples.
+        let nlat = 181;
+        let nlon = 360;
+        let mut u = vec![0.0f32; nlat * nlon];
+        let mut v = vec![0.0f32; nlat * nlon];
+        for r in 0..nlat {
+            for c in 0..nlon {
+                u[r * nlon + c] = c as f32; // "lon index"
+                v[r * nlon + c] = 90.0 - r as f32; // latitude
+            }
+        }
+        let g = WindGrid { nlat, nlon, lat0: 90.0, lat_step: -1.0, lon0: 0.0, lon_step: 1.0, u, v };
+        let w = 64;
+        let h = 64;
+        let out = g.resample_mercator(w, h);
+        assert_eq!(out.len(), w * h * 2);
+        // texel row 32 (world.y = 32/64 = 0.5) is the equator -> v ~ 0.
+        let j = 32;
+        let i = 10;
+        let vv = out[(j * w + i) * 2 + 1];
+        assert!(vv.abs() < 4.0, "equator lat ~0, got {vv}");
     }
 }
