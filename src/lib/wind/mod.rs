@@ -48,15 +48,18 @@ impl WindModel {
             Self::Icon => "ICON · global (DWD) · 0.1° (~11 km)",
             Self::IconEu => "ICON-EU · Europe (DWD) · 0.0625° (~6.5 km)",
             Self::AromeFrance => "AROME · France · 0.025° (~2.8 km)",
-            Self::IconCh1 => "ICON-CH1 · Alps (MeteoSwiss) · 0.01° (~1 km)",
+            Self::IconCh1 => "ICON-CH1 · Alps (MeteoSwiss) · native ~1 km",
             Self::Gfs => "GFS · global (US) · 0.25° (~28 km)",
         }
     }
 
     /// Whether this model is served by the local GRIB path (vs the Open-Meteo
-    /// point api). ECMWF, GFS and ICON-EU so far.
+    /// point api). ECMWF, GFS, ICON-EU and ICON-CH1 so far.
     pub fn uses_grib(self) -> bool {
-        matches!(self, Self::EcmwfIfs | Self::Gfs | Self::IconEu)
+        matches!(
+            self,
+            Self::EcmwfIfs | Self::Gfs | Self::IconEu | Self::IconCh1
+        )
     }
 
     /// The model's native grid spacing in degrees. Sampling finer than this just
