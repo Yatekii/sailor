@@ -12,6 +12,7 @@ use osm::wind::WindModel;
 
 pub mod hover;
 pub mod map;
+pub mod particles;
 pub mod temperature;
 pub mod wind;
 

@@ -7,7 +7,7 @@ use osm::wind::cache::{Bbox, WindCache};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
 
-use super::{FramePass, Layer, LayerCtx};
+use super::{particles::ParticleSystem, FramePass, Layer, LayerCtx};
 
 /// Max arrows drawn in a frame; the lattice fetch is capped well below this.
 const MAX_INSTANCES: usize = 512;
@@ -91,6 +91,7 @@ const ARROW: &[[f32; 2]] = &[
     [0.6, -0.18], [1.0, 0.0], [0.6, 0.18],
 ];
 
+#[allow(dead_code)]
 pub struct WindLayer {
     pipeline: RenderPipeline,
     bind_group_layout: BindGroupLayout,
@@ -100,6 +101,7 @@ pub struct WindLayer {
     instances: Buffer,
     instance_count: u32,
     cache: WindCache,
+    particles: ParticleSystem,
     visible: bool,
 }
 
@@ -225,6 +227,7 @@ impl WindLayer {
             instances,
             instance_count: 0,
             cache: WindCache::new(CONFIG.general.data_root.clone()),
+            particles: ParticleSystem::new(device),
             visible: true,
         }
     }
