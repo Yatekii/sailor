@@ -1,4 +1,5 @@
 use crate::wind::WindModel;
+use crate::wind::grid::WindGrid;
 
 pub mod ecmwf;
 pub mod gfs;
@@ -41,20 +42,28 @@ pub fn run_candidates(now_unix: i64, skip: i64, count: i64) -> Vec<(String, u32)
         .collect()
 }
 
-/// Fetch the latest 10u/10v GRIB2 messages for `model` from its native source,
-/// caching as it goes. None if no run resolves or the model has no GRIB source.
-pub async fn fetch_grib(
+/// Load the latest wind field for `model` as a regular `WindGrid`, from its
+/// native GRIB source, caching as it goes. None if no run resolves or the model
+/// has no GRIB source. Regular lat/lon sources decode via `from_uv_messages`;
+/// unstructured sources (ICON-CH1) build the grid by regridding their mesh.
+pub async fn load_grid(
     model: WindModel,
     cache_location: &str,
     now_unix: i64,
-) -> Option<(Vec<u8>, Vec<u8>)> {
+) -> Option<WindGrid> {
     match model {
-        WindModel::EcmwfIfs => ecmwf::fetch_wind(cache_location, now_unix).await,
-        WindModel::Gfs => gfs::fetch_wind(cache_location, now_unix).await,
-        WindModel::IconEu => icon_eu::fetch_wind(cache_location, now_unix).await,
+        WindModel::EcmwfIfs => uv(ecmwf::fetch_wind(cache_location, now_unix).await),
+        WindModel::Gfs => uv(gfs::fetch_wind(cache_location, now_unix).await),
+        WindModel::IconEu => uv(icon_eu::fetch_wind(cache_location, now_unix).await),
         // Open-Meteo models have no native GRIB source here yet.
         _ => None,
     }
+}
+
+/// Decode a fetched (10u, 10v) message pair into a regular grid.
+fn uv(msgs: Option<(Vec<u8>, Vec<u8>)>) -> Option<WindGrid> {
+    let (u, v) = msgs?;
+    WindGrid::from_uv_messages(&u, &v)
 }
 
 #[cfg(test)]

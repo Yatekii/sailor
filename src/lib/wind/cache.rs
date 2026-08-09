@@ -5,7 +5,7 @@ use web_time::Instant;
 
 use crate::platform::{Task, spawn_task};
 use crate::wind::grid::WindGrid;
-use crate::wind::model::fetch_grib;
+use crate::wind::model::load_grid;
 use crate::wind::{WindField, WindModel, WindSample};
 use sailor_platform::wind_fetch::fetch_wind_json;
 
@@ -287,9 +287,7 @@ impl WindCache {
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
             self.grid_loader = Some(spawn_task(async move {
-                fetch_grib(model, &cache_location, now_unix)
-                    .await
-                    .and_then(|(u, v)| WindGrid::from_uv_messages(&u, &v))
+                load_grid(model, &cache_location, now_unix).await
             }));
         }
 
