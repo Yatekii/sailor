@@ -75,9 +75,8 @@ fn vs_main(in: VsIn) -> VsOut {
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    // Blue (calm) -> red (strong), saturating around 35 kn.
-    let t = clamp(in.speed / 35.0, 0.0, 1.0);
-    return vec4<f32>(t, 0.15, 1.0 - t, 0.9);
+    // in.speed is the wind magnitude in knots; colour it with the shared palette.
+    return vec4<f32>(wind_color(in.speed), 0.9);
 }
 "#;
 
@@ -117,7 +116,7 @@ impl WindLayer {
     pub fn new(device: &Device) -> Self {
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("wind wgsl"),
-            source: ShaderSource::Wgsl(WGSL.into()),
+            source: ShaderSource::Wgsl(format!("{}{WGSL}", super::PALETTE_WGSL).into()),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {

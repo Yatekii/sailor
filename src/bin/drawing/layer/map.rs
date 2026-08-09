@@ -1,7 +1,7 @@
 use std::num::NonZeroU64;
 use std::sync::{Arc, Mutex, RwLock};
 
-use glyphon::{Cache, FontSystem, Resolution, SwashCache, TextAtlas, TextRenderer, Viewport};
+use glyphon::TextRenderer;
 use nalgebra_glm::vec2;
 use osm::cache::{CacheStats, TileCache};
 use osm::config::{MAX_FEATURES, MAX_TILES};
@@ -51,10 +51,8 @@ pub struct MapLayer {
     bind_group: BindGroup,
     shader_watcher: FileWatcher,
 
-    font_system: FontSystem,
-    swash_cache: SwashCache,
-    viewport: Viewport,
-    atlas: TextAtlas,
+    /// Own only the renderer; the font system, atlas and viewport are the shared
+    /// `TextStack` passed via the frame context.
     text_renderer: TextRenderer,
     /// Draw on-map name labels. Off by default — the hover overlay shows names
     /// instead, keeping the map uncluttered like the planetiler demo.
@@ -73,9 +71,9 @@ pub struct MapLayer {
 impl MapLayer {
     pub fn new(
         device: &Device,
-        queue: &Queue,
         camera: &Camera,
         feature_collection: Arc<RwLock<FeatureCollection>>,
+        text: &mut super::text::TextStack,
     ) -> Self {
         let shader_watcher = FileWatcher::watch(&[
             &CONFIG.renderer.vertex_shader,
@@ -167,28 +165,9 @@ impl MapLayer {
             &tile_selection_buffer,
         );
 
-        // Load the bundled Ruda font and use it for the default families. This
-        // makes text deterministic and works on the web, which has no system fonts.
-        let mut font_system = FontSystem::new_with_fonts([
-            glyphon::fontdb::Source::Binary(Arc::new(
-                include_bytes!("../../../../config/Ruda-Regular.ttf").to_vec(),
-            )),
-            glyphon::fontdb::Source::Binary(Arc::new(
-                include_bytes!("../../../../config/Ruda-Bold.ttf").to_vec(),
-            )),
-        ]);
-        {
-            let db = font_system.db_mut();
-            db.set_sans_serif_family("Ruda");
-            db.set_serif_family("Ruda");
-            db.set_monospace_family("Ruda");
-        }
-        let swash_cache = SwashCache::new();
-        let cache = Cache::new(device);
-        let viewport = Viewport::new(device, &cache);
-        let mut atlas = TextAtlas::new(device, queue, &cache, TextureFormat::Bgra8Unorm);
+        // Our own text renderer, drawing into the shared glyph atlas.
         let text_renderer =
-            TextRenderer::new(&mut atlas, device, MultisampleState::default(), None);
+            TextRenderer::new(&mut text.atlas, device, MultisampleState::default(), None);
 
         Self {
             blend_pipeline,
@@ -199,10 +178,6 @@ impl MapLayer {
             bind_group_layout,
             bind_group,
             shader_watcher,
-            font_system,
-            swash_cache,
-            viewport,
-            atlas,
             text_renderer,
             labels: false,
             tile_cache: TileCache::new(CONFIG.general.data_root.clone()),
@@ -780,17 +755,9 @@ impl Layer for MapLayer {
 
         if self.labels {
             span!(ctx.spans, "cpu.text_prep", {
-                self.viewport.update(
-                    ctx.queue,
-                    Resolution {
-                        width: ctx.resolution.0,
-                        height: ctx.resolution.1,
-                    },
-                );
-
                 for tile_id in &self.visible_tiles {
                     let tile = self.tile_cache.get_tile_mut(tile_id);
-                    tile.prepare_text(&mut self.font_system);
+                    tile.prepare_text(&mut ctx.text.font_system);
                 }
                 let camera = ctx.screen;
                 let tile_cache = &self.tile_cache;
@@ -803,11 +770,11 @@ impl Layer for MapLayer {
                     .prepare(
                         ctx.device,
                         ctx.queue,
-                        &mut self.font_system,
-                        &mut self.atlas,
-                        &self.viewport,
+                        &mut ctx.text.font_system,
+                        &mut ctx.text.atlas,
+                        &ctx.text.viewport,
                         text_areas,
-                        &mut self.swash_cache,
+                        &mut ctx.text.swash_cache,
                     )
                     .unwrap();
             });
@@ -922,7 +889,7 @@ impl Layer for MapLayer {
                 });
 
                 self.text_renderer
-                    .render(&self.atlas, &self.viewport, &mut pass)
+                    .render(&frame.text.atlas, &frame.text.viewport, &mut pass)
                     .unwrap();
             });
         }

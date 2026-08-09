@@ -66,6 +66,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     var p = parts[i];
     let uv = vec2<f32>(fract(p.pos.x), p.pos.y);
     let w = sample_wind(uv); // knots (u east, v north), bilinear
+    p.pad.x = length(w); // carry the wind speed (kn) to the draw pass for colouring
     // step in world units, scaled so on-screen speed is roughly zoom-independent.
     let step = w * u.speed / pow(2.0, u.zoom);
     p.prev = p.pos;
@@ -106,14 +107,13 @@ fn vs_main(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let world = select(p.prev, p.pos, vi == 1u);
     var out: VsOut;
     out.pos = vec4<f32>(to_clip(world, u.center, u.scale), 0.0, 1.0);
-    out.speed = length(p.pos - p.prev);
+    out.speed = p.pad.x; // wind speed in knots, stashed by the compute pass
     return out;
 }
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let t = clamp(in.speed * 4000.0, 0.0, 1.0);
-    return vec4<f32>(t, 0.15, 1.0 - t, 0.85);
+    return vec4<f32>(wind_color(in.speed), 0.85);
 }
 "#;
 
@@ -327,7 +327,7 @@ impl ParticleSystem {
 
         let draw_shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("draw wgsl"),
-            source: ShaderSource::Wgsl(DRAW_WGSL.into()),
+            source: ShaderSource::Wgsl(format!("{}{DRAW_WGSL}", super::PALETTE_WGSL).into()),
         });
 
         let draw_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {

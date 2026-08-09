@@ -8,6 +8,7 @@ use winit::window::Window;
 
 use osm::math::Camera;
 
+use super::layer::text::TextStack;
 use super::layer::{FramePass, GpuTiming, Layer, LayerCtx, LayerStack, Selection, Spans, StatSink};
 use crate::config::CONFIG;
 
@@ -22,6 +23,8 @@ pub struct Painter {
     multisampled_framebuffer: TextureView,
     stencil: TextureView,
     gpu_timing: Option<GpuTiming>,
+    /// Shared text resources, lent to layers each frame.
+    pub text: TextStack,
 }
 
 impl Painter {
@@ -104,6 +107,8 @@ impl Painter {
         let gpu_timing =
             timestamps_supported.then(|| GpuTiming::new(&device, queue.get_timestamp_period()));
 
+        let text = TextStack::new(&device, &queue, surface_config.format);
+
         Self {
             window,
             hidpi_factor: factor,
@@ -115,6 +120,7 @@ impl Painter {
             multisampled_framebuffer,
             stencil,
             gpu_timing,
+            text,
         }
     }
 
@@ -226,6 +232,12 @@ impl Painter {
                 label: Some("tile polygon encoder"),
             });
 
+        self.text.update_viewport(
+            &self.queue,
+            self.surface_config.width,
+            self.surface_config.height,
+        );
+
         {
             let mut ctx = LayerCtx {
                 device: &self.device,
@@ -238,6 +250,7 @@ impl Painter {
                 spans: &mut spans,
                 time: Default::default(),
                 wind,
+                text: &mut self.text,
             };
             map.update(&mut ctx);
             overlays.update_all(&mut ctx);
@@ -256,6 +269,7 @@ impl Painter {
                 depth_stencil: &self.stencil,
                 screen: camera,
                 gpu_timing: self.gpu_timing.as_ref(),
+                text: &self.text,
                 record_gpu,
                 spans: &mut spans,
             };

@@ -184,14 +184,14 @@ impl Application {
             feature_collection.clone(),
         );
 
-        let painter = drawing::Painter::init(window, size).await;
+        let mut painter = drawing::Painter::init(window, size).await;
         let hud = drawing::ui::Hud::new(&painter.window, &painter.device, &painter.surface_config);
 
         let map = drawing::layer::map::MapLayer::new(
             &painter.device,
-            &painter.queue,
             &app_state.screen,
             feature_collection,
+            &mut painter.text,
         );
         let mut overlays = drawing::layer::LayerStack::new();
         overlays.push(Box::new(drawing::layer::wind::WindLayer::new(
@@ -203,6 +203,10 @@ impl Application {
         overlays.push(Box::new(drawing::layer::hover::HoverLayer::new(
             &painter.device,
             painter.surface_config.format,
+        )));
+        overlays.push(Box::new(drawing::layer::legend::LegendLayer::new(
+            &painter.device,
+            &mut painter.text,
         )));
 
         Self {
