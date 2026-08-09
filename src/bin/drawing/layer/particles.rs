@@ -39,13 +39,33 @@ fn hash01(n: u32) -> f32 {
     return f32(x & 0xffffffu) / f32(0xffffffu);
 }
 
+// Manual bilinear sample of the wind texture (rg32float isn't hardware-filterable,
+// and nearest sampling gives angular, kinked flow). Longitude wraps, latitude clamps.
+fn sample_wind(uv: vec2<f32>) -> vec2<f32> {
+    let dim = vec2<f32>(textureDimensions(wind));
+    let p = uv * dim - vec2<f32>(0.5, 0.5);
+    let base = floor(p);
+    let f = p - base;
+    let w = i32(dim.x);
+    let h = i32(dim.y);
+    let x0 = ((i32(base.x) % w) + w) % w;
+    let x1 = ((i32(base.x) + 1) % w + w) % w;
+    let y0 = clamp(i32(base.y), 0, h - 1);
+    let y1 = clamp(i32(base.y) + 1, 0, h - 1);
+    let c00 = textureLoad(wind, vec2<i32>(x0, y0), 0).xy;
+    let c10 = textureLoad(wind, vec2<i32>(x1, y0), 0).xy;
+    let c01 = textureLoad(wind, vec2<i32>(x0, y1), 0).xy;
+    let c11 = textureLoad(wind, vec2<i32>(x1, y1), 0).xy;
+    return mix(mix(c00, c10, f.x), mix(c01, c11, f.x), f.y);
+}
+
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= arrayLength(&parts)) { return; }
     var p = parts[i];
     let uv = vec2<f32>(fract(p.pos.x), p.pos.y);
-    let w = textureSampleLevel(wind, samp, uv, 0.0).xy; // knots (u east, v north)
+    let w = sample_wind(uv); // knots (u east, v north), bilinear
     // step in world units, scaled so on-screen speed is roughly zoom-independent.
     let step = w * u.speed / pow(2.0, u.zoom);
     p.prev = p.pos;
