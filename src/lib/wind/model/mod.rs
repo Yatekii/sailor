@@ -3,6 +3,7 @@ use crate::wind::grid::WindGrid;
 
 pub mod ecmwf;
 pub mod gfs;
+pub mod icon_ch1;
 pub mod icon_eu;
 
 /// A field's byte range within a source `.grib2` file.
@@ -55,6 +56,7 @@ pub async fn load_grid(
         WindModel::EcmwfIfs => uv(ecmwf::fetch_wind(cache_location, now_unix).await),
         WindModel::Gfs => uv(gfs::fetch_wind(cache_location, now_unix).await),
         WindModel::IconEu => uv(icon_eu::fetch_wind(cache_location, now_unix).await),
+        WindModel::IconCh1 => icon_ch1::load_grid(cache_location).await,
         // Open-Meteo models have no native GRIB source here yet.
         _ => None,
     }
