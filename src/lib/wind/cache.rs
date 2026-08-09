@@ -307,6 +307,12 @@ impl WindCache {
     pub fn loaded_bbox(&self) -> Option<Bbox> {
         self.loaded_bbox
     }
+
+    /// The loaded GRIB grid, if any (None for Open-Meteo models). Lets the render
+    /// layer upload it for particle advection.
+    pub fn grid(&self) -> Option<&crate::wind::grid::WindGrid> {
+        self.grid.as_ref()
+    }
 }
 
 #[cfg(test)]

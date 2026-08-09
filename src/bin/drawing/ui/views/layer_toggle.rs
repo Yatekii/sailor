@@ -16,6 +16,19 @@ pub fn view_layer_toggle(ui: &mut Ui, app_state: &mut AppState) {
                 }
             });
         ui.add(Slider::new(&mut wind.density, 4.0..=30.0).text("arrows"));
+        use crate::drawing::layer::RenderMode;
+        ui.horizontal(|ui| {
+            ui.label("Render");
+            ui.selectable_value(&mut wind.mode, RenderMode::Arrows, "arrows");
+            let grib = wind.model.uses_grib();
+            ui.add_enabled_ui(grib, |ui| {
+                ui.selectable_value(&mut wind.mode, RenderMode::Particles, "particles");
+            });
+            // fall back to arrows if the model can't do particles
+            if !grib {
+                wind.mode = RenderMode::Arrows;
+            }
+        });
     }
 
     ui.separator();

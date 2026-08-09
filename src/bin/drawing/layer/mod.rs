@@ -125,6 +125,13 @@ pub trait StatSink {
 #[derive(Clone, Copy, Default)]
 pub struct ForecastTime;
 
+/// How the wind overlay draws: static arrows, or animated particle flow.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RenderMode {
+    Arrows,
+    Particles,
+}
+
 /// Wind-overlay controls the app hands the wind layer each frame (from the UI).
 /// App-agnostic value; no egui type leaks into the layer.
 #[derive(Clone, Copy)]
@@ -133,6 +140,7 @@ pub struct WindControls {
     pub model: WindModel,
     /// Target arrows across the viewport (lattice density).
     pub density: f32,
+    pub mode: RenderMode,
 }
 
 impl Default for WindControls {
@@ -141,6 +149,7 @@ impl Default for WindControls {
             visible: true,
             model: WindModel::EcmwfIfs,
             density: 10.0,
+            mode: RenderMode::Arrows,
         }
     }
 }
@@ -270,5 +279,10 @@ mod tests {
             visible: true,
         }));
         assert_eq!(stack.names_in_paint_order(), vec!["map", "temperature"]);
+    }
+
+    #[test]
+    fn wind_controls_default_mode_is_arrows() {
+        assert_eq!(WindControls::default().mode, RenderMode::Arrows);
     }
 }
