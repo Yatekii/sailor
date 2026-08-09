@@ -54,7 +54,11 @@ fn title_fragment(reference_iso: &str, var: &str) -> Option<String> {
     if reference_iso.len() < 16 || b[4] != b'-' || b[10] != b'T' {
         return None;
     }
-    let (y, m, d) = (&reference_iso[0..4], &reference_iso[5..7], &reference_iso[8..10]);
+    let (y, m, d) = (
+        &reference_iso[0..4],
+        &reference_iso[5..7],
+        &reference_iso[8..10],
+    );
     let (hh, mi) = (&reference_iso[11..13], &reference_iso[14..16]);
     Some(format!("{var} at {d}.{m}.{y} {hh}:{mi} Step 0 (Control)"))
 }
@@ -122,9 +126,10 @@ fn coord_field(bytes: &[u8], id: (u8, u8)) -> Option<Vec<f32>> {
 async fn cell_coords(cache_location: &str) -> Option<(Vec<f32>, Vec<f32>)> {
     let lat_path = format!("{cache_location}/wind/icon_ch1_lat.f32");
     let lon_path = format!("{cache_location}/wind/icon_ch1_lon.f32");
-    if let (Some(la), Some(lo)) =
-        (platform::read_bytes(&lat_path), platform::read_bytes(&lon_path))
-    {
+    if let (Some(la), Some(lo)) = (
+        platform::read_bytes(&lat_path),
+        platform::read_bytes(&lon_path),
+    ) {
         return Some((f32_from_bytes(&la), f32_from_bytes(&lo)));
     }
     let href = discover_constants_href().await?;

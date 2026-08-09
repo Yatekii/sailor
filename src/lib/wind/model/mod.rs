@@ -47,11 +47,7 @@ pub fn run_candidates(now_unix: i64, skip: i64, count: i64) -> Vec<(String, u32)
 /// native GRIB source, caching as it goes. None if no run resolves or the model
 /// has no GRIB source. Regular lat/lon sources decode via `from_uv_messages`;
 /// unstructured sources (ICON-CH1) build the grid by regridding their mesh.
-pub async fn load_grid(
-    model: WindModel,
-    cache_location: &str,
-    now_unix: i64,
-) -> Option<WindGrid> {
+pub async fn load_grid(model: WindModel, cache_location: &str, now_unix: i64) -> Option<WindGrid> {
     match model {
         WindModel::EcmwfIfs => uv(ecmwf::fetch_wind(cache_location, now_unix).await),
         WindModel::Gfs => uv(gfs::fetch_wind(cache_location, now_unix).await),
