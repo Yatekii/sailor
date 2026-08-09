@@ -162,6 +162,8 @@ pub struct WindCache {
     grid: Option<WindGrid>,
     /// In-flight task loading the GRIB grid.
     grid_loader: Option<Task<Option<WindGrid>>>,
+    /// incremented every time a new grid is stored; lets the render layer detect changes.
+    grid_generation: u64,
 }
 
 impl WindCache {
@@ -177,6 +179,7 @@ impl WindCache {
             density: 10.0,
             grid: None,
             grid_loader: None,
+            grid_generation: 0,
         }
     }
 
@@ -264,6 +267,7 @@ impl WindCache {
                 match result {
                     Some(g) => {
                         self.grid = Some(g);
+                        self.grid_generation += 1;
                         self.retry_after = None;
                     }
                     None => self.retry_after = Some(now + BACKOFF),
@@ -312,6 +316,11 @@ impl WindCache {
     /// layer upload it for particle advection.
     pub fn grid(&self) -> Option<&crate::wind::grid::WindGrid> {
         self.grid.as_ref()
+    }
+
+    /// Monotonically increasing counter; advances each time a new grid is stored.
+    pub fn grid_generation(&self) -> u64 {
+        self.grid_generation
     }
 }
 

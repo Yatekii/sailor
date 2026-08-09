@@ -103,8 +103,8 @@ pub struct WindLayer {
     particles: ParticleSystem,
     visible: bool,
     mode: RenderMode,
-    /// pointer-sized id of the loaded grid so we only re-upload on change.
-    grid_id: usize,
+    /// generation of the last uploaded grid; 0 means none uploaded yet.
+    grid_id: u64,
 }
 
 impl WindLayer {
@@ -263,7 +263,7 @@ impl Layer for WindLayer {
     fn visible(&self) -> bool {
         self.visible
             && (self.instance_count > 0
-                || (self.mode == RenderMode::Particles && self.grid_id != 0))
+                || (self.mode == RenderMode::Particles && self.cache.grid_generation() > 0))
     }
 
     fn update(&mut self, ctx: &mut LayerCtx) {
@@ -276,10 +276,10 @@ impl Layer for WindLayer {
         if ctx.wind.mode == RenderMode::Particles {
             // upload the wind grid when it first arrives or changes.
             if let Some(grid) = self.cache.grid() {
-                let id = grid as *const _ as usize;
-                if id != self.grid_id {
+                let new_gen = self.cache.grid_generation();
+                if new_gen != self.grid_id {
                     self.particles.upload_wind(ctx.queue, grid);
-                    self.grid_id = id;
+                    self.grid_id = new_gen;
                 }
                 self.particles.render_trails(
                     ctx.device,

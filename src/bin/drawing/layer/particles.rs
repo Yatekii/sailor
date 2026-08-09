@@ -197,7 +197,7 @@ impl ParticleSystem {
         let particles = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("particles"),
             contents: as_byte_slice(&data),
-            usage: BufferUsages::STORAGE | BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
         });
 
         // advect bind group layout: particles (rw), wind texture, sampler, uniform
@@ -607,7 +607,7 @@ impl ParticleSystem {
             }));
         }
 
-        // --- fade pass: src -> dst with REPLACE blend ---
+        // --- fade pass: src -> dst with REPLACE blend; clear dst first (fade writes every texel). ---
         {
             let fade_bg = self.fade_bgs[src].as_ref().unwrap();
             let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -616,7 +616,7 @@ impl ParticleSystem {
                     depth_slice: None,
                     view: &self.trails_views[dst],
                     resolve_target: None,
-                    ops: Operations { load: LoadOp::Load, store: StoreOp::Store },
+                    ops: Operations { load: LoadOp::Clear(Color::TRANSPARENT), store: StoreOp::Store },
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,

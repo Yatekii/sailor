@@ -161,7 +161,7 @@ mod tests {
         let h = 64;
         let out = g.resample_mercator(w, h);
         assert_eq!(out.len(), w * h * 2);
-        // texel row 32 (world.y = 32/64 = 0.5) is the equator -> v ~ 0.
+        // row 32 center is world_y ≈ 0.508 → lat ≈ -2.8°, so |v| < 4.
         let j = 32;
         let i = 10;
         let vv = out[(j * w + i) * 2 + 1];
