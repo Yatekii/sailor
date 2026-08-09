@@ -24,7 +24,9 @@ struct Particle {
 
 const ADVECT_WGSL: &str = r#"
 struct Particle { pos: vec2<f32>, prev: vec2<f32>, age: f32, seed: f32, pad: vec2<f32> };
-struct CU { dt: f32, speed: f32, zoom: f32, frame: f32, pad: vec4<f32> };
+// vmin/vmax are the viewport's world-space bounds; particles respawn inside them
+// so on-screen density holds instead of scattering across the whole globe.
+struct CU { dt: f32, speed: f32, zoom: f32, frame: f32, vmin: vec2<f32>, vmax: vec2<f32> };
 @group(0) @binding(0) var<storage, read_write> parts: array<Particle>;
 @group(0) @binding(1) var wind: texture_2d<f32>;
 @group(0) @binding(2) var samp: sampler;
@@ -50,13 +52,15 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     // world y is +south; north wind (+v) should move the particle toward -y.
     p.pos = vec2<f32>(p.pos.x + step.x, p.pos.y - step.y);
     p.age = p.age + u.dt;
-    let dead = p.age > 60.0 || p.pos.y < 0.0 || p.pos.y > 1.0 || length(step) < 1e-7;
+    let out = p.pos.x < u.vmin.x || p.pos.x > u.vmax.x || p.pos.y < u.vmin.y || p.pos.y > u.vmax.y;
+    let dead = p.age > 60.0 || out || length(step) < 1e-8;
     if (dead) {
         let nx = hash01(i * 3u + u32(u.frame) * 2654435761u);
         let ny = hash01(i * 5u + u32(u.frame) * 40503u + 7u);
-        p.pos = vec2<f32>(nx, ny);
+        // respawn inside the viewport, ages staggered so they don't all blink together.
+        p.pos = u.vmin + vec2<f32>(nx, ny) * (u.vmax - u.vmin);
         p.prev = p.pos;
-        p.age = 0.0;
+        p.age = hash01(i * 7u + u32(u.frame) + 11u) * 60.0;
     }
     parts[i] = p;
 }
@@ -560,7 +564,25 @@ impl ParticleSystem {
         }
 
         // --- compute advect pass ---
-        let cu = [1.0f32, 0.02, camera.zoom, self.frame, 0.0, 0.0, 0.0, 0.0];
+        // speed tuned so particles drift a fraction of the viewport per second,
+        // not zip across it; the /2^zoom in the shader cancels the draw scale, so
+        // on-screen speed is roughly zoom-independent. vmin/vmax are the viewport
+        // world bounds, so respawned particles stay on screen.
+        let s = 2f32.powf(camera.zoom) * camera.tile_size();
+        let hx = (camera.width / 2.0) / s;
+        let hy = (camera.height / 2.0) / s;
+        let cx = camera.center.x as f32;
+        let cy = camera.center.y as f32;
+        let cu = [
+            1.0f32,
+            0.0015,
+            camera.zoom,
+            self.frame,
+            cx - hx,
+            cy - hy,
+            cx + hx,
+            cy + hy,
+        ];
         queue.write_buffer(&self.cu, 0, as_byte_slice(&cu));
 
         let advect_bg = device.create_bind_group(&BindGroupDescriptor {
