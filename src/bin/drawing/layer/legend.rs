@@ -6,11 +6,13 @@ use wgpu::*;
 use super::text::TextStack;
 use super::{FramePass, Layer, LayerCtx};
 
-/// Bar geometry in physical pixels.
-const BAR_W: f32 = 260.0;
-const BAR_H: f32 = 14.0;
-const MARGIN_X: f32 = 24.0;
-const MARGIN_BOTTOM: f32 = 40.0;
+/// Bar geometry in physical pixels (sized for hidpi/retina).
+const BAR_W: f32 = 360.0;
+const BAR_H: f32 = 28.0;
+const MARGIN_X: f32 = 40.0;
+const MARGIN_BOTTOM: f32 = 64.0;
+/// TextArea scale — matches the map's retina text handling.
+const LABEL_SCALE: f32 = 2.0;
 /// Tick labels along the bar (knots).
 const TICKS: [&str; 6] = ["0", "10", "20", "30", "40", "50 kn"];
 
@@ -193,14 +195,14 @@ impl Layer for LegendLayer {
         ctx.queue.write_buffer(&self.uniform, 0, as_byte_slice(&u));
 
         // Labels under the bar, one per tick.
-        let top = self.rect[1] + BAR_H + 3.0;
+        let top = self.rect[1] + BAR_H + 4.0;
         let areas = self.labels.iter().enumerate().map(|(i, buffer)| {
-            let left = self.rect[0] + i as f32 / (TICKS.len() - 1) as f32 * BAR_W - 4.0;
+            let left = self.rect[0] + i as f32 / (TICKS.len() - 1) as f32 * BAR_W - 6.0;
             TextArea {
                 buffer,
                 left,
                 top,
-                scale: 1.0,
+                scale: LABEL_SCALE,
                 bounds: TextBounds {
                     left: left as i32,
                     top: top as i32,
