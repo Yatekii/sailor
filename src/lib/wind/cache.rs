@@ -285,7 +285,7 @@ impl WindCache {
             self.grid_loader = Some(spawn_task(async move {
                 fetch_ecmwf_wind(&cache_location, now_unix)
                     .await
-                    .and_then(|(u, v)| WindGrid::from_ecmwf_messages(&u, &v))
+                    .and_then(|(u, v)| WindGrid::from_uv_messages(&u, &v))
             }));
         }
 

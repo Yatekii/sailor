@@ -34,10 +34,10 @@ impl WindGrid {
 const MS_TO_KN: f32 = 1.943_844_5;
 
 impl WindGrid {
-    /// Build a grid from ECMWF open-data 10u and 10v GRIB2 messages. Returns
-    /// None if either message is missing, not a regular lat/lon grid, or the
-    /// field lengths disagree. Values are converted m/s -> knots.
-    pub fn from_ecmwf_messages(u_bytes: &[u8], v_bytes: &[u8]) -> Option<WindGrid> {
+    /// Build a grid from 10u and 10v GRIB2 messages (ECMWF, GFS, any regular
+    /// lat/lon source). Returns None if either message is missing, not a regular
+    /// lat/lon grid, or the field lengths disagree. Values are m/s -> knots.
+    pub fn from_uv_messages(u_bytes: &[u8], v_bytes: &[u8]) -> Option<WindGrid> {
         let um = read_messages(u_bytes).next()?;
         let vm = read_messages(v_bytes).next()?;
         let (nlat, nlon) = um.grid_dimensions().ok()?;
@@ -139,7 +139,7 @@ mod tests {
     fn decodes_ecmwf_fixture() {
         let u = std::fs::read("tests/fixtures/wind/ecmwf_10u.grib2").unwrap();
         let v = std::fs::read("tests/fixtures/wind/ecmwf_10v.grib2").unwrap();
-        let g = WindGrid::from_ecmwf_messages(&u, &v).expect("decode");
+        let g = WindGrid::from_uv_messages(&u, &v).expect("decode");
         assert_eq!((g.nlat, g.nlon), (721, 1440));
         assert!((g.lat0 - 90.0).abs() < 1e-3);
         assert!((g.lat_step - -0.25).abs() < 1e-3);
