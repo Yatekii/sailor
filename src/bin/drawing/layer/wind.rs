@@ -7,7 +7,7 @@ use osm::wind::cache::{Bbox, WindCache};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
 
-use super::{particles::ParticleSystem, FramePass, Layer, LayerCtx};
+use super::{particles::ParticleSystem, FramePass, Layer, LayerCtx, RenderMode};
 
 /// Max arrows drawn in a frame; the lattice fetch is capped well below this.
 const MAX_INSTANCES: usize = 512;
@@ -91,7 +91,6 @@ const ARROW: &[[f32; 2]] = &[
     [0.6, -0.18], [1.0, 0.0], [0.6, 0.18],
 ];
 
-#[allow(dead_code)]
 pub struct WindLayer {
     pipeline: RenderPipeline,
     bind_group_layout: BindGroupLayout,
@@ -103,6 +102,9 @@ pub struct WindLayer {
     cache: WindCache,
     particles: ParticleSystem,
     visible: bool,
+    mode: RenderMode,
+    /// pointer-sized id of the loaded grid so we only re-upload on change.
+    grid_id: usize,
 }
 
 impl WindLayer {
@@ -229,6 +231,8 @@ impl WindLayer {
             cache: WindCache::new(CONFIG.general.data_root.clone()),
             particles: ParticleSystem::new(device),
             visible: true,
+            mode: RenderMode::Arrows,
+            grid_id: 0,
         }
     }
 
@@ -257,15 +261,32 @@ impl Layer for WindLayer {
     }
 
     fn visible(&self) -> bool {
-        self.visible && self.instance_count > 0
+        self.visible
+            && (self.instance_count > 0
+                || (self.mode == RenderMode::Particles && self.grid_id != 0))
     }
 
     fn update(&mut self, ctx: &mut LayerCtx) {
         let cam = ctx.screen;
         self.visible = ctx.wind.visible;
+        self.mode = ctx.wind.mode;
         self.cache
             .request(Self::viewport_bbox(cam), ctx.wind.model, ctx.wind.density);
 
+        if ctx.wind.mode == RenderMode::Particles {
+            // upload the wind grid when it first arrives or changes.
+            if let Some(grid) = self.cache.grid() {
+                let id = grid as *const _ as usize;
+                if id != self.grid_id {
+                    self.particles.upload_wind(ctx.queue, grid);
+                    self.grid_id = id;
+                }
+                self.particles.advance(ctx.device, ctx.queue, ctx.encoder, cam);
+            }
+            return;
+        }
+
+        // arrows path
         // Rebuild instances each frame: position is relative to the camera centre,
         // which moves on every pan/zoom. Subtract the centre in f64 (and project
         // lat/lon in f64) so a small offset doesn't vanish in f32 at high zoom.
@@ -319,6 +340,27 @@ impl Layer for WindLayer {
     }
 
     fn paint(&self, frame: &mut FramePass) {
+        if self.mode == RenderMode::Particles {
+            let mut pass = frame.encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("wind particles"),
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    depth_slice: None,
+                    view: frame.view,
+                    resolve_target: None,
+                    ops: Operations {
+                        load: LoadOp::Load,
+                        store: StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            self.particles.draw(&mut pass);
+            return;
+        }
+
         let Some(bind_group) = &self.bind_group else { return };
         if self.instance_count == 0 {
             return;
