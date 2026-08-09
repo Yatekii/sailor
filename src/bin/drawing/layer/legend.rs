@@ -9,8 +9,8 @@ use super::{FramePass, Layer, LayerCtx};
 /// Bar geometry in physical pixels (sized for hidpi/retina).
 const BAR_W: f32 = 360.0;
 const BAR_H: f32 = 28.0;
-const MARGIN_X: f32 = 40.0;
-const MARGIN_BOTTOM: f32 = 64.0;
+/// Gap from the top of the map to the bar (clears the top frametime strip).
+const MARGIN_TOP: f32 = 56.0;
 /// TextArea scale — matches the map's retina text handling.
 const LABEL_SCALE: f32 = 2.0;
 /// Tick labels along the bar (knots).
@@ -180,8 +180,8 @@ impl Layer for LegendLayer {
         }
 
         let (w, h) = (ctx.resolution.0 as f32, ctx.resolution.1 as f32);
-        // bottom-left corner; rect = [x, y_top, width, height] in pixels.
-        self.rect = [MARGIN_X, h - MARGIN_BOTTOM - BAR_H, BAR_W, BAR_H];
+        // top-centre; rect = [x, y_top, width, height] in pixels.
+        self.rect = [(w - BAR_W) / 2.0, MARGIN_TOP, BAR_W, BAR_H];
         let u = [
             w,
             h,
