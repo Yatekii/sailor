@@ -29,6 +29,7 @@ struct Asset {
 
 #[derive(Deserialize)]
 struct Props {
+    title: String,
     #[serde(rename = "forecast:reference_datetime")]
     reference: String,
 }
@@ -74,25 +75,33 @@ async fn search(body: &str) -> Option<SearchResp> {
     serde_json::from_slice(&bytes).ok()
 }
 
-/// Discover the latest run's control step-0 `U_10M`/`V_10M` signed hrefs.
+/// Marks a control, step-0 (analysis) field — the member/lead we advect.
+const STEP0_CONTROL: &str = "Step 0 (Control)";
+
+/// Discover the latest run's control step-0 `U_10M`/`V_10M` signed hrefs. The
+/// newest U_10M item overall may be a perturbed member or a later lead whose
+/// control analysis isn't published, so we pull recent U_10M items and pick the
+/// latest that IS a step-0 control, rather than trusting item order.
 async fn discover_wind_hrefs() -> Option<(String, String)> {
-    // newest U_10M item -> its reference datetime.
-    let newest = search(
-        r#"{"collections":["ch.meteoschweiz.ogd-forecasting-icon-ch1"],"query":{"title":{"startsWith":"U_10M"}},"limit":1}"#,
+    let list = search(
+        r#"{"collections":["ch.meteoschweiz.ogd-forecasting-icon-ch1"],"query":{"title":{"startsWith":"U_10M"}},"limit":100}"#,
     )
     .await?;
-    let reference = newest.features.first()?.properties.reference.clone();
+    let u = list
+        .features
+        .into_iter()
+        .filter(|f| f.properties.title.contains(STEP0_CONTROL))
+        .max_by(|a, b| a.properties.reference.cmp(&b.properties.reference))?;
+    let reference = u.properties.reference.clone();
+    let u_href = first_href(&u)?;
 
-    let mut hrefs = [None, None];
-    for (i, var) in ["U_10M", "V_10M"].iter().enumerate() {
-        let frag = title_fragment(&reference, var)?;
-        let body = format!(
-            r#"{{"collections":["{CID}"],"query":{{"title":{{"contains":"{frag}"}}}},"limit":1}}"#
-        );
-        let resp = search(&body).await?;
-        hrefs[i] = first_href(resp.features.first()?);
-    }
-    Some((hrefs[0].take()?, hrefs[1].take()?))
+    // the matching V_10M for the same run.
+    let frag = title_fragment(&reference, "V_10M")?;
+    let body = format!(
+        r#"{{"collections":["{CID}"],"query":{{"title":{{"contains":"{frag}"}}}},"limit":1}}"#
+    );
+    let v_href = first_href(search(&body).await?.features.first()?)?;
+    Some((u_href, v_href))
 }
 
 /// Discover the collection-level horizontal-constants (grid) signed href.
