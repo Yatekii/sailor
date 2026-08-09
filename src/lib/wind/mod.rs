@@ -1,8 +1,8 @@
 use serde::Deserialize;
 
 pub mod cache;
-pub mod ecmwf;
 pub mod grid;
+pub mod model;
 
 /// A selectable weather model, mapped to its Open-Meteo id. Non-US models first;
 /// GFS is the US one we prefer to avoid but keep available.
@@ -50,9 +50,9 @@ impl WindModel {
     }
 
     /// Whether this model is served by the local GRIB path (vs the Open-Meteo
-    /// point api). Only ECMWF for now.
+    /// point api). ECMWF and GFS so far.
     pub fn uses_grib(self) -> bool {
-        matches!(self, Self::EcmwfIfs)
+        matches!(self, Self::EcmwfIfs | Self::Gfs)
     }
 
     /// The model's native grid spacing in degrees. Sampling finer than this just

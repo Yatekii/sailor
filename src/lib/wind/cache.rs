@@ -4,8 +4,8 @@ use std::time::Duration;
 use web_time::Instant;
 
 use crate::platform::{Task, spawn_task};
-use crate::wind::ecmwf::fetch_ecmwf_wind;
 use crate::wind::grid::WindGrid;
+use crate::wind::model::fetch_grib;
 use crate::wind::{WindField, WindModel, WindSample};
 use sailor_platform::wind_fetch::fetch_wind_json;
 
@@ -198,6 +198,9 @@ impl WindCache {
             self.loaded_bbox = None;
             self.pending = None;
             self.retry_after = None;
+            // drop the GRIB grid too, so a switch between grib models refetches.
+            self.grid = None;
+            self.grid_loader = None;
         }
 
         if model.uses_grib() {
@@ -278,12 +281,13 @@ impl WindCache {
         let cooling = self.retry_after.is_some_and(|t| now < t);
         if self.grid.is_none() && self.grid_loader.is_none() && !cooling {
             let cache_location = self.cache_location.clone();
+            let model = self.model;
             let now_unix = web_time::SystemTime::now()
                 .duration_since(web_time::UNIX_EPOCH)
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
             self.grid_loader = Some(spawn_task(async move {
-                fetch_ecmwf_wind(&cache_location, now_unix)
+                fetch_grib(model, &cache_location, now_unix)
                     .await
                     .and_then(|(u, v)| WindGrid::from_uv_messages(&u, &v))
             }));
