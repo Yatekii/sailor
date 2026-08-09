@@ -2,6 +2,7 @@ use crate::wind::WindModel;
 
 pub mod ecmwf;
 pub mod gfs;
+pub mod icon_eu;
 
 /// A field's byte range within a source `.grib2` file.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -50,6 +51,7 @@ pub async fn fetch_grib(
     match model {
         WindModel::EcmwfIfs => ecmwf::fetch_wind(cache_location, now_unix).await,
         WindModel::Gfs => gfs::fetch_wind(cache_location, now_unix).await,
+        WindModel::IconEu => icon_eu::fetch_wind(cache_location, now_unix).await,
         // Open-Meteo models have no native GRIB source here yet.
         _ => None,
     }

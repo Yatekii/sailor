@@ -32,6 +32,8 @@ allow = [
     "Zlib",
     "OFL-1.1",
     "Ubuntu-font-1.0",
+    # pure-rust bzip2 backend (libbz2-rs-sys) for DWD ICON grib; permissive BSD-style.
+    "bzip2-1.0.6",
 ]
 confidence-threshold = 0.8
 

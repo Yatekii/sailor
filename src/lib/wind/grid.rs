@@ -3,8 +3,9 @@ use std::f32::consts::PI;
 
 /// A decoded regular lat/lon wind field for one forecast step. Degrees for
 /// angles, knots for u/v. The lat axis descends from `lat0` by `lat_step`; the
-/// lon axis ascends from `lon0` by `lon_step` and wraps the globe, so longitude
-/// is indexed modulo `nlon`. Data is row-major (lat-major, lon fastest).
+/// lon axis ascends from `lon0` by `lon_step`. May be global (spans 360°, wraps
+/// at the seam) or regional (spans less; `sample` clamps outside coverage). Data
+/// is row-major (lat-major, lon fastest).
 #[derive(Clone, Debug)]
 pub struct WindGrid {
     pub nlat: usize,
@@ -18,13 +19,22 @@ pub struct WindGrid {
 }
 
 impl WindGrid {
-    /// Nearest-neighbour sample at `lon`/`lat` in degrees. Longitude wraps; row
-    /// clamps to the poles.
+    /// Nearest-neighbour sample at `lon`/`lat` in degrees. Row clamps to the
+    /// poles. Longitude is periodic (mod 360°): a global grid wraps around the
+    /// seam, a regional grid (span < 360°) clamps to its covered range so points
+    /// land in the right column instead of aliasing modulo the column count.
     pub fn sample(&self, lon: f32, lat: f32) -> (f32, f32) {
         let row = (((lat - self.lat0) / self.lat_step).round() as isize)
             .clamp(0, self.nlat as isize - 1) as usize;
-        let raw = ((lon - self.lon0) / self.lon_step).round() as isize;
-        let col = raw.rem_euclid(self.nlon as isize) as usize;
+        // bring (lon - lon0) into [0, 360) before indexing.
+        let deg = (lon - self.lon0).rem_euclid(360.0);
+        let raw = (deg / self.lon_step).round() as isize;
+        let span = self.nlon as f32 * self.lon_step; // ~360 for a global grid
+        let col = if span.abs() >= 359.9 {
+            raw.rem_euclid(self.nlon as isize)
+        } else {
+            raw.clamp(0, self.nlon as isize - 1)
+        } as usize;
         let idx = row * self.nlon + col;
         (self.u[idx], self.v[idx])
     }
@@ -133,6 +143,40 @@ mod tests {
         let g = grid();
         // far south clamps to last row
         assert_eq!(g.sample(0.0, -200.0), (4.0, -4.0));
+    }
+
+    // A regional grid (span < 360°) whose lon origin is in 0..360 must index by
+    // periodic longitude, not wrap modulo the column count. Mirrors ICON-EU:
+    // lon0 = 336.5 (= -23.5°), 0.0625° step. A point at 8.5°E must land in the
+    // column for 8.5°, not alias into the Atlantic.
+    #[test]
+    fn regional_grid_indexes_by_periodic_lon() {
+        let nlon = 1377;
+        let lon0 = 336.5;
+        let step = 0.0625;
+        // one row; u = column index so we can read back which column was hit.
+        let u: Vec<f32> = (0..nlon).map(|c| c as f32).collect();
+        let v = vec![0.0; nlon];
+        let g = WindGrid {
+            nlat: 1,
+            nlon,
+            lat0: 47.0,
+            lat_step: -0.0625,
+            lon0,
+            lon_step: step,
+            u,
+            v,
+        };
+        // expected column for 8.5°E: ((8.5 - 336.5) mod 360) / step.
+        let expected = (((8.5f32 - lon0).rem_euclid(360.0)) / step).round();
+        let (col_hit, _) = g.sample(8.5, 47.0);
+        assert_eq!(col_hit, expected);
+        // and that column really is ~8.5°E, not a wrapped-around value.
+        let hit_lon = lon0 + col_hit * step - 360.0;
+        assert!(
+            (hit_lon - 8.5).abs() < step,
+            "sampled {hit_lon}°, wanted 8.5°"
+        );
     }
 
     #[test]

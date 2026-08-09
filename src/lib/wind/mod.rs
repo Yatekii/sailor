@@ -10,15 +10,17 @@ pub mod model;
 pub enum WindModel {
     EcmwfIfs,
     Icon,
+    IconEu,
     AromeFrance,
     IconCh1,
     Gfs,
 }
 
 impl WindModel {
-    pub const ALL: [WindModel; 5] = [
+    pub const ALL: [WindModel; 6] = [
         Self::EcmwfIfs,
         Self::Icon,
+        Self::IconEu,
         Self::AromeFrance,
         Self::IconCh1,
         Self::Gfs,
@@ -29,6 +31,7 @@ impl WindModel {
         match self {
             Self::EcmwfIfs => "ecmwf_ifs025",
             Self::Icon => "icon_seamless",
+            Self::IconEu => "icon_eu",
             Self::AromeFrance => "meteofrance_arome_france",
             // meteoswiss ids are newer; verify against open-meteo's model list if
             // this one returns nothing.
@@ -43,6 +46,7 @@ impl WindModel {
         match self {
             Self::EcmwfIfs => "ECMWF IFS · global · 0.25° (~28 km)",
             Self::Icon => "ICON · global (DWD) · 0.1° (~11 km)",
+            Self::IconEu => "ICON-EU · Europe (DWD) · 0.0625° (~6.5 km)",
             Self::AromeFrance => "AROME · France · 0.025° (~2.8 km)",
             Self::IconCh1 => "ICON-CH1 · Alps (MeteoSwiss) · 0.01° (~1 km)",
             Self::Gfs => "GFS · global (US) · 0.25° (~28 km)",
@@ -50,9 +54,9 @@ impl WindModel {
     }
 
     /// Whether this model is served by the local GRIB path (vs the Open-Meteo
-    /// point api). ECMWF and GFS so far.
+    /// point api). ECMWF, GFS and ICON-EU so far.
     pub fn uses_grib(self) -> bool {
-        matches!(self, Self::EcmwfIfs | Self::Gfs)
+        matches!(self, Self::EcmwfIfs | Self::Gfs | Self::IconEu)
     }
 
     /// The model's native grid spacing in degrees. Sampling finer than this just
@@ -61,6 +65,7 @@ impl WindModel {
         match self {
             Self::EcmwfIfs | Self::Gfs => 0.25,
             Self::Icon => 0.1,
+            Self::IconEu => 0.0625,
             Self::AromeFrance => 0.025,
             Self::IconCh1 => 0.01,
         }
