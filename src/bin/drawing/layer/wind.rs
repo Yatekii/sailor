@@ -240,6 +240,12 @@ impl Layer for WindLayer {
                     self.particles.upload_wind(ctx.queue, grid);
                     self.grid_id = new_gen;
                 }
+            }
+            // Keep advecting the last-uploaded field even while a newly selected
+            // model's grid is still loading, so switching models doesn't freeze
+            // the animation. grid_id > 0 means a field has been uploaded at least
+            // once.
+            if self.grid_id > 0 {
                 self.particles.render_trails(
                     ctx.device,
                     ctx.queue,
