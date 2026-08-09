@@ -36,3 +36,26 @@ pub async fn get_range(url: &str, offset: u64, length: u64) -> Option<Vec<u8>> {
         }
     }
 }
+
+/// POST a JSON `body` and return the response bytes, or None on any
+/// non-success/error. Used for STAC search, which is POST-only.
+pub async fn post_json(url: &str, body: &str) -> Option<Vec<u8>> {
+    let client = reqwest::Client::new();
+    match client
+        .post(url)
+        .header("Content-Type", "application/json")
+        .body(body.to_string())
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => r.bytes().await.ok().map(|b| b.to_vec()),
+        Ok(r) => {
+            log::warn!("post {} for {url}", r.status());
+            None
+        }
+        Err(e) => {
+            log::warn!("post error for {url}: {e}");
+            None
+        }
+    }
+}
