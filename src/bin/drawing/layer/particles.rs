@@ -11,6 +11,10 @@ const TEX_H: u32 = 1024;
 /// Number of advected particles.
 const PARTICLES: u32 = 6000;
 
+/// Advection speed in world units per (knot · second); the shader multiplies by
+/// wind speed and real elapsed time. Tuned to the old per-frame look at 60 fps.
+const SPEED: f32 = 0.024;
+
 /// One particle: current + previous world position, age, and a per-particle seed.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -51,6 +55,9 @@ pub struct ParticleSystem {
     du: Buffer,
     draw_bg: Option<BindGroup>,
     frame: f32,
+    /// wall-clock of the previous advect, so the step scales by real elapsed
+    /// time (fps-independent) rather than per-frame.
+    last_frame: Option<web_time::Instant>,
     /// two ping-pong Rgba8Unorm textures for accumulating fading trails.
     trails: [Texture; 2],
     trails_views: [TextureView; 2],
@@ -425,6 +432,7 @@ impl ParticleSystem {
             du,
             draw_bg: None,
             frame: 0.0,
+            last_frame: None,
             trails,
             trails_views,
             trails_size: (1, 1),
@@ -486,6 +494,16 @@ impl ParticleSystem {
         }
 
         // --- compute advect pass ---
+        // Real elapsed seconds since the last advect, so motion is fps-independent.
+        // Clamped so a stall (or the first frame) can't teleport particles.
+        let now = web_time::Instant::now();
+        let dt = self
+            .last_frame
+            .map(|t| now.duration_since(t).as_secs_f32())
+            .unwrap_or(1.0 / 60.0)
+            .clamp(0.0, 0.1);
+        self.last_frame = Some(now);
+
         // speed tuned so particles drift a fraction of the viewport per second,
         // not zip across it; the /2^zoom in the shader cancels the draw scale, so
         // on-screen speed is roughly zoom-independent. vmin/vmax are the viewport
@@ -496,8 +514,8 @@ impl ParticleSystem {
         let cx = camera.center.x as f32;
         let cy = camera.center.y as f32;
         let cu = [
-            1.0f32,
-            0.0004,
+            dt,
+            SPEED,
             camera.zoom,
             self.frame,
             cx - hx,

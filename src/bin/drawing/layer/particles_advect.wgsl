@@ -17,6 +17,12 @@ fn hash01(n: u32) -> f32 {
 // Manual bilinear sample of the wind texture (rg32float isn't hardware-filterable,
 // and nearest sampling gives angular, kinked flow). Longitude wraps, latitude clamps.
 fn sample_wind(uv: vec2<f32>) -> vec2<f32> {
+    // beyond the poles (outside the mercator [0,1] band) there is no data; return
+    // zero so particles that drift past the top/bottom edge leave no trail instead
+    // of streaming along the clamped edge row.
+    if (uv.y < 0.0 || uv.y > 1.0) {
+        return vec2<f32>(0.0, 0.0);
+    }
     let dim = vec2<f32>(textureDimensions(wind));
     let p = uv * dim - vec2<f32>(0.5, 0.5);
     let base = floor(p);
@@ -42,21 +48,23 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let uv = vec2<f32>(fract(p.pos.x), p.pos.y);
     let w = sample_wind(uv); // knots (u east, v north), bilinear
     p.pad.x = length(w); // carry the wind speed (kn) to the draw pass for colouring
-    // step in world units, scaled so on-screen speed is roughly zoom-independent.
-    let step = w * u.speed / pow(2.0, u.zoom);
+    // step in world units, scaled by real elapsed time (u.dt seconds) so motion
+    // is fps-independent, and by 1/2^zoom so on-screen speed is zoom-independent.
+    let step = w * u.speed * u.dt / pow(2.0, u.zoom);
     p.prev = p.pos;
     // world y is +south; north wind (+v) should move the particle toward -y.
     p.pos = vec2<f32>(p.pos.x + step.x, p.pos.y - step.y);
     p.age = p.age + u.dt;
     let out = p.pos.x < u.vmin.x || p.pos.x > u.vmax.x || p.pos.y < u.vmin.y || p.pos.y > u.vmax.y;
-    let dead = p.age > 60.0 || out || length(step) < 1e-8;
+    // lifetime in seconds now that age accumulates real elapsed time.
+    let dead = p.age > 4.0 || out || length(step) < 1e-8;
     if (dead) {
         let nx = hash01(i * 3u + u32(u.frame) * 2654435761u);
         let ny = hash01(i * 5u + u32(u.frame) * 40503u + 7u);
         // respawn inside the viewport, ages staggered so they don't all blink together.
         p.pos = u.vmin + vec2<f32>(nx, ny) * (u.vmax - u.vmin);
         p.prev = p.pos;
-        p.age = hash01(i * 7u + u32(u.frame) + 11u) * 60.0;
+        p.age = hash01(i * 7u + u32(u.frame) + 11u) * 4.0;
     }
     parts[i] = p;
 }

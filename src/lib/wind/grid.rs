@@ -38,6 +38,24 @@ impl WindGrid {
         let idx = row * self.nlon + col;
         (self.u[idx], self.v[idx])
     }
+
+    /// Whether `lon`/`lat` falls inside the grid's real coverage. A global grid
+    /// (lon span ~360°) covers every longitude; a regional grid does not, and
+    /// `sample` would edge-clamp outside it — callers that must not extrapolate
+    /// (the particle field) check this first.
+    pub fn covers(&self, lon: f32, lat: f32) -> bool {
+        let edge = self.lat0 + (self.nlat as f32 - 1.0) * self.lat_step;
+        let (lat_lo, lat_hi) = (self.lat0.min(edge), self.lat0.max(edge));
+        if lat < lat_lo || lat > lat_hi {
+            return false;
+        }
+        let span = self.nlon as f32 * self.lon_step;
+        if span.abs() >= 359.9 {
+            return true; // global: every longitude is covered
+        }
+        let deg = (lon - self.lon0).rem_euclid(360.0);
+        deg <= (self.nlon as f32 - 1.0) * self.lon_step
+    }
 }
 
 /// Metres/second to knots.
@@ -147,7 +165,13 @@ impl WindGrid {
             let lat = lat_rad.to_degrees().clamp(-85.0, 85.0);
             for i in 0..w {
                 let lon = (i as f32 + 0.5) / w as f32 * 360.0 - 180.0;
-                let (u, v) = self.sample(lon, lat);
+                // no-data (0,0) outside coverage, so particles there make no trail
+                // instead of streaming through edge-clamped values.
+                let (u, v) = if self.covers(lon, lat) {
+                    self.sample(lon, lat)
+                } else {
+                    (0.0, 0.0)
+                };
                 let idx = (j * w + i) * 2;
                 out[idx] = u;
                 out[idx + 1] = v;
@@ -199,6 +223,30 @@ mod tests {
         let g = grid();
         // far south clamps to last row
         assert_eq!(g.sample(0.0, -200.0), (4.0, -4.0));
+    }
+
+    #[test]
+    fn covers_global_vs_regional() {
+        // the synthetic grid spans 4 cols x 90° = 360°, i.e. global in longitude,
+        // lat 90..89. Every longitude is covered; latitude is bounded.
+        let g = grid();
+        assert!(g.covers(-170.0, 89.5)); // any lon, in-lat
+        assert!(!g.covers(0.0, 0.0)); // lat out of [89,90]
+
+        // a regional strip: lon 5.5..11 (span 5.5°), lat 45.5..48.
+        let r = WindGrid {
+            nlat: 2,
+            nlon: 2,
+            lat0: 48.0,
+            lat_step: -2.5,
+            lon0: 5.5,
+            lon_step: 5.5,
+            u: vec![0.0; 4],
+            v: vec![0.0; 4],
+        };
+        assert!(r.covers(8.5, 47.0)); // zurich-ish, inside
+        assert!(!r.covers(2.0, 47.0)); // west of the strip
+        assert!(!r.covers(8.5, 40.0)); // south of the strip
     }
 
     // A regional grid (span < 360°) whose lon origin is in 0..360 must index by
