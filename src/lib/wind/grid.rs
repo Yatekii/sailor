@@ -41,7 +41,7 @@ impl WindGrid {
 }
 
 /// Metres/second to knots.
-const MS_TO_KN: f32 = 1.943_844_5;
+pub(crate) const MS_TO_KN: f32 = 1.943_844_5;
 
 impl WindGrid {
     /// Build a grid from 10u and 10v GRIB2 messages (ECMWF, GFS, any regular
@@ -74,6 +74,62 @@ impl WindGrid {
             u: ud.iter().map(|x| *x as f32 * MS_TO_KN).collect(),
             v: vd.iter().map(|x| *x as f32 * MS_TO_KN).collect(),
         })
+    }
+}
+
+impl WindGrid {
+    /// Build a regular grid from scattered cells by averaging every cell that
+    /// falls in each target texel. `bbox` is (min_lon, min_lat, max_lon,
+    /// max_lat); `step` the texel size in degrees. Row 0 is north. Cells
+    /// outside the box are ignored; texels with no cell stay zero. u/v are
+    /// taken as-is (caller converts units).
+    pub fn from_scattered(
+        lats: &[f32],
+        lons: &[f32],
+        u: &[f32],
+        v: &[f32],
+        bbox: (f32, f32, f32, f32),
+        step: f32,
+    ) -> WindGrid {
+        let (min_lon, min_lat, max_lon, max_lat) = bbox;
+        let nlon = (((max_lon - min_lon) / step).round() as usize).max(1) + 1;
+        let nlat = (((max_lat - min_lat) / step).round() as usize).max(1) + 1;
+        let mut su = vec![0.0f32; nlat * nlon];
+        let mut sv = vec![0.0f32; nlat * nlon];
+        let mut cnt = vec![0u32; nlat * nlon];
+        for i in 0..lats.len() {
+            let (lat, lon) = (lats[i], lons[i]);
+            if lon < min_lon || lon > max_lon || lat < min_lat || lat > max_lat {
+                continue;
+            }
+            let col = ((lon - min_lon) / step).round() as usize;
+            // row 0 = north, so measure down from max_lat.
+            let row = ((max_lat - lat) / step).round() as usize;
+            if row >= nlat || col >= nlon {
+                continue;
+            }
+            let idx = row * nlon + col;
+            su[idx] += u[i];
+            sv[idx] += v[i];
+            cnt[idx] += 1;
+        }
+        for idx in 0..su.len() {
+            if cnt[idx] > 0 {
+                let n = cnt[idx] as f32;
+                su[idx] /= n;
+                sv[idx] /= n;
+            }
+        }
+        WindGrid {
+            nlat,
+            nlon,
+            lat0: max_lat,
+            lat_step: -step,
+            lon0: min_lon,
+            lon_step: step,
+            u: su,
+            v: sv,
+        }
     }
 }
 
@@ -194,6 +250,27 @@ mod tests {
         // wind should be a sane magnitude in knots everywhere.
         let (u0, v0) = g.sample(8.5, 47.4); // zurich
         assert!(u0.hypot(v0) < 200.0);
+    }
+
+    // Scattered cells averaged into regular texels. Two cells fall in the same
+    // target texel; their u/v must average. A far-away cell must not leak in.
+    #[test]
+    fn from_scattered_averages_cells_in_texel() {
+        // target: lon [0,1], lat [0,1], step 0.5 -> 3x3 texels, centers on the
+        // 0.0/0.5/1.0 lines. Two cells near (0.5,0.5) and one near (0.0,0.0).
+        let lats = [0.51, 0.49, 0.01];
+        let lons = [0.51, 0.49, 0.01];
+        let u = [10.0, 20.0, -5.0];
+        let v = [1.0, 3.0, 0.0];
+        let g = WindGrid::from_scattered(&lats, &lons, &u, &v, (0.0, 0.0, 1.0, 1.0), 0.5);
+        assert_eq!((g.nlat, g.nlon), (3, 3));
+        // center texel (lon 0.5, lat 0.5) averages the first two cells.
+        let (cu, cv) = g.sample(0.5, 0.5);
+        assert!((cu - 15.0).abs() < 1e-3, "u avg got {cu}");
+        assert!((cv - 2.0).abs() < 1e-3, "v avg got {cv}");
+        // corner texel (lon 0, lat 0) holds the third cell only.
+        let (du, _) = g.sample(0.0, 0.0);
+        assert!((du + 5.0).abs() < 1e-3, "corner u got {du}");
     }
 
     #[test]
