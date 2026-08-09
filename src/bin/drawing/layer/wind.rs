@@ -281,7 +281,13 @@ impl Layer for WindLayer {
                     self.particles.upload_wind(ctx.queue, grid);
                     self.grid_id = id;
                 }
-                self.particles.advance(ctx.device, ctx.queue, ctx.encoder, cam);
+                self.particles.render_trails(
+                    ctx.device,
+                    ctx.queue,
+                    ctx.encoder,
+                    cam,
+                    ctx.resolution,
+                );
             }
             return;
         }
@@ -342,22 +348,19 @@ impl Layer for WindLayer {
     fn paint(&self, frame: &mut FramePass) {
         if self.mode == RenderMode::Particles {
             let mut pass = frame.encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("wind particles"),
+                label: Some("wind particles composite"),
                 color_attachments: &[Some(RenderPassColorAttachment {
                     depth_slice: None,
                     view: frame.view,
                     resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Load,
-                        store: StoreOp::Store,
-                    },
+                    ops: Operations { load: LoadOp::Load, store: StoreOp::Store },
                 })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            self.particles.draw(&mut pass);
+            self.particles.composite(&mut pass);
             return;
         }
 
