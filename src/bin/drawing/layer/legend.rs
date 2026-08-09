@@ -13,33 +13,20 @@ const BAR_H: f32 = 28.0;
 const MARGIN_TOP: f32 = 56.0;
 /// TextArea scale — matches the map's retina text handling.
 const LABEL_SCALE: f32 = 2.0;
+/// Vertical padding inside the frosted card, physical pixels.
+const PAD: f32 = 16.0;
+/// Horizontal padding — wider so the centred end ticks (0, 50) clear the edge.
+const PAD_X: f32 = 30.0;
+/// Room reserved below the bar for the two label lines, physical pixels.
+const LABEL_ROW: f32 = 56.0;
+/// Height of one rendered label line, physical pixels (font * scale).
+const LABEL_LINE: f32 = 26.0;
 /// Tick labels along the bar (knots).
-const TICKS: [&str; 6] = ["0", "10", "20", "30", "40", "50 kn"];
+const TICKS: [&str; 6] = ["0", "10", "20", "30", "40", "50"];
+/// Units line, centred under the ticks.
+const UNITS: &str = "[kn]";
 
-const GRADIENT_WGSL: &str = r#"
-struct LU { viewport: vec2<f32>, rect_pos: vec2<f32>, rect_size: vec2<f32>, pad: vec2<f32> };
-@group(0) @binding(0) var<uniform> u: LU;
-
-struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) t: f32 };
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    // triangle-strip quad corners (x across the bar, y down it)
-    var corners = array<vec2<f32>, 4>(vec2(0.0, 0.0), vec2(0.0, 1.0), vec2(1.0, 0.0), vec2(1.0, 1.0));
-    let c = corners[vi];
-    let px = u.rect_pos + c * u.rect_size;
-    let ndc = vec2<f32>(px.x / u.viewport.x * 2.0 - 1.0, 1.0 - px.y / u.viewport.y * 2.0);
-    var out: VsOut;
-    out.pos = vec4<f32>(ndc, 0.0, 1.0);
-    out.t = c.x;
-    return out;
-}
-
-@fragment
-fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    return vec4<f32>(wind_color(in.t * 50.0), 0.92);
-}
-"#;
+const LEGEND_WGSL: &str = include_str!("legend.wgsl");
 
 /// On-map wind-speed color legend: a gradient bar plus knots tick labels, using
 /// the shared palette and the shared glyphon atlas. Shown when the wind overlay
@@ -50,6 +37,7 @@ pub struct LegendLayer {
     uniform: Buffer_,
     text_renderer: TextRenderer,
     labels: Vec<Buffer>,
+    units: Buffer,
     rect: [f32; 4],
     visible: bool,
 }
@@ -61,14 +49,14 @@ impl LegendLayer {
     pub fn new(device: &Device, text: &mut TextStack) -> Self {
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("legend wgsl"),
-            source: ShaderSource::Wgsl(format!("{}{GRADIENT_WGSL}", super::PALETTE_WGSL).into()),
+            source: ShaderSource::Wgsl(format!("{}{LEGEND_WGSL}", super::PALETTE_WGSL).into()),
         });
 
         let bgl = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("legend uniform"),
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
-                visibility: ShaderStages::VERTEX,
+                visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -124,7 +112,7 @@ impl LegendLayer {
 
         let uniform = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("legend uniform"),
-            contents: as_byte_slice(&[0.0f32; 8]),
+            contents: as_byte_slice(&[0.0f32; 12]),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
 
@@ -142,15 +130,14 @@ impl LegendLayer {
 
         // Static tick labels, shaped once against the shared font system.
         let attrs = Attrs::new().family(Family::SansSerif);
-        let labels = TICKS
-            .iter()
-            .map(|s| {
-                let mut buffer = Buffer::new(&mut text.font_system, Metrics::relative(13.0, 1.2));
-                buffer.set_text(s, &attrs, Shaping::Advanced, None);
-                buffer.shape_until_scroll(&mut text.font_system, false);
-                buffer
-            })
-            .collect();
+        let shape = |text: &mut TextStack, s: &str| {
+            let mut buffer = Buffer::new(&mut text.font_system, Metrics::relative(13.0, 1.2));
+            buffer.set_text(s, &attrs, Shaping::Advanced, None);
+            buffer.shape_until_scroll(&mut text.font_system, false);
+            buffer
+        };
+        let labels = TICKS.iter().map(|s| shape(text, s)).collect();
+        let units = shape(text, UNITS);
 
         Self {
             pipeline,
@@ -158,6 +145,7 @@ impl LegendLayer {
             uniform,
             text_renderer,
             labels,
+            units,
             rect: [0.0; 4],
             visible: false,
         }
@@ -180,24 +168,36 @@ impl Layer for LegendLayer {
         }
 
         let (w, h) = (ctx.resolution.0 as f32, ctx.resolution.1 as f32);
-        // top-centre; rect = [x, y_top, width, height] in pixels.
-        self.rect = [(w - BAR_W) / 2.0, MARGIN_TOP, BAR_W, BAR_H];
+        // frosted card wraps the bar plus a row for the labels; top-centred.
+        let panel_w = BAR_W + 2.0 * PAD_X;
+        let panel_h = PAD + BAR_H + LABEL_ROW + PAD;
+        let panel_x = (w - panel_w) / 2.0;
+        let panel_y = MARGIN_TOP;
+        // bar inset by PAD_X horizontally, PAD vertically; rect = [x, y_top, w, h].
+        self.rect = [panel_x + PAD_X, panel_y + PAD, BAR_W, BAR_H];
         let u = [
             w,
-            h,
+            h, // viewport
+            panel_x,
+            panel_y, // panel_pos
+            panel_w,
+            panel_h, // panel_size
             self.rect[0],
-            self.rect[1],
-            self.rect[2],
-            self.rect[3],
-            0.0,
-            0.0,
+            self.rect[1], // bar_pos
+            BAR_W,
+            BAR_H, // bar_size
+            PAD,
+            PAD, // pad
         ];
         ctx.queue.write_buffer(&self.uniform, 0, as_byte_slice(&u));
 
         // Labels under the bar, one per tick.
         let top = self.rect[1] + BAR_H + 4.0;
         let areas = self.labels.iter().enumerate().map(|(i, buffer)| {
-            let left = self.rect[0] + i as f32 / (TICKS.len() - 1) as f32 * BAR_W - 6.0;
+            // centre each tick on its position along the bar.
+            let tick_x = self.rect[0] + i as f32 / (TICKS.len() - 1) as f32 * BAR_W;
+            let label_w = buffer.layout_runs().map(|r| r.line_w).fold(0.0, f32::max) * LABEL_SCALE;
+            let left = tick_x - label_w / 2.0;
             TextArea {
                 buffer,
                 left,
@@ -213,6 +213,31 @@ impl Layer for LegendLayer {
                 custom_glyphs: &[],
             }
         });
+
+        // Units on a second line, centred under the ticks.
+        let units_w = self
+            .units
+            .layout_runs()
+            .map(|r| r.line_w)
+            .fold(0.0, f32::max)
+            * LABEL_SCALE;
+        let units_left = panel_x + (panel_w - units_w) / 2.0;
+        let units_top = top + LABEL_LINE;
+        let units_area = TextArea {
+            buffer: &self.units,
+            left: units_left,
+            top: units_top,
+            scale: LABEL_SCALE,
+            bounds: TextBounds {
+                left: units_left as i32,
+                top: units_top as i32,
+                right: units_left as i32 + 200,
+                bottom: units_top as i32 + 40,
+            },
+            default_color: Color::rgb(25, 25, 25),
+            custom_glyphs: &[],
+        };
+        let areas = areas.chain(std::iter::once(units_area));
 
         self.text_renderer
             .prepare(
